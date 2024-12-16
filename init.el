@@ -133,40 +133,27 @@ Enable `recentf-mode' if it isn't already."
                   (overlay-put (make-overlay (match-beginning 0) (match-end 0))
                                'face '(:slant italic :weight bold :underline t)))))
             (grep-mode)
-            (local-set-key (kbd "d") (lambda () 
-                                       (interactive)
-                                       (my/grep search-term 
-                                                (read-directory-name "New search directory: ")
-                                                glob)))
-            (local-set-key (kbd "s") (lambda () 
-                                       (interactive)
-                                       (my/grep (read-string "New search term: ")
-                                                directory
-                                                glob)))
-            (local-set-key (kbd "g") (lambda () 
-                                       (interactive)
-                                       (my/grep search-term directory glob)))
             (pop-to-buffer buffer-name)
             (goto-char (point-min))
             (message "ripgrep finished.")))
       (progn
         (setq default-directory directory)
         (message (format "%s : %s : %s" search-term glob directory))
-        (rgrep search-term  (if (string= "" glob) "*" glob) directory)
-        (with-current-buffer "*grep*"
-          (local-set-key (kbd "d") (lambda () 
-                                     (interactive)
-                                     (my/grep search-term 
-                                              (read-directory-name "New search directory: ")
-                                              glob)))
-          (local-set-key (kbd "s") (lambda () 
-                                     (interactive)
-                                     (my/grep (read-string "New search term: ")
-                                              directory
-                                              glob)))
-          (local-set-key (kbd "g") (lambda () 
-                                     (interactive)
-                                     (my/grep search-term directory glob))))))))
+        (rgrep search-term  (if (string= "" glob) "*" glob) directory)))
+    (with-current-buffer "*grep*"
+      (local-set-key (kbd "d") (lambda () 
+                                 (interactive)
+                                 (my/grep search-term 
+                                          (read-directory-name "New search directory: ")
+                                          glob)))
+      (local-set-key (kbd "s") (lambda () 
+                                 (interactive)
+                                 (my/grep (read-string "New search term: ")
+                                          directory
+                                          glob)))
+      (local-set-key (kbd "g") (lambda () 
+                                 (interactive)
+                                 (my/grep search-term directory glob))))))
 ;;
 (defun my/find-file ()
   "Find file from current directory in many different ways."

@@ -206,31 +206,32 @@ Being solved with the following code:
                   (overlay-put (make-overlay (match-beginning 0) (match-end 0))
                                'face '(:slant italic :weight bold :underline t)))))
             (grep-mode)
-            (local-set-key (kbd "d") (lambda () 
-                                       (interactive)
-                                       (my/grep search-term 
-                                                (read-directory-name "New search directory: ")
-                                                glob)))
-            (local-set-key (kbd "s") (lambda () 
-                                       (interactive)
-                                       (my/grep (read-string "New search term: ")
-                                                directory
-                                                glob)))
-            (local-set-key (kbd "g") (lambda () 
-                                       (interactive)
-                                       (my/grep search-term directory glob)))
             (pop-to-buffer buffer-name)
             (goto-char (point-min))
             (message "ripgrep finished.")))
       (progn
         (setq default-directory directory)
         (message (format "%s : %s : %s" search-term glob directory))
-        (rgrep search-term  (if (string= "" glob) "*" glob) directory)))))
+        (rgrep search-term  (if (string= "" glob) "*" glob) directory)))
+    (with-current-buffer "*grep*"
+      (local-set-key (kbd "d") (lambda () 
+                                 (interactive)
+                                 (my/grep search-term 
+                                          (read-directory-name "New search directory: ")
+                                          glob)))
+      (local-set-key (kbd "s") (lambda () 
+                                 (interactive)
+                                 (my/grep (read-string "New search term: ")
+                                          directory
+                                          glob)))
+      (local-set-key (kbd "g") (lambda () 
+                                 (interactive)
+                                 (my/grep search-term directory glob))))))
 #+end_src
 
 *** BUGS
 
-**** TODO rgrep fallback doesn't have local keys option of "d" "s" "g" which would be a nice improvement
+**** FIXED rgrep fallback doesn't have local keys option of "d" "s" "g" which would be a nice improvement
 
 ** DOING find-name-dired
 
