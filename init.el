@@ -1,3 +1,5 @@
+;; -*- lexical-binding: t; -*-
+
 ;;
 ;; -> emacs-enhanced
 ;;
@@ -88,30 +90,41 @@ Enable `recentf-mode' if it isn't already."
 ;;
 (defun my/grep (search-term &optional directory glob)
   "Run ripgrep (rg) with SEARCH-TERM and optionally DIRECTORY and GLOB.
-If ripgrep is unavailable, fall back to Emacs's rgrep command. Highlights SEARCH-TERM in results.
-
-By default, only the SEARCH-TERM needs to be provided. If called with a
-universal argument, DIRECTORY and GLOB are prompted for as well."
+  If ripgrep is unavailable, fall back to Emacs's rgrep command. Highlights SEARCH-TERM in results.
+  By default, only the SEARCH-TERM needs to be provided. If called with a
+  universal argument, DIRECTORY and GLOB are prompted for as well."
   (interactive
    (let ((univ-arg current-prefix-arg))
      (list
       (read-string "Search for: ")
       (when univ-arg (read-directory-name "Directory: "))
-      (when univ-arg (read-string "File pattern (glob, default: *): " nil nil "*")))))
+      (when univ-arg (read-string "File pattern (glob, default: ): " nil nil "")))))
   (let* ((directory (or directory default-directory)) ;; Use the provided directory or default to `default-directory`
-         (directory (expand-file-name directory))) ;; Expand directory to absolute path
+         (directory (expand-file-name directory)) ;; Expand directory to absolute path
+         (glob (or glob "")))
     (if (executable-find "rg")
         ;; Use ripgrep if available
         (let* ((buffer-name "*grep*")
+               ;; Check for `.ignore` files using `rg --debug`
+               (debug-command (format "rg --debug --files %s" directory))
+               (debug-output (shell-command-to-string debug-command))
+               ;; Extract paths to .ignore files from debug output
+               (ignore-files (when (string-match "ignore file: \\(.*?\\.ignore\\)" debug-output)
+                               (match-string 1 debug-output)))
+               ;; The main ripgrep command
                (rg-command (format "rg --color=never --column --line-number --no-heading --smart-case -e %s --glob %s %s"
                                    (shell-quote-argument search-term)
-                                   (shell-quote-argument (or glob "*")) ;; Default glob to "*"
+                                   (shell-quote-argument glob)
                                    directory))
                (raw-output (shell-command-to-string rg-command))
                (formatted-output
                 (if (not (string-empty-p raw-output))
                     ;; Replace absolute path with relative path or "./"
-                    (replace-regexp-in-string (concat "\\(^" (regexp-quote directory) "\\)") "./" raw-output)
+                    (concat "Directory: " directory "\n"
+                            (when (not (string= "" glob)) (concat "Glob:      " glob "\n"))
+                            (if ignore-files (format "%s\n" ignore-files) "")
+                            "\n"
+                            (replace-regexp-in-string (concat "\\(^" (regexp-quote directory) "\\)") "./" raw-output))
                   nil)))
           ;; Kill existing buffer if it exists
           (when (get-buffer buffer-name)
@@ -133,10 +146,12 @@ universal argument, DIRECTORY and GLOB are prompted for as well."
                         (end (match-end 0)))
                     ;; Add an overlay to highlight the match
                     (let ((overlay (make-overlay start end)))
-                      (overlay-put overlay 'face '(:background "yellow" :foreground "black"))))))
-              (grep-mode)
-              (pop-to-buffer buffer-name)
-              (goto-char (point-min)))))
+                      (overlay-put overlay 'face '(:slant italic :weight bold))
+                      ;; (overlay-put overlay 'face '(:background "yellow" :foreground "black"))
+                      )))))
+            (grep-mode)
+            (pop-to-buffer buffer-name)
+            (goto-char (point-min))))
       ;; Fall back to rgrep if ripgrep is not available
       (let ((default-directory directory))
         (rgrep search-term (or glob "*") directory)))))
@@ -166,4 +181,9 @@ universal argument, DIRECTORY and GLOB are prompted for as well."
                            (abbreviate-file-name default-directory))
                    file-list))))
     (when file (find-file (expand-file-name file)))))
+;;
+(defun my-icomplete-exit-minibuffer-with-input ()
+  "Exit the minibuffer with the current input, without forcing completion."
+  (interactive)
+  (exit-minibuffer))
 ;;
