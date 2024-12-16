@@ -8,7 +8,38 @@
 
 * Introduction
 
-A stripped-down Emacs configuration that avoids external packages, perfect for lightweight usage in VMs or basic tasks.
+A conversion of major Emacs packages / functions, especially ones that I rely on to single defuns to try avoid the dependence of external packages.
+
+Perfect for lightweight usage in VMs or basic tasks.
+
+Used in concert with https://github.com/captainflasmr/Emacs-core
+
+* Kanban
+
+Here is a kanban of the features that will be (hopefully) converted to core/enhanced Emacs features and visually demonstrating their current status via a kanban board
+
+#+begin: kanban :layout ("..." . 50) :scope nil :range ("TODO" . "DONE") :sort "O" :depth 3 :match "roadmap" :compressed t
+| TODO                                     | DOING           | DONE                    |
+|------------------------------------------+-----------------+-------------------------|
+| [[file:README.org::*Make this whole readme properly literate][Make this whole readme properly literate]] | [[file:README.org::*embark][embark]]          | [[file:README.org::*ace-window][ace-window]]              |
+| [[file:README.org::*selected-window-accent-mode][selected-window-accent-mode]]              | [[file:README.org::*deadgrep][deadgrep]]        | [[file:README.org::*recentf-open][recentf-open]]            |
+| [[file:README.org::*htmlize][htmlize]]                                  | [[file:README.org::*find-name-dired][find-name-dired]] | [[file:README.org::*rainbow-mode][rainbow-mode]]            |
+| [[file:README.org::*image-dired][image-dired]]                              | [[file:README.org::*magit][magit]]           | [[file:README.org::*visual-fill-column-mode][visual-fill-column-mode]] |
+| [[file:README.org::*tempel][tempel]]                                   |                 |                         |
+| [[file:README.org::*corfu / company completion][corfu / company completion]]               |                 |                         |
+| [[file:README.org::*spelling][spelling]]                                 |                 |                         |
+| [[file:README.org::*popper][popper]]                                   |                 |                         |
+| [[file:README.org::*shell][shell]]                                    |                 |                         |
+| [[file:README.org::*capf-autosuggest][capf-autosuggest]]                         |                 |                         |
+| [[file:README.org::*org-capture][org-capture]]                              |                 |                         |
+| [[file:README.org::*DWIM script integration][DWIM script integration]]                  |                 |                         |
+| [[file:README.org::*org-agenda][org-agenda]]                               |                 |                         |
+| [[file:README.org::*kurecolor][kurecolor]]                                |                 |                         |
+| [[file:README.org::*Ada][Ada]]                                      |                 |                         |
+| [[file:README.org::*transients][transients]]                               |                 |                         |
+| [[file:README.org::*my/transient-outlining-and-folding][my/transient-outlining-and-folding]]       |                 |                         |
+| [[file:README.org::*my/prog-folding][my/prog-folding]]                          |                 |                         |
+#+end:
 
 * Roadmap                                                           :roadmap:
 
