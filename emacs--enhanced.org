@@ -117,62 +117,60 @@ Enable `recentf-mode' if it isn't already."
       (read-string "Search for: ")
       (when univ-arg (read-directory-name "Directory: "))
       (when univ-arg (read-string "File pattern (glob, default: ): " nil nil "")))))
-  (let* ((directory (or directory default-directory)) ;; Use the provided directory or default to `default-directory`
-         (directory (expand-file-name directory)) ;; Expand directory to absolute path
-         (glob (or glob "")))
+  (let* ((directory (expand-file-name (or directory default-directory)))
+         (glob (or glob ""))
+         (buffer-name "*grep*"))
     (if (executable-find "rg")
-        ;; Use ripgrep if available
-        (let* ((buffer-name "*grep*")
-               ;; Check for `.ignore` files using `rg --debug`
-               (debug-command (format "rg --debug --files %s" directory))
-               (debug-output (shell-command-to-string debug-command))
-               ;; Extract paths to .ignore files from debug output
-               (ignore-files (when (string-match "ignore file: \\(.*?\\.ignore\\)" debug-output)
-                               (match-string 1 debug-output)))
-               ;; The main ripgrep command
-               (rg-command (format "rg --color=never --column --line-number --no-heading --smart-case -e %s --glob %s %s"
+        (let* ((rg-command (format "rg --color=never --max-columns=500 --column --line-number --no-heading --smart-case -e %s --glob %s %s"
                                    (shell-quote-argument search-term)
                                    (shell-quote-argument glob)
                                    directory))
+               (debug-output (shell-command-to-string (format "rg --debug --files %s" directory)))
+               (ignore-files (when (string-match "ignore file: \\(.*?\\.ignore\\)" debug-output)
+                               (match-string 1 debug-output)))
                (raw-output (shell-command-to-string rg-command))
                (formatted-output
-                (if (not (string-empty-p raw-output))
-                    ;; Replace absolute path with relative path or "./"
-                    (concat "Directory: " directory "\n"
-                            (when (not (string= "" glob)) (concat "Glob:      " glob "\n"))
-                            (if ignore-files (format "%s\n" ignore-files) "")
-                            "\n"
-                            (replace-regexp-in-string (concat "\\(^" (regexp-quote directory) "\\)") "./" raw-output))
-                  nil)))
-          ;; Kill existing buffer if it exists
+                (when (not (string-empty-p raw-output))
+                  (concat
+                   (format "Search:    %s\nDirectory: %s\n" search-term directory)
+                   (unless (string= "" glob) (format "Glob:      %s\n" glob))
+                   (if ignore-files (format "%s\n" ignore-files) "")
+                   "\n"
+                   (replace-regexp-in-string (concat "\\(^" (regexp-quote directory) "\\)") "./" raw-output)))))
           (when (get-buffer buffer-name)
             (kill-buffer buffer-name))
-          ;; Create the results buffer
           (with-current-buffer (get-buffer-create buffer-name)
-            (read-only-mode -1)
+            (setq default-directory directory)
             (erase-buffer)
-            (if (not formatted-output)
-                (progn
-                  (message "Ripgrep finished with errors or no results.")
-                  (insert "No results found."))
-              (insert formatted-output)
-              ;; Highlight the search term
-              (let ((case-fold-search t)) ;; Make the highlighting case insensitive
-                (goto-char (point-min))
+            (insert (or formatted-output "No results found."))
+            (insert "\nripgrep finished.")
+            (goto-char (point-min))
+            (when formatted-output
+              (let ((case-fold-search t))
                 (while (search-forward search-term nil t)
-                  (let ((start (match-beginning 0))
-                        (end (match-end 0)))
-                    ;; Add an overlay to highlight the match
-                    (let ((overlay (make-overlay start end)))
-                      (overlay-put overlay 'face '(:slant italic :weight bold))
-                      ;; (overlay-put overlay 'face '(:background "yellow" :foreground "black"))
-                      )))))
+                  (overlay-put (make-overlay (match-beginning 0) (match-end 0))
+                               'face '(:slant italic :weight bold :underline t)))))
             (grep-mode)
+            (local-set-key (kbd "d") (lambda () 
+                                       (interactive)
+                                       (my/grep search-term 
+                                                (read-directory-name "New search directory: ")
+                                                glob)))
+            (local-set-key (kbd "s") (lambda () 
+                                       (interactive)
+                                       (my/grep (read-string "New search term: ")
+                                                directory
+                                                glob)))
+            (local-set-key (kbd "g") (lambda () 
+                                       (interactive)
+                                       (my/grep search-term directory glob)))
             (pop-to-buffer buffer-name)
-            (goto-char (point-min))))
-      ;; Fall back to rgrep if ripgrep is not available
-      (let ((default-directory directory))
-        (rgrep search-term (or glob "*") directory)))))
+            (goto-char (point-min))
+            (message "ripgrep finished.")))
+      (progn
+        (setq default-directory directory)
+        (message (format "%s : %s : %s" search-term glob directory))
+        (rgrep search-term  (if (string= "" glob) "*" glob) directory)))))
 ;;
 (defun my/find-file ()
   "Find file from current directory in many different ways."
