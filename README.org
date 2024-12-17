@@ -14,6 +14,18 @@ Perfect for lightweight usage in VMs or basic tasks.
 
 Used in concert with https://github.com/captainflasmr/Emacs-core
 
+* Whats New
+
+** <2024-12-17>
+
+fix(README): add workaround for missing ssh-askpass in Emacs with vc-dir mode
+
+- Documented steps to resolve the issue where pushing to GitHub from Emacs using vc-dir mode fails due to missing ssh-askpass.
+- Added instructions for installing `openssh-askpass` and creating a symbolic link to `/usr/lib/ssh/ssh-askpass`.
+- Mentioned the potential QFSFileEngine error during `git push` with workaround applied.
+
+This commit adds clarity for users encountering the `Permission denied (publickey)` issue and provides a temporary fix until a better solution is implemented.
+
 * Kanban
 
 Here is a kanban of the features that will be (hopefully) converted to core/enhanced Emacs features and visually demonstrating their current status via a kanban board
@@ -303,6 +315,55 @@ Being solved with the following code:
 Replace by built-in VC
 
 Just need to be able to push using ssh
+
+The following instructions seem to work for now, but should really be doing a little better:
+
+Are you getting the following issue when trying to push to github from Emacs in vc-dir mdoe?
+  
+#+begin_src 
+Running "git push"...
+ssh_askpass: exec(/usr/lib/ssh/ssh-askpass): No such file or directory
+git@github.com: Permission denied (publickey).
+fatal: Could not read from remote repository.
+
+Please make sure you have the correct access rights
+and the repository exists.
+#+end_src
+
+Well the ssh-askpass is not installed and doesn't exist in =/usr/lib/ssh/ssh-askpass=
+
+Is there a way to point to a different name in Emacs?, not sure
+
+But perform the following as a current workaround
+  
+Install the following:
+
+=openssh-askpass=
+
+Which make available the following:
+  
+/usr/bin/qt4-ssh-askpass
+
+Emacs is looking for:
+
+/usr/lib/ssh/ssh-askpass
+
+So why not provide a symbolic link as root!?, seems to work:
+
+#+begin_src 
+  su -
+  cd /usr/lib/ssh
+  ln -s /usr/bin/qt4-ssh-askpass ssh-askpass
+#+end_src
+
+Although still raises the following:
+  
+#+begin_src
+  Running "git push"...
+  ErrorHandler::Throw - warning: QFSFileEngine::open: No file name specified file:  line: 0 function: 
+  To github.com:captainflasmr/Emacs-enhanced.git
+  6735e12..4766e6c  main -> main
+#+end_src
 
 ** TODO selected-window-accent-mode
 
