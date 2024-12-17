@@ -114,8 +114,8 @@ Enable `recentf-mode' if it isn't already."
                (formatted-output
                 (when (not (string-empty-p raw-output))
                   (concat
-                   (format "Search:    %s\nDirectory: %s\n" search-term directory)
-                   (unless (string= "" glob) (format "Glob:      %s\n" glob))
+                   (format "[s] Search:    %s\n[d] Directory: %s\n" search-term directory)
+                   (format "[o] Glob:      %s\n" glob)
                    (if ignore-files (format "%s\n" ignore-files) "")
                    "\n"
                    (replace-regexp-in-string (concat "\\(^" (regexp-quote directory) "\\)") "./" raw-output)))))
@@ -151,6 +151,11 @@ Enable `recentf-mode' if it isn't already."
                                  (my/grep (read-string "New search term: ")
                                           directory
                                           glob)))
+      (local-set-key (kbd "o") (lambda () 
+                                 (interactive)
+                                 (my/grep search-term
+                                          directory
+                                          (read-string "New glob: "))))
       (local-set-key (kbd "g") (lambda () 
                                  (interactive)
                                  (my/grep search-term directory glob))))))
