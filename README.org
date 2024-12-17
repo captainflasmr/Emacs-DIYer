@@ -10,7 +10,7 @@
 
 A conversion of major Emacs packages / functions, especially ones that I rely on to single defuns to try avoid the dependence of external packages.
 
-Perfect for light-weight usage in VMs or basic tasks.
+Perfect for lightweight usage in VMs or basic tasks.
 
 Used in concert with https://github.com/captainflasmr/Emacs-core
 
