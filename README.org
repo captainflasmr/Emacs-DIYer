@@ -4,17 +4,27 @@
 #+description: Emacs elisp defuns replacing or enhancing major external packages.
 #+startup: showall
 #+todo: TODO DOING | DONE
-#+property: header-args :tangle no
+#+property: header-args :tangle ~/.emacs.d/Emacs-enhanced/init.el
+
+#+begin_src emacs-lisp
+;; -*- lexical-binding: t; -*-
+#+end_src
 
 * Introduction
 
 A conversion of major Emacs packages / functions, especially ones that I rely on to single defuns to try avoid the dependence of external packages.
+
+It is also a general comment on how I have moved to more a vanilla based Emacs setup and relying much less on external packages as I think I now have enough elisp knowledge to replace a lot of them!
 
 Perfect for lightweight usage in VMs or basic tasks.
 
 Used in concert with https://github.com/captainflasmr/Emacs-core
 
 * Whats New
+
+** <2024-12-18>
+
+Added abbrev to replace tempel
 
 ** <2024-12-17>
 
@@ -31,33 +41,46 @@ This commit adds clarity for users encountering the `Permission denied (publicke
 Here is a kanban of the features that will be (hopefully) converted to core/enhanced Emacs features and visually demonstrating their current status via a kanban board
 
 #+begin: kanban :layout ("..." . 50) :scope nil :range ("TODO" . "DONE") :sort "O" :depth 3 :match "roadmap" :compressed t
-| TODO                                     | DOING           | DONE                    |
-|------------------------------------------+-----------------+-------------------------|
-| [[file:README.org::*Make this whole readme properly literate][Make this whole readme properly literate]] | [[file:README.org::*embark][embark]]          | [[file:README.org::*ace-window][ace-window]]              |
-| [[file:README.org::*selected-window-accent-mode][selected-window-accent-mode]]              | [[file:README.org::*deadgrep][deadgrep]]        | [[file:README.org::*recentf-open][recentf-open]]            |
-| [[file:README.org::*htmlize][htmlize]]                                  | [[file:README.org::*find-name-dired][find-name-dired]] | [[file:README.org::*rainbow-mode][rainbow-mode]]            |
-| [[file:README.org::*image-dired][image-dired]]                              | [[file:README.org::*magit][magit]]           | [[file:README.org::*visual-fill-column-mode][visual-fill-column-mode]] |
-| [[file:README.org::*tempel][tempel]]                                   |                 |                         |
-| [[file:README.org::*corfu / company completion][corfu / company completion]]               |                 |                         |
-| [[file:README.org::*spelling][spelling]]                                 |                 |                         |
-| [[file:README.org::*popper][popper]]                                   |                 |                         |
-| [[file:README.org::*shell][shell]]                                    |                 |                         |
-| [[file:README.org::*capf-autosuggest][capf-autosuggest]]                         |                 |                         |
-| [[file:README.org::*org-capture][org-capture]]                              |                 |                         |
-| [[file:README.org::*DWIM script integration][DWIM script integration]]                  |                 |                         |
-| [[file:README.org::*org-agenda][org-agenda]]                               |                 |                         |
-| [[file:README.org::*kurecolor][kurecolor]]                                |                 |                         |
-| [[file:README.org::*Ada][Ada]]                                      |                 |                         |
-| [[file:README.org::*transients][transients]]                               |                 |                         |
-| [[file:README.org::*my/transient-outlining-and-folding][my/transient-outlining-and-folding]]       |                 |                         |
-| [[file:README.org::*my/prog-folding][my/prog-folding]]                          |                 |                         |
+| TODO                                     | DOING    | DONE                    |
+|------------------------------------------+----------+-------------------------|
+| [[file:README.org::*Make this whole readme properly literate][Make this whole readme properly literate]] | [[file:README.org::*embark][embark]]   | [[file:README.org::*ace-window][ace-window]]              |
+| [[file:README.org::*selected-window-accent-mode][selected-window-accent-mode]]              | [[file:README.org::*deadgrep][deadgrep]] | [[file:README.org::*recentf-open][recentf-open]]            |
+| [[file:README.org::*htmlize][htmlize]]                                  |          | [[file:README.org::*rainbow-mode][rainbow-mode]]            |
+| [[file:README.org::*image-dired][image-dired]]                              |          | [[file:README.org::*visual-fill-column-mode][visual-fill-column-mode]] |
+| [[file:README.org::*corfu / company completion][corfu / company completion]]               |          | [[file:README.org::*find-name-dired][find-name-dired]]         |
+| [[file:README.org::*spelling][spelling]]                                 |          | [[file:README.org::*magit][magit]]                   |
+| [[file:README.org::*popper][popper]]                                   |          | [[file:README.org::*tempel][tempel]]                  |
+| [[file:README.org::*shell][shell]]                                    |          |                         |
+| [[file:README.org::*capf-autosuggest][capf-autosuggest]]                         |          |                         |
+| [[file:README.org::*org-capture][org-capture]]                              |          |                         |
+| [[file:README.org::*DWIM script integration][DWIM script integration]]                  |          |                         |
+| [[file:README.org::*org-agenda][org-agenda]]                               |          |                         |
+| [[file:README.org::*kurecolor][kurecolor]]                                |          |                         |
+| [[file:README.org::*Ada][Ada]]                                      |          |                         |
+| [[file:README.org::*transients][transients]]                               |          |                         |
+| [[file:README.org::*my/transient-outlining-and-folding][my/transient-outlining-and-folding]]       |          |                         |
+| [[file:README.org::*my/prog-folding][my/prog-folding]]                          |          |                         |
 #+end:
 
 * Roadmap                                                           :roadmap:
 
 Here are the features that will be (hopefully) converted to core.
 
-** TODO Make this whole readme properly literate
+** DONE minibuffer completion
+
+fido-mode enabled replacing:
+
+- vertico
+- marginalia
+
+but also require the following for exiting a forced completion:
+
+#+begin_src elisp
+(defun my-icomplete-exit-minibuffer-with-input ()
+  "Exit the minibuffer with the current input, without forcing completion."
+  (interactive)
+  (exit-minibuffer))
+#+end_src
 
 ** DONE ace-window
 CLOSED: [2024-12-08 Sun 13:53]
@@ -118,8 +141,7 @@ Enable `recentf-mode' if it isn't already."
   (interactive
    (list
     (progn (unless recentf-mode (recentf-mode 1))
-           (completing-read (format-prompt "Open recent file" nil)
-                            recentf-list nil t))))
+           (completing-read "Open recent file: " recentf-list nil t))))
   (when file
     (funcall recentf-menu-action file)))
 #+end_src
@@ -150,29 +172,6 @@ Solved with the code below:
   (remove-overlays (point-min) (point-max)))
 #+end_src
 
-** DOING embark
-
-I am not using too many aspects mainly the following:
-
-- copy command - probably easy to replicate
-
-Solved with the code below:
-
-#+begin_src elisp
-(defun my-icomplete-copy-candidate ()
-  "Copy the current Icomplete candidate to the kill ring."
-  (interactive)
-  (let ((candidate (car completion-all-sorted-completions)))
-    (when candidate
-      (kill-new (substring-no-properties candidate))
-      (abort-recursive-edit))))
-;;
-(define-key minibuffer-local-completion-map (kbd "C-c ,") 'my-icomplete-copy-candidate)
-#+end_src
-  
-- collect
-- export
-
 ** DONE visual-fill-column-mode
 CLOSED: [2024-12-09 Mon 13:50]
 
@@ -191,92 +190,8 @@ Solved with the code below:
     (set-window-margins nil margin margin)))
 #+end_src
 
-** DOING deadgrep
-
-Would rgrep be potentially good enough?, maybe, or maybe pull on ripgrep through a simple interface and re-use =grep-mode= so essentially it will look just like rgrep output except with more information about the ripgrep search in the style of deadgrep, for example:
-
-- directory
-- search term
-- glob
-
-and like deadgrep have some local keybindings that can input the directory, search-term or glob
-
-Being solved with the following code:
-
-#+begin_src elisp
-(defun my/grep (search-term &optional directory glob)
-  "Run ripgrep (rg) with SEARCH-TERM and optionally DIRECTORY and GLOB.
-  If ripgrep is unavailable, fall back to Emacs's rgrep command. Highlights SEARCH-TERM in results.
-  By default, only the SEARCH-TERM needs to be provided. If called with a
-  universal argument, DIRECTORY and GLOB are prompted for as well."
-  (interactive
-   (let ((univ-arg current-prefix-arg))
-     (list
-      (read-string "Search for: ")
-      (when univ-arg (read-directory-name "Directory: "))
-      (when univ-arg (read-string "File pattern (glob, default: ): " nil nil "")))))
-  (let* ((directory (expand-file-name (or directory default-directory)))
-         (glob (or glob ""))
-         (buffer-name "*grep*"))
-    (if (executable-find "rg")
-        (let* ((rg-command (format "rg --color=never --max-columns=500 --column --line-number --no-heading --smart-case -e %s --glob %s %s"
-                                   (shell-quote-argument search-term)
-                                   (shell-quote-argument glob)
-                                   directory))
-               (debug-output (shell-command-to-string (format "rg --debug --files %s" directory)))
-               (ignore-files (when (string-match "ignore file: \\(.*?\\.ignore\\)" debug-output)
-                               (match-string 1 debug-output)))
-               (raw-output (shell-command-to-string rg-command))
-               (formatted-output
-                (when (not (string-empty-p raw-output))
-                  (concat
-                   (format "Search:    %s\nDirectory: %s\n" search-term directory)
-                   (unless (string= "" glob) (format "Glob:      %s\n" glob))
-                   (if ignore-files (format "%s\n" ignore-files) "")
-                   "\n"
-                   (replace-regexp-in-string (concat "\\(^" (regexp-quote directory) "\\)") "./" raw-output)))))
-          (when (get-buffer buffer-name)
-            (kill-buffer buffer-name))
-          (with-current-buffer (get-buffer-create buffer-name)
-            (setq default-directory directory)
-            (erase-buffer)
-            (insert (or formatted-output "No results found."))
-            (insert "\nripgrep finished.")
-            (goto-char (point-min))
-            (when formatted-output
-              (let ((case-fold-search t))
-                (while (search-forward search-term nil t)
-                  (overlay-put (make-overlay (match-beginning 0) (match-end 0))
-                               'face '(:slant italic :weight bold :underline t)))))
-            (grep-mode)
-            (pop-to-buffer buffer-name)
-            (goto-char (point-min))
-            (message "ripgrep finished.")))
-      (progn
-        (setq default-directory directory)
-        (message (format "%s : %s : %s" search-term glob directory))
-        (rgrep search-term  (if (string= "" glob) "*" glob) directory)))
-    (with-current-buffer "*grep*"
-      (local-set-key (kbd "d") (lambda () 
-                                 (interactive)
-                                 (my/grep search-term 
-                                          (read-directory-name "New search directory: ")
-                                          glob)))
-      (local-set-key (kbd "s") (lambda () 
-                                 (interactive)
-                                 (my/grep (read-string "New search term: ")
-                                          directory
-                                          glob)))
-      (local-set-key (kbd "g") (lambda () 
-                                 (interactive)
-                                 (my/grep search-term directory glob))))))
-#+end_src
-
-*** BUGS
-
-**** FIXED rgrep fallback doesn't have local keys option of "d" "s" "g" which would be a nice improvement
-
-** DOING find-name-dired
+** DONE find-name-dired
+CLOSED: [2024-12-18 Wed 09:27]
 
 Currently find file type jump key functionality for core is just find-name-dired but probably better to have a more flexible version that can still use =find-name-dired= but if ripgrep exists or even find then present those options.  This will then potentially be a more modern approach.
 
@@ -310,9 +225,10 @@ Being solved with the following code:
     (when file (find-file (expand-file-name file)))))
 #+end_src
 
-** DOING magit
+** DONE magit
+CLOSED: [2024-12-18 Wed 09:28]
 
-Replace by built-in VC
+Replaced by built-in VC
 
 Just need to be able to push using ssh
 
@@ -365,6 +281,124 @@ Although still raises the following:
   6735e12..4766e6c  main -> main
 #+end_src
 
+** DONE tempel
+CLOSED: [2024-12-18 Wed 09:26]
+
+I use pretty simple, no yassnippet complexity here, so maybe I can adapt abbrev with some predefined functions for the most common completion replacements?
+
+** DOING embark
+
+I am not using too many aspects mainly the following:
+
+- copy command - probably easy to replicate
+
+Solved with the code below:
+
+#+begin_src elisp
+(defun my-icomplete-copy-candidate ()
+  "Copy the current Icomplete candidate to the kill ring."
+  (interactive)
+  (let ((candidate (car completion-all-sorted-completions)))
+    (when candidate
+      (kill-new (substring-no-properties candidate))
+      (abort-recursive-edit))))
+;;
+(define-key minibuffer-local-completion-map (kbd "C-c ,") 'my-icomplete-copy-candidate)
+#+end_src
+  
+- collect
+- export
+
+** DOING deadgrep
+
+Would rgrep be potentially good enough?, maybe, or maybe pull on ripgrep through a simple interface and re-use =grep-mode= so essentially it will look just like rgrep output except with more information about the ripgrep search in the style of deadgrep, for example:
+
+- directory
+- search term
+- glob
+
+and like deadgrep have some local keybindings that can input the directory, search-term or glob
+
+Being solved with the following code:
+
+#+begin_src elisp
+(defun my/grep (search-term &optional directory glob)
+  "Run ripgrep (rg) with SEARCH-TERM and optionally DIRECTORY and GLOB.
+  If ripgrep is unavailable, fall back to Emacs's rgrep command. Highlights SEARCH-TERM in results.
+  By default, only the SEARCH-TERM needs to be provided. If called with a
+  universal argument, DIRECTORY and GLOB are prompted for as well."
+  (interactive
+   (let ((univ-arg current-prefix-arg))
+     (list
+      (read-string "Search for: ")
+      (when univ-arg (read-directory-name "Directory: "))
+      (when univ-arg (read-string "File pattern (glob, default: ): " nil nil "")))))
+  (let* ((directory (expand-file-name (or directory default-directory)))
+         (glob (or glob ""))
+         (buffer-name "*grep*"))
+    (if (executable-find "rg")
+        (let* ((rg-command (format "rg --color=never --max-columns=500 --column --line-number --no-heading --smart-case -e %s --glob %s %s"
+                                   (shell-quote-argument search-term)
+                                   (shell-quote-argument glob)
+                                   directory))
+               (debug-output (shell-command-to-string (format "rg --debug --files %s" directory)))
+               (ignore-files (when (string-match "ignore file: \\(.*?\\.ignore\\)" debug-output)
+                               (match-string 1 debug-output)))
+               (raw-output (shell-command-to-string rg-command))
+               (formatted-output
+                (when (not (string-empty-p raw-output))
+                  (concat
+                   (format "[s] Search:    %s\n[d] Directory: %s\n" search-term directory)
+                   (format "[o] Glob:      %s\n" glob)
+                   (if ignore-files (format "%s\n" ignore-files) "")
+                   "\n"
+                   (replace-regexp-in-string (concat "\\(^" (regexp-quote directory) "\\)") "./" raw-output)))))
+          (when (get-buffer buffer-name)
+            (kill-buffer buffer-name))
+          (with-current-buffer (get-buffer-create buffer-name)
+            (setq default-directory directory)
+            (erase-buffer)
+            (insert (or formatted-output "No results found."))
+            (insert "\nripgrep finished.")
+            (goto-char (point-min))
+            (when formatted-output
+              (let ((case-fold-search t))
+                (while (search-forward search-term nil t)
+                  (overlay-put (make-overlay (match-beginning 0) (match-end 0))
+                               'face '(:slant italic :weight bold :underline t)))))
+            (grep-mode)
+            (pop-to-buffer buffer-name)
+            (goto-char (point-min))
+            (message "ripgrep finished.")))
+      (progn
+        (setq default-directory directory)
+        (message (format "%s : %s : %s" search-term glob directory))
+        (rgrep search-term  (if (string= "" glob) "*" glob) directory)))
+    (with-current-buffer "*grep*"
+      (local-set-key (kbd "d") (lambda () 
+                                 (interactive)
+                                 (my/grep search-term 
+                                          (read-directory-name "New search directory: ")
+                                          glob)))
+      (local-set-key (kbd "s") (lambda () 
+                                 (interactive)
+                                 (my/grep (read-string "New search term: ")
+                                          directory
+                                          glob)))
+      (local-set-key (kbd "o") (lambda () 
+                                 (interactive)
+                                 (my/grep search-term
+                                          directory
+                                          (read-string "New glob: "))))
+      (local-set-key (kbd "g") (lambda () 
+                                 (interactive)
+                                 (my/grep search-term directory glob))))))
+#+end_src
+
+*** BUGS
+
+**** FIXED rgrep fallback doesn't have local keys option of "d" "s" "g" which would be a nice improvement
+
 ** TODO selected-window-accent-mode
 
 My package of highlighting the selected window/tabs, which actually I find very useful and of course due to my familiarity I could code up a more simple version.
@@ -376,10 +410,6 @@ Go through the Emacs export mechanism instead and open separate browser window, 
 ** TODO image-dired
 
 Copy over functionality, no real external things, its just is it valuable given how little I use it? 
-
-** TODO tempel
-
-I use pretty simple, no yassnippet complexity here, so maybe I can adapt dabrev with some predefined functions for the most common completion replacements?
 
 ** TODO corfu / company completion
 

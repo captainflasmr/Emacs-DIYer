@@ -1,8 +1,10 @@
 ;; -*- lexical-binding: t; -*-
 
-;;
-;; -> emacs-enhanced
-;;
+(defun my-icomplete-exit-minibuffer-with-input ()
+  "Exit the minibuffer with the current input, without forcing completion."
+  (interactive)
+  (exit-minibuffer))
+
 (defun my/quick-window-jump ()
   "Jump to a window by typing its assigned character label.
 If there are only two windows, jump directly to the other window."
@@ -40,7 +42,7 @@ If there are only two windows, jump directly to the other window."
           (setq my/quick-window-overlays nil)
           (when-let ((selected-window (cdr (assoc (char-to-string key) window-map))))
             (select-window selected-window)))))))
-;;
+
 (defun my/recentf-open (file)
   "Prompt for FILE in `recentf-list' and visit it.
 Enable `recentf-mode' if it isn't already."
@@ -50,7 +52,7 @@ Enable `recentf-mode' if it isn't already."
            (completing-read "Open recent file: " recentf-list nil t))))
   (when file
     (funcall recentf-menu-action file)))
-;;
+
 (defun my/rainbow-mode ()
   "Overlay colors represented as hex values in the current buffer."
   (interactive)
@@ -64,19 +66,12 @@ Enable `recentf-mode' if it isn't already."
           (if (string-greaterp color "#888888")
               (overlay-put overlay 'face `(:background ,color :foreground "black"))
             (overlay-put overlay 'face `(:background ,color :foreground "white"))))))))
+;;
 (defun my/rainbow-mode-clear ()
   "Remove all hex color overlays in the current buffer."
   (interactive)
   (remove-overlays (point-min) (point-max)))
-;;
-(defun my-icomplete-copy-candidate ()
-  "Copy the current Icomplete candidate to the kill ring."
-  (interactive)
-  (let ((candidate (car completion-all-sorted-completions)))
-    (when candidate
-      (kill-new (substring-no-properties candidate))
-      (abort-recursive-edit))))
-;;
+
 (defun toggle-centered-buffer ()
   "Toggle center alignment of the buffer by adjusting window margins based on the fill-column."
   (interactive)
@@ -87,7 +82,43 @@ Enable `recentf-mode' if it isn't already."
                    0)))
     (visual-line-mode 1)
     (set-window-margins nil margin margin)))
+
+(defun my/find-file ()
+  "Find file from current directory in many different ways."
+  (interactive)
+  (let* ((find-options (delq nil
+                             (list (when (executable-find "find")
+                                     '("find -type f -printf \"$PWD/%p\\0\"" . :string))
+                                   (when (executable-find "fd")
+                                     '("fd --absolute-path --type f -0" . :string))
+                                   (when (executable-find "rg")
+                                     '("rg --follow --files --null" . :string))
+                                   (when (fboundp 'find-name-dired)
+                                     '("find-name-dired" . :command)))))
+         (selection (completing-read "Select: " find-options))
+         file-list
+         file)
+    (pcase (alist-get selection find-options nil nil #'string=)
+      (:command
+       (call-interactively (intern selection)))
+      (:string
+       (setq file-list (split-string (shell-command-to-string selection) "\0" t))
+       (setq file (completing-read
+                   (format "Find file in %s: "
+                           (abbreviate-file-name default-directory))
+                   file-list))))
+    (when file (find-file (expand-file-name file)))))
+
+(defun my-icomplete-copy-candidate ()
+  "Copy the current Icomplete candidate to the kill ring."
+  (interactive)
+  (let ((candidate (car completion-all-sorted-completions)))
+    (when candidate
+      (kill-new (substring-no-properties candidate))
+      (abort-recursive-edit))))
 ;;
+(define-key minibuffer-local-completion-map (kbd "C-c ,") 'my-icomplete-copy-candidate)
+
 (defun my/grep (search-term &optional directory glob)
   "Run ripgrep (rg) with SEARCH-TERM and optionally DIRECTORY and GLOB.
   If ripgrep is unavailable, fall back to Emacs's rgrep command. Highlights SEARCH-TERM in results.
@@ -159,35 +190,3 @@ Enable `recentf-mode' if it isn't already."
       (local-set-key (kbd "g") (lambda () 
                                  (interactive)
                                  (my/grep search-term directory glob))))))
-;;
-(defun my/find-file ()
-  "Find file from current directory in many different ways."
-  (interactive)
-  (let* ((find-options (delq nil
-                             (list (when (executable-find "find")
-                                     '("find -type f -printf \"$PWD/%p\\0\"" . :string))
-                                   (when (executable-find "fd")
-                                     '("fd --absolute-path --type f -0" . :string))
-                                   (when (executable-find "rg")
-                                     '("rg --follow --files --null" . :string))
-                                   (when (fboundp 'find-name-dired)
-                                     '("find-name-dired" . :command)))))
-         (selection (completing-read "Select: " find-options))
-         file-list
-         file)
-    (pcase (alist-get selection find-options nil nil #'string=)
-      (:command
-       (call-interactively (intern selection)))
-      (:string
-       (setq file-list (split-string (shell-command-to-string selection) "\0" t))
-       (setq file (completing-read
-                   (format "Find file in %s: "
-                           (abbreviate-file-name default-directory))
-                   file-list))))
-    (when file (find-file (expand-file-name file)))))
-;;
-(defun my-icomplete-exit-minibuffer-with-input ()
-  "Exit the minibuffer with the current input, without forcing completion."
-  (interactive)
-  (exit-minibuffer))
-;;
