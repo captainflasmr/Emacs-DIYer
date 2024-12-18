@@ -414,7 +414,7 @@ When toggled, the function displays the next available pop-up
 buffer or hides currently displayed pop-ups. Stores the last
 active popup in `my/popper-current-popup`."
   (interactive)
-  (let* ((popup-patterns '("\\*Help\\*" "\\*eshell\\*" "\\*eldoc\\*"))
+  (let* ((popup-patterns '("\\*Help\\*" "\\*eshell\.*\\*" "\\*eldoc\.*\\*"))
          (popup-buffers (seq-filter (lambda (buf)
                                       (let ((bufname (buffer-name buf)))
                                         (seq-some (lambda (pattern)
@@ -461,10 +461,10 @@ If the popup is visible, hide it. If the popup is not visible, restore it."
     (message "No active popup buffer to toggle.")))
 ;;
 ;; Cycle through popups or show the next popup.
-(global-set-key (kbd "C-c l") #'my/popper-toggle-popup)
+(global-set-key (kbd "C-c p") #'my/popper-toggle-popup)
 ;;
 ;; Toggle the currently selected popup.
-(global-set-key (kbd "C-c p") #'my/popper-toggle-current)
+(global-set-key (kbd "C-c l") #'my/popper-toggle-current)
 #+end_src
 
 ** TODO selected-window-accent-mode
