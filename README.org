@@ -41,25 +41,23 @@ This commit adds clarity for users encountering the `Permission denied (publicke
 Here is a kanban of the features that will be (hopefully) converted to core/enhanced Emacs features and visually demonstrating their current status via a kanban board
 
 #+begin: kanban :layout ("..." . 50) :scope nil :range ("TODO" . "DONE") :sort "O" :depth 3 :match "roadmap" :compressed t
-| TODO                                     | DOING    | DONE                    |
-|------------------------------------------+----------+-------------------------|
-| [[file:README.org::*Make this whole readme properly literate][Make this whole readme properly literate]] | [[file:README.org::*embark][embark]]   | [[file:README.org::*ace-window][ace-window]]              |
-| [[file:README.org::*selected-window-accent-mode][selected-window-accent-mode]]              | [[file:README.org::*deadgrep][deadgrep]] | [[file:README.org::*recentf-open][recentf-open]]            |
-| [[file:README.org::*htmlize][htmlize]]                                  |          | [[file:README.org::*rainbow-mode][rainbow-mode]]            |
-| [[file:README.org::*image-dired][image-dired]]                              |          | [[file:README.org::*visual-fill-column-mode][visual-fill-column-mode]] |
-| [[file:README.org::*corfu / company completion][corfu / company completion]]               |          | [[file:README.org::*find-name-dired][find-name-dired]]         |
-| [[file:README.org::*spelling][spelling]]                                 |          | [[file:README.org::*magit][magit]]                   |
-| [[file:README.org::*popper][popper]]                                   |          | [[file:README.org::*tempel][tempel]]                  |
-| [[file:README.org::*shell][shell]]                                    |          |                         |
-| [[file:README.org::*capf-autosuggest][capf-autosuggest]]                         |          |                         |
-| [[file:README.org::*org-capture][org-capture]]                              |          |                         |
-| [[file:README.org::*DWIM script integration][DWIM script integration]]                  |          |                         |
-| [[file:README.org::*org-agenda][org-agenda]]                               |          |                         |
-| [[file:README.org::*kurecolor][kurecolor]]                                |          |                         |
-| [[file:README.org::*Ada][Ada]]                                      |          |                         |
-| [[file:README.org::*transients][transients]]                               |          |                         |
-| [[file:README.org::*my/transient-outlining-and-folding][my/transient-outlining-and-folding]]       |          |                         |
-| [[file:README.org::*my/prog-folding][my/prog-folding]]                          |          |                         |
+| TODO                               | DOING    | DONE                    |
+|------------------------------------+----------+-------------------------|
+| [[file:README.org::*selected-window-accent-mode][selected-window-accent-mode]]        | [[file:README.org::*embark][embark]]   | [[file:README.org::*minibuffer completion][minibuffer completion]]   |
+| [[file:README.org::*htmlize][htmlize]]                            | [[file:README.org::*deadgrep][deadgrep]] | [[file:README.org::*ace-window][ace-window]]              |
+| [[file:README.org::*image-dired][image-dired]]                        | [[file:README.org::*popper][popper]]   | [[file:README.org::*recentf-open][recentf-open]]            |
+| [[file:README.org::*corfu / company completion][corfu / company completion]]         |          | [[file:README.org::*rainbow-mode][rainbow-mode]]            |
+| [[file:README.org::*spelling][spelling]]                           |          | [[file:README.org::*visual-fill-column-mode][visual-fill-column-mode]] |
+| [[file:README.org::*shell][shell]]                              |          | [[file:README.org::*find-name-dired][find-name-dired]]         |
+| [[file:README.org::*capf-autosuggest][capf-autosuggest]]                   |          | [[file:README.org::*magit][magit]]                   |
+| [[file:README.org::*org-capture][org-capture]]                        |          | [[file:README.org::*tempel][tempel]]                  |
+| [[file:README.org::*DWIM script integration][DWIM script integration]]            |          |                         |
+| [[file:README.org::*org-agenda][org-agenda]]                         |          |                         |
+| [[file:README.org::*kurecolor][kurecolor]]                          |          |                         |
+| [[file:README.org::*Ada][Ada]]                                |          |                         |
+| [[file:README.org::*transients][transients]]                         |          |                         |
+| [[file:README.org::*my/transient-outlining-and-folding][my/transient-outlining-and-folding]] |          |                         |
+| [[file:README.org::*my/prog-folding][my/prog-folding]]                    |          |                         |
 #+end:
 
 * Roadmap                                                           :roadmap:
@@ -399,6 +397,76 @@ Being solved with the following code:
 
 **** FIXED rgrep fallback doesn't have local keys option of "d" "s" "g" which would be a nice improvement
 
+** DOING popper
+
+Mainly used for popping and popping out shells, I'm sure I can code up an alternative solution here if I need to.
+
+Testing the following implementation:
+
+#+begin_src elisp
+(defvar my/popper-current-popup nil
+  "Stores the currently active popup buffer for quick toggle.")
+;;
+(defun my/popper-toggle-popup ()
+  "Toggle visibility of pop-up buffers.
+Pop-ups are identified by their names and certain buffer modes.
+When toggled, the function displays the next available pop-up
+buffer or hides currently displayed pop-ups. Stores the last
+active popup in `my/popper-current-popup`."
+  (interactive)
+  (let* ((popup-patterns '("\\*Help\\*" "\\*eshell\\*" "\\*eldoc\\*"))
+         (popup-buffers (seq-filter (lambda (buf)
+                                      (let ((bufname (buffer-name buf)))
+                                        (seq-some (lambda (pattern)
+                                                    (string-match-p pattern bufname))
+                                                  popup-patterns)))
+                                    (buffer-list)))
+         (current-popup (car (seq-filter (lambda (win)
+                                           (member (window-buffer win) popup-buffers))
+                                         (window-list)))))
+
+    (if current-popup
+        ;; If a pop-up buffer is currently visible, bury it.
+        (let ((buf (window-buffer current-popup)))
+          (delete-window current-popup)
+          (bury-buffer buf)
+          (setq my/popper-current-popup nil) ;; Clear the currently tracked popup.
+          (message "Hid pop-up buffer: %s" (buffer-name buf)))
+      ;; Otherwise, display the first available pop-up buffer.
+      (if popup-buffers
+          (let ((buf (car popup-buffers)))
+            (pop-to-buffer buf
+                           '(display-buffer-at-bottom
+                             (inhibit-same-window . t)
+                             (window-height . 0.3)))
+            (setq my/popper-current-popup buf) ;; Store the displayed popup buffer.
+            (message "Displayed pop-up buffer: %s" (buffer-name buf)))
+        (message "No pop-up buffers to display!")))))
+;;
+(defun my/popper-toggle-current ()
+  "Toggle visibility of the last active popup buffer (`my/popper-current-popup`).
+If the popup is visible, hide it. If the popup is not visible, restore it."
+  (interactive)
+  (if (and my/popper-current-popup (buffer-live-p my/popper-current-popup))
+      (if (get-buffer-window my/popper-current-popup)
+          (progn
+            (delete-window (get-buffer-window my/popper-current-popup))
+            (message "Hid active popup buffer: %s" (buffer-name my/popper-current-popup)))
+        (pop-to-buffer my/popper-current-popup
+                       '(display-buffer-at-bottom
+                         (inhibit-same-window . t)
+                         (window-height . 0.3)))
+        (message "Restored active popup buffer: %s" (buffer-name my/popper-current-popup)))
+    ;; If no valid currently tracked popup:
+    (message "No active popup buffer to toggle.")))
+;;
+;; Cycle through popups or show the next popup.
+(global-set-key (kbd "C-c l") #'my/popper-toggle-popup)
+;;
+;; Toggle the currently selected popup.
+(global-set-key (kbd "C-c p") #'my/popper-toggle-current)
+#+end_src
+
 ** TODO selected-window-accent-mode
 
 My package of highlighting the selected window/tabs, which actually I find very useful and of course due to my familiarity I could code up a more simple version.
@@ -424,10 +492,6 @@ I like jinx as it is fast and efficient.
 powerthesaurus I don't use that often.
 
 writegood-mode is a favourite, but I could probably live without it.
-
-** TODO popper
-
-Mainly used for popping and popping out shells, I'm sure I can code up an alternative solution here if I need to.
 
 ** TODO shell
 
