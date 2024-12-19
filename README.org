@@ -1,7 +1,7 @@
-#+title: Emacs-enhanced - Replacement defuns for major functional improvements
+-*- mode: org; fill-column: 80; eval: (display-fill-column-indicator-mode -1); -*-
+#+title: Emacs Enhanced
 #+author: James Dyer
-#+date: 2024
-#+description: Emacs elisp defuns replacing or enhancing major external packages.
+#+options: toc:nil author:t title:t
 #+startup: showall
 #+todo: TODO DOING | DONE
 #+property: header-args :tangle ~/.emacs.d/Emacs-enhanced/init.el
