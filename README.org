@@ -424,7 +424,6 @@ active popup in `my/popper-current-popup`."
          (current-popup (car (seq-filter (lambda (win)
                                            (member (window-buffer win) popup-buffers))
                                          (window-list)))))
-
     (if current-popup
         ;; If a pop-up buffer is currently visible, bury it.
         (let ((buf (window-buffer current-popup)))
