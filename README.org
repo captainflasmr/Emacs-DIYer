@@ -467,53 +467,7 @@ If the popup is visible, hide it. If the popup is not visible, restore it."
 (global-set-key (kbd "C-c l") #'my/popper-toggle-current)
 #+end_src
 
-** TODO selected-window-accent-mode
-
-My package of highlighting the selected window/tabs, which actually I find very useful and of course due to my familiarity I could code up a more simple version.
-
-** TODO htmlize
-
-Go through the Emacs export mechanism instead and open separate browser window, refreshing when exported each time?
-
-** TODO image-dired
-
-Copy over functionality, no real external things, its just is it valuable given how little I use it? 
-
-** TODO corfu / company completion
-
-Can probably live without, as tab completion is probably fine
-
-** TODO spelling
-
-The core is using hunspell, flyspell which works generally pretty well, libreoffice will pretty much always be available or easily installable so hunspell will probably be always available.
-
-I like jinx as it is fast and efficient.
-
-powerthesaurus I don't use that often.
-
-writegood-mode is a favourite, but I could probably live without it.
-
-** TODO shell
-
-Can I bring in cape-history into eshell/shell, the main issue is the inline fish type completion which I may be able to live without, but it is really fast and convenient!
-
-** TODO capf-autosuggest
-
-Some elisp for some simple predictive inline completion, maybe take a look at how capf-autosuggest does it.
-
-** TODO org-capture
-
-I think we can already move to core
-
-** TODO DWIM script integration
-
-Should be almost a straightforward copy, just need to consider which bash scripts I copy across, if any
-
-** TODO org-agenda
-
-I think we can already move to core
-
-** TODO kurecolor
+** DOING kurecolor
 
 Add some elisp with the requisite regex-search and elisp colour calls, I have achieved this in the past, before I found the more convenient option of kurecolor
 
@@ -521,6 +475,7 @@ Testing with the following code:
 
 #+begin_src elisp
 (require 'cl-lib)
+(require 'color)
 ;;
 (defun my/color-hex-to-rgb (hex-color)
   "Convert a HEX-COLOR string to a list of RGB values."
@@ -618,6 +573,52 @@ Testing with the following code:
 (global-set-key (kbd "M-<right>") (lambda () (interactive) (my/increase-hue-at-point 5)))
 (global-set-key (kbd "M-<home>") 'my/insert-random-color-at-point)
 #+end_src
+
+** TODO selected-window-accent-mode
+
+My package of highlighting the selected window/tabs, which actually I find very useful and of course due to my familiarity I could code up a more simple version.
+
+** TODO htmlize
+
+Go through the Emacs export mechanism instead and open separate browser window, refreshing when exported each time?
+
+** TODO image-dired
+
+Copy over functionality, no real external things, its just is it valuable given how little I use it? 
+
+** TODO corfu / company completion
+
+Can probably live without, as tab completion is probably fine
+
+** TODO spelling
+
+The core is using hunspell, flyspell which works generally pretty well, libreoffice will pretty much always be available or easily installable so hunspell will probably be always available.
+
+I like jinx as it is fast and efficient.
+
+powerthesaurus I don't use that often.
+
+writegood-mode is a favourite, but I could probably live without it.
+
+** TODO shell
+
+Can I bring in cape-history into eshell/shell, the main issue is the inline fish type completion which I may be able to live without, but it is really fast and convenient!
+
+** TODO capf-autosuggest
+
+Some elisp for some simple predictive inline completion, maybe take a look at how capf-autosuggest does it.
+
+** TODO org-capture
+
+I think we can already move to core
+
+** TODO DWIM script integration
+
+Should be almost a straightforward copy, just need to consider which bash scripts I copy across, if any
+
+** TODO org-agenda
+
+I think we can already move to core
 
 ** TODO Ada
 
