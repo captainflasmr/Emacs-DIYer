@@ -201,7 +201,7 @@ When toggled, the function displays the next available pop-up
 buffer or hides currently displayed pop-ups. Stores the last
 active popup in `my/popper-current-popup`."
   (interactive)
-  (let* ((popup-patterns '("\\*Help\\*" "\\*eshell\\*" "\\*eldoc\\*"))
+  (let* ((popup-patterns '("\\*Help\\*" "\\*eshell\.*\\*" "\\*eldoc\.*\\*"))
          (popup-buffers (seq-filter (lambda (buf)
                                       (let ((bufname (buffer-name buf)))
                                         (seq-some (lambda (pattern)
@@ -211,7 +211,6 @@ active popup in `my/popper-current-popup`."
          (current-popup (car (seq-filter (lambda (win)
                                            (member (window-buffer win) popup-buffers))
                                          (window-list)))))
-
     (if current-popup
         ;; If a pop-up buffer is currently visible, bury it.
         (let ((buf (window-buffer current-popup)))
@@ -248,7 +247,106 @@ If the popup is visible, hide it. If the popup is not visible, restore it."
     (message "No active popup buffer to toggle.")))
 ;;
 ;; Cycle through popups or show the next popup.
-(global-set-key (kbd "C-c l") #'my/popper-toggle-popup)
+(global-set-key (kbd "C-c p") #'my/popper-toggle-popup)
 ;;
 ;; Toggle the currently selected popup.
-(global-set-key (kbd "C-c p") #'my/popper-toggle-current)
+(global-set-key (kbd "C-c l") #'my/popper-toggle-current)
+
+(require 'cl-lib)
+(require 'color)
+;;
+(defun my/color-hex-to-rgb (hex-color)
+  "Convert a HEX-COLOR string to a list of RGB values."
+  (unless (string-match "^#[0-9a-fA-F]\\{6\\}$" hex-color)
+    (error "Invalid hex color: %s" hex-color))
+  (mapcar (lambda (x) (/ (string-to-number x 16) 255.0))
+          (list (substring hex-color 1 3)
+                (substring hex-color 3 5)
+                (substring hex-color 5 7))))
+;;
+(defun my/color-rgb-to-hex (rgb)
+  "Convert a list of RGB values to a hex color string."
+  (format "#%02x%02x%02x"
+          (round (* 255 (nth 0 rgb)))
+          (round (* 255 (nth 1 rgb)))
+          (round (* 255 (nth 2 rgb)))))
+;;
+(defun my/color-adjust-brightness (hex-color delta)
+  "Adjust the brightness of HEX-COLOR by DELTA (-1.0 to 1.0)."
+  (let* ((rgb (my/color-hex-to-rgb hex-color))
+         (adjusted-rgb (mapcar (lambda (c) (min 1.0 (max 0.0 (+ c delta)))) rgb)))
+    (my/color-rgb-to-hex adjusted-rgb)))
+;;
+(defun my/color-adjust-saturation (hex-color delta)
+  "Adjust the saturation of HEX-COLOR by DELTA (-1.0 to 1.0)."
+  (let* ((rgb (my/color-hex-to-rgb hex-color))
+         (max (apply 'max rgb))
+         (adjusted-rgb (mapcar
+                        (lambda (c)
+                          (if (= max 0.0)
+                              c
+                            (+ (* c (- 1 delta)) (* max delta))))
+                        rgb)))
+    (my/color-rgb-to-hex adjusted-rgb)))
+;;
+(defun my/color-adjust-hue (hex-color delta)
+  "Adjust the hue of HEX-COLOR by DELTA (in degrees)."
+  (let* ((rgb (my/color-hex-to-rgb hex-color))
+         (hsl (color-rgb-to-hsl (nth 0 rgb) (nth 1 rgb) (nth 2 rgb)))
+         (new-h (mod (+ (nth 0 hsl) (/ delta 360.0)) 1.0)) ;; Wrap hue around
+         (new-rgb (apply 'color-hsl-to-rgb (list new-h (nth 1 hsl) (nth 2 hsl)))))
+    (my/color-rgb-to-hex new-rgb)))
+;;
+(defun my/replace-color-at-point (transform-fn &rest args)
+  "Replace the hex color code at point using TRANSFORM-FN with ARGS."
+  (let ((bounds (bounds-of-thing-at-point 'sexp))
+        (original (thing-at-point 'sexp t)))
+    (if (and bounds (string-match "^#[0-9a-fA-F]\\{6\\}$" original))
+        (let ((new-color (apply transform-fn original args)))
+          (delete-region (car bounds) (cdr bounds))
+          (insert new-color))
+      (error "No valid hex color code at point"))))
+;;
+(defun my/increase-brightness-at-point (delta)
+  "Increase brightness of hex color at point by DELTA."
+  (interactive "nBrightness delta: ")
+  (my/replace-color-at-point 'my/color-adjust-brightness delta)
+  (my/rainbow-mode))
+;;
+(defun my/decrease-brightness-at-point (delta)
+  "Decrease brightness of hex color at point by DELTA."
+  (interactive "nBrightness delta: ")
+  (my/replace-color-at-point 'my/color-adjust-brightness (- delta))
+  (my/rainbow-mode))
+;;
+(defun my/increase-saturation-at-point (delta)
+  "Increase saturation of hex color at point by DELTA."
+  (interactive "nSaturation delta: ")
+  (my/replace-color-at-point 'my/color-adjust-saturation delta)
+  (my/rainbow-mode))
+;;
+(defun my/decrease-saturation-at-point (delta)
+  "Decrease saturation of hex color at point by DELTA."
+  (interactive "nSaturation delta: ")
+  (my/replace-color-at-point 'my/color-adjust-saturation (- delta))
+  (my/rainbow-mode))
+;;
+(defun my/increase-hue-at-point (delta)
+  "Increase hue of hex color at point by DELTA (in degrees)."
+  (interactive "nHue delta (degrees): ")
+  (my/replace-color-at-point 'my/color-adjust-hue delta)
+  (my/rainbow-mode))
+;;
+(defun my/decrease-hue-at-point (delta)
+  "Decrease hue of hex color at point by DELTA (in degrees)."
+  (interactive "nHue delta (degrees): ")
+  (my/replace-color-at-point 'my/color-adjust-hue (- delta))
+  (my/rainbow-mode))
+;;
+(global-set-key (kbd "M-<up>") (lambda () (interactive) (my/increase-brightness-at-point 0.02)))
+(global-set-key (kbd "M-<down>") (lambda () (interactive) (my/decrease-brightness-at-point 0.02)))
+(global-set-key (kbd "M-<prior>") (lambda () (interactive) (my/increase-saturation-at-point 0.02)))
+(global-set-key (kbd "M-<next>") (lambda () (interactive) (my/decrease-saturation-at-point 0.02)))
+(global-set-key (kbd "M-<left>") (lambda () (interactive) (my/decrease-hue-at-point 5)))
+(global-set-key (kbd "M-<right>") (lambda () (interactive) (my/increase-hue-at-point 5)))
+(global-set-key (kbd "M-<home>") 'my/insert-random-color-at-point)

@@ -22,6 +22,19 @@ Used in concert with https://github.com/captainflasmr/Emacs-core
 
 * Whats New
 
+** <2024-12-19>
+
+- *Replaced Features:*
+  - *Minibuffer Completion*: Replaced `vertico`, `marginalia`, and other third-party tools with `fido-mode` and a workaround for exiting forced completion.
+  - *Magit*: Transitioned to built-in VC for Git workflows; includes instructions for addressing SSH-related issues during pushes.
+
+- *New Implementations:*
+  - *Popper Replacement*: Introduced custom Elisp functions for toggling and managing popup buffers, mimicking `popper` functionality.
+  - *Find-Name-Dired Alternative*: Enhanced file search functionality with fallback to `find`, `fd`, or `ripgrep` where available, maintaining compatibility with built-in `dired`.
+  - *Color Manipulation*: Added Elisp functions for adjusting color brightness, saturation, and hue, providing a lightweight alternative to `kurecolor`.
+    
+- Tidied up kanban focussing more on the features that I am replacing with elisp rather than just replacing with built-ins
+
 ** <2024-12-18>
 
 Added abbrev to replace tempel
@@ -41,23 +54,17 @@ This commit adds clarity for users encountering the `Permission denied (publicke
 Here is a kanban of the features that will be (hopefully) converted to core/enhanced Emacs features and visually demonstrating their current status via a kanban board
 
 #+begin: kanban :layout ("..." . 50) :scope nil :range ("TODO" . "DONE") :sort "O" :depth 3 :match "roadmap" :compressed t
-| TODO                               | DOING    | DONE                    |
-|------------------------------------+----------+-------------------------|
-| [[file:README.org::*selected-window-accent-mode][selected-window-accent-mode]]        | [[file:README.org::*embark][embark]]   | [[file:README.org::*minibuffer completion][minibuffer completion]]   |
-| [[file:README.org::*htmlize][htmlize]]                            | [[file:README.org::*deadgrep][deadgrep]] | [[file:README.org::*ace-window][ace-window]]              |
-| [[file:README.org::*image-dired][image-dired]]                        | [[file:README.org::*popper][popper]]   | [[file:README.org::*recentf-open][recentf-open]]            |
-| [[file:README.org::*corfu / company completion][corfu / company completion]]         |          | [[file:README.org::*rainbow-mode][rainbow-mode]]            |
-| [[file:README.org::*spelling][spelling]]                           |          | [[file:README.org::*visual-fill-column-mode][visual-fill-column-mode]] |
-| [[file:README.org::*shell][shell]]                              |          | [[file:README.org::*find-name-dired][find-name-dired]]         |
-| [[file:README.org::*capf-autosuggest][capf-autosuggest]]                   |          | [[file:README.org::*magit][magit]]                   |
-| [[file:README.org::*org-capture][org-capture]]                        |          | [[file:README.org::*tempel][tempel]]                  |
-| [[file:README.org::*DWIM script integration][DWIM script integration]]            |          |                         |
-| [[file:README.org::*org-agenda][org-agenda]]                         |          |                         |
-| [[file:README.org::*kurecolor][kurecolor]]                          |          |                         |
-| [[file:README.org::*Ada][Ada]]                                |          |                         |
-| [[file:README.org::*transients][transients]]                         |          |                         |
-| [[file:README.org::*my/transient-outlining-and-folding][my/transient-outlining-and-folding]] |          |                         |
-| [[file:README.org::*my/prog-folding][my/prog-folding]]                    |          |                         |
+| TODO                        | DOING     | DONE                    |
+|-----------------------------+-----------+-------------------------|
+| [[file:README.org::*selected-window-accent-mode][selected-window-accent-mode]] | [[file:README.org::*embark][embark]]    | [[file:README.org::*minibuffer completion][minibuffer completion]]   |
+| [[file:README.org::*htmlize][htmlize]]                     | [[file:README.org::*deadgrep][deadgrep]]  | [[file:README.org::*ace-window][ace-window]]              |
+| [[file:README.org::*shell / completion][shell / completion]]          | [[file:README.org::*popper][popper]]    | [[file:README.org::*recentf-open][recentf-open]]            |
+| [[file:README.org::*capf-autosuggest][capf-autosuggest]]            | [[file:README.org::*kurecolor][kurecolor]] | [[file:README.org::*rainbow-mode][rainbow-mode]]            |
+| [[file:README.org::*Ada][Ada]]                         |           | [[file:README.org::*visual-fill-column-mode][visual-fill-column-mode]] |
+|                             |           | [[file:README.org::*find-name-dired][find-name-dired]]         |
+|                             |           | [[file:README.org::*magit][magit]]                   |
+|                             |           | [[file:README.org::*tempel][tempel]]                  |
+|                             |           | [[file:README.org::*image-dired][image-dired]]             |
 #+end:
 
 * Roadmap                                                           :roadmap:
@@ -284,6 +291,10 @@ CLOSED: [2024-12-18 Wed 09:26]
 
 I use pretty simple, no yassnippet complexity here, so maybe I can adapt abbrev with some predefined functions for the most common completion replacements?
 
+Yes, adapted to using =abbrev-mode=, the syntax for the =abbrev_defs= is very similar to tempel congiguration files so easy to adapt.
+
+The only negative is the positional cursor options easily defined from tempel but if I really wanted to I could just include lambda functions to move th cursor.  But I don't think I am too bothered, I will just use the usual Emacs navigation keys.
+
 ** DOING embark
 
 I am not using too many aspects mainly the following:
@@ -306,6 +317,11 @@ Solved with the code below:
   
 - collect
 - export
+
+** DONE image-dired
+CLOSED: [2024-12-19 Thu 11:44]
+
+Copy over functionality, no real external things, its just is it valuable given how little I use it? 
 
 ** DOING deadgrep
 
@@ -581,25 +597,7 @@ My package of highlighting the selected window/tabs, which actually I find very 
 
 Go through the Emacs export mechanism instead and open separate browser window, refreshing when exported each time?
 
-** TODO image-dired
-
-Copy over functionality, no real external things, its just is it valuable given how little I use it? 
-
-** TODO corfu / company completion
-
-Can probably live without, as tab completion is probably fine
-
-** TODO spelling
-
-The core is using hunspell, flyspell which works generally pretty well, libreoffice will pretty much always be available or easily installable so hunspell will probably be always available.
-
-I like jinx as it is fast and efficient.
-
-powerthesaurus I don't use that often.
-
-writegood-mode is a favourite, but I could probably live without it.
-
-** TODO shell
+** TODO shell / completion
 
 Can I bring in cape-history into eshell/shell, the main issue is the inline fish type completion which I may be able to live without, but it is really fast and convenient!
 
@@ -607,35 +605,11 @@ Can I bring in cape-history into eshell/shell, the main issue is the inline fish
 
 Some elisp for some simple predictive inline completion, maybe take a look at how capf-autosuggest does it.
 
-** TODO org-capture
-
-I think we can already move to core
-
-** TODO DWIM script integration
-
-Should be almost a straightforward copy, just need to consider which bash scripts I copy across, if any
-
-** TODO org-agenda
-
-I think we can already move to core
-
 ** TODO Ada
 
 Unfortunately this may be the only elisp package that I may need to bake into this whole concept.  Current ada-mode isn't supported out of the box in Emacs, it is suggested to use the AdaCore ada-mode but that is a pain to compile (mainly due to trying to install gnatcoll), I have found the old ada mode used by Emacs for that adequate, so this may need to be separately downloaded and baked in.
 
 These is also the potential to use ada-mode-lite and leverage eglot for the rest.
-
-** TODO transients
-
-Convert all transients which rely on Emacs 28 implementation of built-in transients.  The same can be achieved comfortably with a simple menu to stdout and read key type system.
-
-*** TODO my/transient-outlining-and-folding
-
-Transient menu for outline-mode.
-
-*** TODO my/prog-folding
-
-Enable and configure outline minor mode for code folding.  This function sets up the outline minor mode tailored for programming modes based on basic space / tab indentation.
 
 * TODO Features that won't be converted to core
 
@@ -646,5 +620,7 @@ Enable and configure outline minor mode for code folding.  This function sets up
 ** TODO ox-hugo
 
 ** TODO eglot
+
+Although I could always build the latest Emacs to overcome this.
 
 Not too much I can do about this, however I could apply some =etag= replacement functionality, but it really isn't the same.
