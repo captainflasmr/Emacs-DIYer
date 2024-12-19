@@ -239,7 +239,7 @@ Just need to be able to push using ssh
 
 The following instructions seem to work for now, but should really be doing a little better:
 
-Are you getting the following issue when trying to push to github from Emacs in vc-dir mdoe?
+Are you getting the following issue when trying to push to github from Emacs in vc-dir mode?
   
 #+begin_src 
 Running "git push"...
@@ -291,7 +291,7 @@ CLOSED: [2024-12-18 Wed 09:26]
 
 I use pretty simple, no yassnippet complexity here, so maybe I can adapt abbrev with some predefined functions for the most common completion replacements?
 
-Yes, adapted to using =abbrev-mode=, the syntax for the =abbrev_defs= is very similar to tempel congiguration files so easy to adapt.
+Yes, adapted to using =abbrev-mode=, the syntax for the =abbrev_defs= is very similar to tempel configuration files so easy to adapt.
 
 The only negative is the positional cursor options easily defined from tempel but if I really wanted to I could just include lambda functions to move th cursor.  But I don't think I am too bothered, I will just use the usual Emacs navigation keys.
 
