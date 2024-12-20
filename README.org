@@ -21,7 +21,8 @@ Perfect for lightweight usage in VMs or basic tasks.
 Used in concert with https://github.com/captainflasmr/Emacs-core
 
 * Whats New
-
+** <2024-12-20>
+- Added defuns for pandoc md to org conversion, I guess I could check for =pandoc= being present on the system?
 ** <2024-12-20>
 
 Update roadmap, mark features as DONE, and enhance configurations:
@@ -65,21 +66,21 @@ This commit adds clarity for users encountering the `Permission denied (publicke
 Here is a kanban of the features that will be (hopefully) converted to core/enhanced Emacs features and visually demonstrating their current status via a kanban board
 
 #+begin: kanban :layout ("..." . 50) :scope nil :range ("TODO" . "DONE") :sort "O" :depth 3 :match "roadmap" :compressed t
-| TODO               | DOING  | DONE                        |
-|--------------------+--------+-----------------------------|
-| [[file:README.org::*htmlize][htmlize]]            | [[file:README.org::*embark][embark]] | [[file:README.org::*minibuffer completion][minibuffer completion]]       |
-| [[file:README.org::*shell / completion][shell / completion]] | [[file:README.org::*popper][popper]] | [[file:README.org::*ace-window][ace-window]]                  |
-| [[file:README.org::*capf-autosuggest][capf-autosuggest]]   |        | [[file:README.org::*recentf-open][recentf-open]]                |
-| [[file:README.org::*Ada][Ada]]                |        | [[file:README.org::*rainbow-mode][rainbow-mode]]                |
-|                    |        | [[file:README.org::*visual-fill-column-mode][visual-fill-column-mode]]     |
-|                    |        | [[file:README.org::*find-name-dired][find-name-dired]]             |
-|                    |        | [[file:README.org::*magit][magit]]                       |
-|                    |        | [[file:README.org::*tempel][tempel]]                      |
-|                    |        | [[file:README.org::*image-dired][image-dired]]                 |
-|                    |        | [[file:README.org::*selected-window-accent-mode][selected-window-accent-mode]] |
-|                    |        | [[file:README.org::*deadgrep][deadgrep]]                    |
-|                    |        | [[file:README.org::*jinx / powerthesaurus][jinx / powerthesaurus]]       |
-|                    |        | [[file:README.org::*kurecolor][kurecolor]]                   |
+| TODO               | DOING                       | DONE                        |
+|--------------------+-----------------------------+-----------------------------|
+| [[file:README.org::*htmlize][htmlize]]            | [[file:README.org::*embark][embark]]                      | [[file:README.org::*minibuffer completion][minibuffer completion]]       |
+| [[file:README.org::*shell / completion][shell / completion]] | [[file:README.org::*popper][popper]]                      | [[file:README.org::*ace-window][ace-window]]                  |
+| [[file:README.org::*capf-autosuggest][capf-autosuggest]]   | [[file:README.org::*pandoc md to org conversion][pandoc md to org conversion]] | [[file:README.org::*recentf-open][recentf-open]]                |
+| [[file:README.org::*Ada][Ada]]                |                             | [[file:README.org::*rainbow-mode][rainbow-mode]]                |
+|                    |                             | [[file:README.org::*visual-fill-column-mode][visual-fill-column-mode]]     |
+|                    |                             | [[file:README.org::*find-name-dired][find-name-dired]]             |
+|                    |                             | [[file:README.org::*magit][magit]]                       |
+|                    |                             | [[file:README.org::*tempel][tempel]]                      |
+|                    |                             | [[file:README.org::*image-dired][image-dired]]                 |
+|                    |                             | [[file:README.org::*selected-window-accent-mode][selected-window-accent-mode]] |
+|                    |                             | [[file:README.org::*deadgrep][deadgrep]]                    |
+|                    |                             | [[file:README.org::*jinx / powerthesaurus][jinx / powerthesaurus]]       |
+|                    |                             | [[file:README.org::*kurecolor][kurecolor]]                   |
 #+end:
 
 * Roadmap                                                           :roadmap:
@@ -675,6 +676,81 @@ If the popup is visible, hide it. If the popup is not visible, restore it."
 (global-set-key (kbd "C-c l") #'my/popper-toggle-current)
 #+end_src
 
+** DOING pandoc md to org conversion
+
+Replacing external tool pandoc conversion from markdown (md) to org, especially useful when copy and pasting from AI chats
+
+Potentially solved with the following, probably requires more testing:
+
+#+begin_src elisp
+(defun my/md-to-org-convert-buffer ()
+  "Convert the current buffer from Markdown to Org-mode format"
+  (interactive)
+  (save-excursion
+    ;; Lists: Translate `-`, `*`, or `+` lists to Org-mode lists
+    (goto-char (point-min))
+    (while (re-search-forward "^\\([ \t]*\\)[*-+] \\(.*\\)$" nil t)
+      (replace-match (concat (match-string 1) "- \\2")))
+    ;; Bold: `**bold**` -> `*bold*` only if directly adjacent
+    (goto-char (point-min))
+    (while (re-search-forward "\\*\\*\\([^ ]\\(.*?\\)[^ ]\\)\\*\\*" nil t)
+      (replace-match "*\\1*"))
+    ;; Italics: `_italic_` -> `/italic/`
+    (goto-char (point-min))
+    (while (re-search-forward "\\b_\\([^ ]\\(.*?\\)[^ ]\\)_\\b" nil t)
+      (replace-match "/\\1/"))
+    ;; Links: `[text](url)` -> `[[url][text]]`
+    (goto-char (point-min))
+    (while (re-search-forward "\\[\\(.*?\\)\\](\\(.*?\\))" nil t)
+      (replace-match "[[\\2][\\1]]"))
+    ;; Code blocks: Markdown ```lang ... ``` to Org #+begin_src ... #+end_src
+    (goto-char (point-min))
+    (while (re-search-forward "```\\(.*?\\)\\(?:\n\\|\\s-\\)\\(\\(?:.\\|\n\\)*?\\)```" nil t)
+      (replace-match "#+begin_src \\1\n\\2#+end_src"))
+    ;; Inline code: `code` -> =code=
+    (goto-char (point-min))
+    (while (re-search-forward "`\\(.*?\\)`" nil t)
+      (replace-match "=\\1="))
+    ;; Horizontal rules: `---` or `***` -> `-----`
+    (goto-char (point-min))
+    (while (re-search-forward "^\\(-{3,}\\|\\*{3,}\\)$" nil t)
+      (replace-match "-----"))
+    ;; Images: `![alt text](url)` -> `[[url]]`
+    (goto-char (point-min))
+    (while (re-search-forward "!\\[.*?\\](\\(.*?\\))" nil t)
+      (replace-match "[[\\1]]"))
+    (goto-char (point-min))
+    ;; Headers: Adjust '#'
+    (while (re-search-forward "^\\(#+\\) " nil t)
+      (replace-match (make-string (length (match-string 1)) ?*) nil nil nil 1))))
+;;
+(defun my/md-to-org-convert-file (input-file output-file)
+  "Convert a Markdown file INPUT-FILE to an Org-mode file OUTPUT-FILE."
+  (with-temp-buffer
+    (insert-file-contents input-file)
+    (md-to-org-convert-buffer)
+    (write-file output-file)))
+;;
+(defun my/convert-markdown-clipboard-to-org ()
+  "Convert Markdown content from clipboard to Org format and insert it at point."
+  (interactive)
+  (let ((markdown-content (current-kill 0))
+        (original-buffer (current-buffer)))
+    (with-temp-buffer
+      (insert markdown-content)
+      (my/md-to-org-convert-buffer)
+      (let ((org-content (buffer-string)))
+        (with-current-buffer original-buffer
+          (insert org-content))))))
+;;
+(defun my/org-promote-all-headings (&optional arg)
+  "Promote all headings in the current Org buffer along with their subheadings."
+  (interactive "p")
+  (org-map-entries
+   (lambda () 
+     (dotimes (_ arg) (org-promote)))))
+#+end_src
+
 ** TODO htmlize
 
 Go through the Emacs export mechanism instead and open separate browser window, refreshing when exported each time?
@@ -692,6 +768,7 @@ Some elisp for some simple predictive inline completion, maybe take a look at ho
 Unfortunately this may be the only elisp package that I may need to bake into this whole concept.  Current ada-mode isn't supported out of the box in Emacs, it is suggested to use the AdaCore ada-mode but that is a pain to compile (mainly due to trying to install gnatcoll), I have found the old ada mode used by Emacs for that adequate, so this may need to be separately downloaded and baked in.
 
 These is also the potential to use ada-mode-lite and leverage eglot for the rest.
+
 
 * TODO Features that won't be converted to core
 ** TODO ox-hugo
