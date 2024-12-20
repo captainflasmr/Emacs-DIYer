@@ -274,48 +274,36 @@ if COLOR is not provided as an argument."
           (insert new-color))
       (error "No valid hex color code at point"))))
 ;;
-(defun my/increase-brightness-at-point (delta)
-  "Increase brightness of hex color at point by DELTA."
-  (interactive "nBrightness delta: ")
-  (my/replace-color-at-point 'my/color-adjust-brightness delta)
-  (my/rainbow-mode))
-;;
-(defun my/decrease-brightness-at-point (delta)
-  "Decrease brightness of hex color at point by DELTA."
-  (interactive "nBrightness delta: ")
-  (my/replace-color-at-point 'my/color-adjust-brightness (- delta))
-  (my/rainbow-mode))
-;;
-(defun my/increase-saturation-at-point (delta)
-  "Increase saturation of hex color at point by DELTA."
-  (interactive "nSaturation delta: ")
-  (my/replace-color-at-point 'my/color-adjust-saturation delta)
-  (my/rainbow-mode))
-;;
-(defun my/decrease-saturation-at-point (delta)
-  "Decrease saturation of hex color at point by DELTA."
-  (interactive "nSaturation delta: ")
-  (my/replace-color-at-point 'my/color-adjust-saturation (- delta))
-  (my/rainbow-mode))
-;;
-(defun my/increase-hue-at-point (delta)
-  "Increase hue of hex color at point by DELTA (in degrees)."
-  (interactive "nHue delta (degrees): ")
-  (my/replace-color-at-point 'my/color-adjust-hue delta)
-  (my/rainbow-mode))
-;;
-(defun my/decrease-hue-at-point (delta)
-  "Decrease hue of hex color at point by DELTA (in degrees)."
-  (interactive "nHue delta (degrees): ")
-  (my/replace-color-at-point 'my/color-adjust-hue (- delta))
-  (my/rainbow-mode))
-;;
-(global-set-key (kbd "M-<up>") (lambda () (interactive) (my/increase-brightness-at-point 0.02)))
-(global-set-key (kbd "M-<down>") (lambda () (interactive) (my/decrease-brightness-at-point 0.02)))
-(global-set-key (kbd "M-<prior>") (lambda () (interactive) (my/increase-saturation-at-point 0.02)))
-(global-set-key (kbd "M-<next>") (lambda () (interactive) (my/decrease-saturation-at-point 0.02)))
-(global-set-key (kbd "M-<left>") (lambda () (interactive) (my/decrease-hue-at-point 5)))
-(global-set-key (kbd "M-<right>") (lambda () (interactive) (my/increase-hue-at-point 5)))
+(global-set-key (kbd "M-<up>") 
+                (lambda () 
+                  (interactive) 
+                  (my/replace-color-at-point 'my/color-adjust-brightness 0.02) 
+                  (my/rainbow-mode)))
+(global-set-key (kbd "M-<down>") 
+                (lambda () 
+                  (interactive) 
+                  (my/replace-color-at-point 'my/color-adjust-brightness -0.02) 
+                  (my/rainbow-mode)))
+(global-set-key (kbd "M-<prior>") 
+                (lambda () 
+                  (interactive) 
+                  (my/replace-color-at-point 'my/color-adjust-saturation 0.02) 
+                  (my/rainbow-mode)))
+(global-set-key (kbd "M-<next>") 
+                (lambda () 
+                  (interactive) 
+                  (my/replace-color-at-point 'my/color-adjust-saturation -0.02) 
+                  (my/rainbow-mode)))
+(global-set-key (kbd "M-<left>") 
+                (lambda () 
+                  (interactive) 
+                  (my/replace-color-at-point 'my/color-adjust-hue -5) 
+                  (my/rainbow-mode)))
+(global-set-key (kbd "M-<right>") 
+                (lambda () 
+                  (interactive) 
+                  (my/replace-color-at-point 'my/color-adjust-hue 5) 
+                  (my/rainbow-mode)))
 (global-set-key (kbd "M-<home>") 'my/insert-random-color-at-point)
 
 (defun my-icomplete-copy-candidate ()

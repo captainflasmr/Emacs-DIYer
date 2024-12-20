@@ -21,8 +21,10 @@ Perfect for lightweight usage in VMs or basic tasks.
 Used in concert with https://github.com/captainflasmr/Emacs-core
 
 * Whats New
+
 ** <2024-12-20>
 - Added defuns for pandoc md to org conversion, I guess I could check for =pandoc= being present on the system?
+  
 ** <2024-12-20>
 
 Update roadmap, mark features as DONE, and enhance configurations:
@@ -539,48 +541,36 @@ Testing with the following code:
           (insert new-color))
       (error "No valid hex color code at point"))))
 ;;
-(defun my/increase-brightness-at-point (delta)
-  "Increase brightness of hex color at point by DELTA."
-  (interactive "nBrightness delta: ")
-  (my/replace-color-at-point 'my/color-adjust-brightness delta)
-  (my/rainbow-mode))
-;;
-(defun my/decrease-brightness-at-point (delta)
-  "Decrease brightness of hex color at point by DELTA."
-  (interactive "nBrightness delta: ")
-  (my/replace-color-at-point 'my/color-adjust-brightness (- delta))
-  (my/rainbow-mode))
-;;
-(defun my/increase-saturation-at-point (delta)
-  "Increase saturation of hex color at point by DELTA."
-  (interactive "nSaturation delta: ")
-  (my/replace-color-at-point 'my/color-adjust-saturation delta)
-  (my/rainbow-mode))
-;;
-(defun my/decrease-saturation-at-point (delta)
-  "Decrease saturation of hex color at point by DELTA."
-  (interactive "nSaturation delta: ")
-  (my/replace-color-at-point 'my/color-adjust-saturation (- delta))
-  (my/rainbow-mode))
-;;
-(defun my/increase-hue-at-point (delta)
-  "Increase hue of hex color at point by DELTA (in degrees)."
-  (interactive "nHue delta (degrees): ")
-  (my/replace-color-at-point 'my/color-adjust-hue delta)
-  (my/rainbow-mode))
-;;
-(defun my/decrease-hue-at-point (delta)
-  "Decrease hue of hex color at point by DELTA (in degrees)."
-  (interactive "nHue delta (degrees): ")
-  (my/replace-color-at-point 'my/color-adjust-hue (- delta))
-  (my/rainbow-mode))
-;;
-(global-set-key (kbd "M-<up>") (lambda () (interactive) (my/increase-brightness-at-point 0.02)))
-(global-set-key (kbd "M-<down>") (lambda () (interactive) (my/decrease-brightness-at-point 0.02)))
-(global-set-key (kbd "M-<prior>") (lambda () (interactive) (my/increase-saturation-at-point 0.02)))
-(global-set-key (kbd "M-<next>") (lambda () (interactive) (my/decrease-saturation-at-point 0.02)))
-(global-set-key (kbd "M-<left>") (lambda () (interactive) (my/decrease-hue-at-point 5)))
-(global-set-key (kbd "M-<right>") (lambda () (interactive) (my/increase-hue-at-point 5)))
+(global-set-key (kbd "M-<up>") 
+                (lambda () 
+                  (interactive) 
+                  (my/replace-color-at-point 'my/color-adjust-brightness 0.02) 
+                  (my/rainbow-mode)))
+(global-set-key (kbd "M-<down>") 
+                (lambda () 
+                  (interactive) 
+                  (my/replace-color-at-point 'my/color-adjust-brightness -0.02) 
+                  (my/rainbow-mode)))
+(global-set-key (kbd "M-<prior>") 
+                (lambda () 
+                  (interactive) 
+                  (my/replace-color-at-point 'my/color-adjust-saturation 0.02) 
+                  (my/rainbow-mode)))
+(global-set-key (kbd "M-<next>") 
+                (lambda () 
+                  (interactive) 
+                  (my/replace-color-at-point 'my/color-adjust-saturation -0.02) 
+                  (my/rainbow-mode)))
+(global-set-key (kbd "M-<left>") 
+                (lambda () 
+                  (interactive) 
+                  (my/replace-color-at-point 'my/color-adjust-hue -5) 
+                  (my/rainbow-mode)))
+(global-set-key (kbd "M-<right>") 
+                (lambda () 
+                  (interactive) 
+                  (my/replace-color-at-point 'my/color-adjust-hue 5) 
+                  (my/rainbow-mode)))
 (global-set-key (kbd "M-<home>") 'my/insert-random-color-at-point)
 #+end_src
 
@@ -751,6 +741,10 @@ Potentially solved with the following, probably requires more testing:
      (dotimes (_ arg) (org-promote)))))
 #+end_src
 
+** TODO completion - corfu / company
+
+Can these in buffer completion systems be replaced by a simple in-built =icomplete= solution?
+
 ** TODO htmlize
 
 Go through the Emacs export mechanism instead and open separate browser window, refreshing when exported each time?
@@ -768,7 +762,6 @@ Some elisp for some simple predictive inline completion, maybe take a look at ho
 Unfortunately this may be the only elisp package that I may need to bake into this whole concept.  Current ada-mode isn't supported out of the box in Emacs, it is suggested to use the AdaCore ada-mode but that is a pain to compile (mainly due to trying to install gnatcoll), I have found the old ada mode used by Emacs for that adequate, so this may need to be separately downloaded and baked in.
 
 These is also the potential to use ada-mode-lite and leverage eglot for the rest.
-
 
 * TODO Features that won't be converted to core
 ** TODO ox-hugo
