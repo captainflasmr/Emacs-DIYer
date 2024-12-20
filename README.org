@@ -22,6 +22,17 @@ Used in concert with https://github.com/captainflasmr/Emacs-core
 
 * Whats New
 
+** <2024-12-20>
+
+Update roadmap, mark features as DONE, and enhance configurations:
+
+- *Features Marked as DONE:*
+  - *image-dired*: Marked as DONE after functionality was revisited and copied over.
+  - *selected-window-accent-mode*: Improved and marked as complete with updated configurations for synchronized highlighting of active windows and tabs.
+  - *jinx/powerthesaurus*: Replaced with a simpler configuration relying on `flyspell-buffer` and dictionary lookups.
+  - *deadgrep*: Transitioned to a lighter approach leveraging `grep-mode` and `ripgrep` while maintaining powerful search output.
+  - *kurecolor*: Achieved similar results with custom regular expressions and built-in Emacs color utilities.
+
 ** <2024-12-19>
 
 - *Replaced Features:*
@@ -54,17 +65,21 @@ This commit adds clarity for users encountering the `Permission denied (publicke
 Here is a kanban of the features that will be (hopefully) converted to core/enhanced Emacs features and visually demonstrating their current status via a kanban board
 
 #+begin: kanban :layout ("..." . 50) :scope nil :range ("TODO" . "DONE") :sort "O" :depth 3 :match "roadmap" :compressed t
-| TODO                        | DOING     | DONE                    |
-|-----------------------------+-----------+-------------------------|
-| [[file:README.org::*selected-window-accent-mode][selected-window-accent-mode]] | [[file:README.org::*embark][embark]]    | [[file:README.org::*minibuffer completion][minibuffer completion]]   |
-| [[file:README.org::*htmlize][htmlize]]                     | [[file:README.org::*deadgrep][deadgrep]]  | [[file:README.org::*ace-window][ace-window]]              |
-| [[file:README.org::*shell / completion][shell / completion]]          | [[file:README.org::*popper][popper]]    | [[file:README.org::*recentf-open][recentf-open]]            |
-| [[file:README.org::*capf-autosuggest][capf-autosuggest]]            | [[file:README.org::*kurecolor][kurecolor]] | [[file:README.org::*rainbow-mode][rainbow-mode]]            |
-| [[file:README.org::*Ada][Ada]]                         |           | [[file:README.org::*visual-fill-column-mode][visual-fill-column-mode]] |
-|                             |           | [[file:README.org::*find-name-dired][find-name-dired]]         |
-|                             |           | [[file:README.org::*magit][magit]]                   |
-|                             |           | [[file:README.org::*tempel][tempel]]                  |
-|                             |           | [[file:README.org::*image-dired][image-dired]]             |
+| TODO               | DOING  | DONE                        |
+|--------------------+--------+-----------------------------|
+| [[file:README.org::*htmlize][htmlize]]            | [[file:README.org::*embark][embark]] | [[file:README.org::*minibuffer completion][minibuffer completion]]       |
+| [[file:README.org::*shell / completion][shell / completion]] | [[file:README.org::*popper][popper]] | [[file:README.org::*ace-window][ace-window]]                  |
+| [[file:README.org::*capf-autosuggest][capf-autosuggest]]   |        | [[file:README.org::*recentf-open][recentf-open]]                |
+| [[file:README.org::*Ada][Ada]]                |        | [[file:README.org::*rainbow-mode][rainbow-mode]]                |
+|                    |        | [[file:README.org::*visual-fill-column-mode][visual-fill-column-mode]]     |
+|                    |        | [[file:README.org::*find-name-dired][find-name-dired]]             |
+|                    |        | [[file:README.org::*magit][magit]]                       |
+|                    |        | [[file:README.org::*tempel][tempel]]                      |
+|                    |        | [[file:README.org::*image-dired][image-dired]]                 |
+|                    |        | [[file:README.org::*selected-window-accent-mode][selected-window-accent-mode]] |
+|                    |        | [[file:README.org::*deadgrep][deadgrep]]                    |
+|                    |        | [[file:README.org::*jinx / powerthesaurus][jinx / powerthesaurus]]       |
+|                    |        | [[file:README.org::*kurecolor][kurecolor]]                   |
 #+end:
 
 * Roadmap                                                           :roadmap:
@@ -295,35 +310,47 @@ Yes, adapted to using =abbrev-mode=, the syntax for the =abbrev_defs= is very si
 
 The only negative is the positional cursor options easily defined from tempel but if I really wanted to I could just include lambda functions to move th cursor.  But I don't think I am too bothered, I will just use the usual Emacs navigation keys.
 
-** DOING embark
-
-I am not using too many aspects mainly the following:
-
-- copy command - probably easy to replicate
-
-Solved with the code below:
-
-#+begin_src elisp
-(defun my-icomplete-copy-candidate ()
-  "Copy the current Icomplete candidate to the kill ring."
-  (interactive)
-  (let ((candidate (car completion-all-sorted-completions)))
-    (when candidate
-      (kill-new (substring-no-properties candidate))
-      (abort-recursive-edit))))
-;;
-(define-key minibuffer-local-completion-map (kbd "C-c ,") 'my-icomplete-copy-candidate)
-#+end_src
-  
-- collect
-- export
-
 ** DONE image-dired
 CLOSED: [2024-12-19 Thu 11:44]
 
 Copy over functionality, no real external things, its just is it valuable given how little I use it? 
 
-** DOING deadgrep
+** DONE selected-window-accent-mode
+CLOSED: [2024-12-20 Fri 08:53]
+
+My package of highlighting the selected window/tabs, which actually I find very useful and of course due to my familiarity I could code up a more simple version.
+
+Pretty much covered by where the user will be prompted for a colour and the faces adapted accordingly:
+
+#+begin_src elisp
+(defun my/sync-tab-bar-to-theme (&optional color)
+  "Synchronize tab-bar faces with the current theme, and set
+mode-line background color interactively using `read-color`
+if COLOR is not provided as an argument."
+  (interactive (list (when current-prefix-arg (read-color "Color: "))))
+  ;; Determine the color to use
+  (let ((selected-color (or color (read-color "Select mode-line background color: "))))
+    (set-hl-line-darker-background)
+    (set-face-attribute 'mode-line nil :height 120 :underline nil :overline nil :box nil
+                        :background selected-color :foreground "#000000")
+    (set-face-attribute 'mode-line-inactive nil :height 120 :underline nil :overline nil
+                        :background "#000000" :foreground "#aaaaaa")
+    (let ((default-bg (face-background 'default))
+          (default-fg (face-foreground 'default))
+          (default-hl (face-background 'highlight))
+          (inactive-fg (face-foreground 'mode-line-inactive)))
+      (custom-set-faces
+       `(vertical-border ((t (:foreground ,(darken-color default-fg 60)))))
+       `(window-divider ((t (:foreground ,(darken-color default-fg 60)))))
+       `(fringe ((t (:foreground ,default-bg :background ,default-bg))))
+       `(tab-bar ((t (:inherit default :background ,default-bg :foreground ,default-fg))))
+       `(tab-bar-tab ((t (:inherit 'highlight :background ,selected-color :foreground "#000000"))))
+       `(tab-bar-tab-inactive ((t (:inherit default :background ,default-bg :foreground ,inactive-fg
+                                            :box (:line-width 2 :color ,default-bg :style released-button)))))))))
+#+end_src
+
+** DONE deadgrep
+CLOSED: [2024-12-20 Fri 08:54]
 
 Would rgrep be potentially good enough?, maybe, or maybe pull on ripgrep through a simple interface and re-use =grep-mode= so essentially it will look just like rgrep output except with more information about the ripgrep search in the style of deadgrep, for example:
 
@@ -413,76 +440,43 @@ Being solved with the following code:
 
 **** FIXED rgrep fallback doesn't have local keys option of "d" "s" "g" which would be a nice improvement
 
-** DOING popper
+** DONE jinx / powerthesaurus
+CLOSED: [2024-12-20 Fri 09:04]
 
-Mainly used for popping and popping out shells, I'm sure I can code up an alternative solution here if I need to.
+I think I can probably just use =flyspell-buffer= and do I really need a thesaurus?, probably not, and just lean on =dictionary-lookup-definition=
 
-Testing the following implementation:
+Solution is the following configuration:
 
 #+begin_src elisp
-(defvar my/popper-current-popup nil
-  "Stores the currently active popup buffer for quick toggle.")
-;;
-(defun my/popper-toggle-popup ()
-  "Toggle visibility of pop-up buffers.
-Pop-ups are identified by their names and certain buffer modes.
-When toggled, the function displays the next available pop-up
-buffer or hides currently displayed pop-ups. Stores the last
-active popup in `my/popper-current-popup`."
-  (interactive)
-  (let* ((popup-patterns '("\\*Help\\*" "\\*eshell\.*\\*" "\\*eldoc\.*\\*"))
-         (popup-buffers (seq-filter (lambda (buf)
-                                      (let ((bufname (buffer-name buf)))
-                                        (seq-some (lambda (pattern)
-                                                    (string-match-p pattern bufname))
-                                                  popup-patterns)))
-                                    (buffer-list)))
-         (current-popup (car (seq-filter (lambda (win)
-                                           (member (window-buffer win) popup-buffers))
-                                         (window-list)))))
-    (if current-popup
-        ;; If a pop-up buffer is currently visible, bury it.
-        (let ((buf (window-buffer current-popup)))
-          (delete-window current-popup)
-          (bury-buffer buf)
-          (setq my/popper-current-popup nil) ;; Clear the currently tracked popup.
-          (message "Hid pop-up buffer: %s" (buffer-name buf)))
-      ;; Otherwise, display the first available pop-up buffer.
-      (if popup-buffers
-          (let ((buf (car popup-buffers)))
-            (pop-to-buffer buf
-                           '(display-buffer-at-bottom
-                             (inhibit-same-window . t)
-                             (window-height . 0.3)))
-            (setq my/popper-current-popup buf) ;; Store the displayed popup buffer.
-            (message "Displayed pop-up buffer: %s" (buffer-name buf)))
-        (message "No pop-up buffers to display!")))))
-;;
-(defun my/popper-toggle-current ()
-  "Toggle visibility of the last active popup buffer (`my/popper-current-popup`).
-If the popup is visible, hide it. If the popup is not visible, restore it."
-  (interactive)
-  (if (and my/popper-current-popup (buffer-live-p my/popper-current-popup))
-      (if (get-buffer-window my/popper-current-popup)
-          (progn
-            (delete-window (get-buffer-window my/popper-current-popup))
-            (message "Hid active popup buffer: %s" (buffer-name my/popper-current-popup)))
-        (pop-to-buffer my/popper-current-popup
-                       '(display-buffer-at-bottom
-                         (inhibit-same-window . t)
-                         (window-height . 0.3)))
-        (message "Restored active popup buffer: %s" (buffer-name my/popper-current-popup)))
-    ;; If no valid currently tracked popup:
-    (message "No active popup buffer to toggle.")))
-;;
-;; Cycle through popups or show the next popup.
-(global-set-key (kbd "C-c p") #'my/popper-toggle-popup)
-;;
-;; Toggle the currently selected popup.
-(global-set-key (kbd "C-c l") #'my/popper-toggle-current)
+(setq ispell-local-dictionary "en_GB")
+(setq ispell-program-name "hunspell")
+(setq dictionary-default-dictionary "*")
+(setq dictionary-server "dict.org")
+(setq dictionary-use-single-buffer t)
+(define-prefix-command 'my-spell-prefix-map)
+(global-set-key (kbd "C-c s") 'my-spell-prefix-map)
+(global-set-key (kbd "C-c s s") #'(lambda()(interactive)
+                                    (flyspell-buffer)
+                                    (call-interactively 'flyspell-mode)))
+(global-set-key (kbd "C-c s d") #'dictionary-lookup-definition)
+(global-set-key (kbd "C-0") #'ispell-word)
 #+end_src
 
-** DOING kurecolor
+Note that at the moment I don't really care about spell checking efficiency (which jinx was very good at), I am quite happy to wait for a few seconds for the (flyspell-buffer) to run, and in a narrowed region it wont take that long anyway.
+
+Also as a bonus I recently discovered the shortcut key of C-. which is to autocorrect cycle a word, this makes life much simpler.
+
+#+begin_quote
+(flyspell-auto-correct-word)
+
+Correct the current word.
+This command proposes various successive corrections for the
+current word.  If invoked repeatedly on the same position, it
+cycles through the possible corrections of the current word.
+#+end_quote
+
+** DONE kurecolor
+CLOSED: [2024-12-20 Fri 08:54]
 
 Add some elisp with the requisite regex-search and elisp colour calls, I have achieved this in the past, before I found the more convenient option of kurecolor
 
@@ -589,9 +583,97 @@ Testing with the following code:
 (global-set-key (kbd "M-<home>") 'my/insert-random-color-at-point)
 #+end_src
 
-** TODO selected-window-accent-mode
+** DOING embark
 
-My package of highlighting the selected window/tabs, which actually I find very useful and of course due to my familiarity I could code up a more simple version.
+I am not using too many aspects mainly the following:
+
+- copy command - probably easy to replicate
+
+Solved with the code below:
+
+#+begin_src elisp
+(defun my-icomplete-copy-candidate ()
+  "Copy the current Icomplete candidate to the kill ring."
+  (interactive)
+  (let ((candidate (car completion-all-sorted-completions)))
+    (when candidate
+      (kill-new (substring-no-properties candidate))
+      (abort-recursive-edit))))
+;;
+(define-key minibuffer-local-completion-map (kbd "C-c ,") 'my-icomplete-copy-candidate)
+#+end_src
+  
+- collect
+- export
+
+** DOING popper
+
+Mainly used for popping and popping out shells, I'm sure I can code up an alternative solution here if I need to.
+
+Testing the following implementation:
+
+#+begin_src elisp
+(defvar my/popper-current-popup nil
+  "Stores the currently active popup buffer for quick toggle.")
+;;
+(defun my/popper-toggle-popup ()
+  "Toggle visibility of pop-up buffers.
+Pop-ups are identified by their names and certain buffer modes.
+When toggled, the function displays the next available pop-up
+buffer or hides currently displayed pop-ups. Stores the last
+active popup in `my/popper-current-popup`."
+  (interactive)
+  (let* ((popup-patterns '("\\*Help\\*" "\\*eshell\.*\\*" "\\*eldoc\.*\\*"))
+         (popup-buffers (seq-filter (lambda (buf)
+                                      (let ((bufname (buffer-name buf)))
+                                        (seq-some (lambda (pattern)
+                                                    (string-match-p pattern bufname))
+                                                  popup-patterns)))
+                                    (buffer-list)))
+         (current-popup (car (seq-filter (lambda (win)
+                                           (member (window-buffer win) popup-buffers))
+                                         (window-list)))))
+    (if current-popup
+        ;; If a pop-up buffer is currently visible, bury it.
+        (let ((buf (window-buffer current-popup)))
+          (delete-window current-popup)
+          (bury-buffer buf)
+          (setq my/popper-current-popup nil) ;; Clear the currently tracked popup.
+          (message "Hid pop-up buffer: %s" (buffer-name buf)))
+      ;; Otherwise, display the first available pop-up buffer.
+      (if popup-buffers
+          (let ((buf (car popup-buffers)))
+            (pop-to-buffer buf
+                           '(display-buffer-at-bottom
+                             (inhibit-same-window . t)
+                             (window-height . 0.3)))
+            (setq my/popper-current-popup buf) ;; Store the displayed popup buffer.
+            (message "Displayed pop-up buffer: %s" (buffer-name buf)))
+        (message "No pop-up buffers to display!")))))
+;;
+(defun my/popper-toggle-current ()
+  "Toggle visibility of the last active popup buffer (`my/popper-current-popup`).
+If the popup is visible, hide it. If the popup is not visible, restore it."
+  (interactive)
+  (if (and my/popper-current-popup (buffer-live-p my/popper-current-popup))
+      (if (get-buffer-window my/popper-current-popup)
+          (progn
+            (delete-window (get-buffer-window my/popper-current-popup))
+            (message "Hid active popup buffer: %s" (buffer-name my/popper-current-popup)))
+        (pop-to-buffer my/popper-current-popup
+                       '(display-buffer-at-bottom
+                         (inhibit-same-window . t)
+                         (window-height . 0.3)))
+        (message "Restored active popup buffer: %s" (buffer-name my/popper-current-popup)))
+    ;; If no valid currently tracked popup:
+    (message "No active popup buffer to toggle.")))
+;;
+;; Cycle through popups or show the next popup.
+(global-set-key (kbd "C-c p") #'my/popper-toggle-popup)
+;;
+;; Toggle the currently selected popup.
+(global-set-key (kbd "C-c l") #'my/popper-toggle-current)
+#+end_src
 
 ** TODO htmlize
 
@@ -612,12 +694,9 @@ Unfortunately this may be the only elisp package that I may need to bake into th
 These is also the potential to use ada-mode-lite and leverage eglot for the rest.
 
 * TODO Features that won't be converted to core
-
-** TODO calendar / calfw
-
-** TODO themes
-
 ** TODO ox-hugo
+
+** TODO plantuml
 
 ** TODO eglot
 
