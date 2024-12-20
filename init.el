@@ -109,15 +109,30 @@ Enable `recentf-mode' if it isn't already."
                    file-list))))
     (when file (find-file (expand-file-name file)))))
 
-(defun my-icomplete-copy-candidate ()
-  "Copy the current Icomplete candidate to the kill ring."
-  (interactive)
-  (let ((candidate (car completion-all-sorted-completions)))
-    (when candidate
-      (kill-new (substring-no-properties candidate))
-      (abort-recursive-edit))))
-;;
-(define-key minibuffer-local-completion-map (kbd "C-c ,") 'my-icomplete-copy-candidate)
+(defun my/sync-tab-bar-to-theme (&optional color)
+  "Synchronize tab-bar faces with the current theme, and set
+mode-line background color interactively using `read-color`
+if COLOR is not provided as an argument."
+  (interactive (list (when current-prefix-arg (read-color "Color: "))))
+  ;; Determine the color to use
+  (let ((selected-color (or color (read-color "Select mode-line background color: "))))
+    (set-hl-line-darker-background)
+    (set-face-attribute 'mode-line nil :height 120 :underline nil :overline nil :box nil
+                        :background selected-color :foreground "#000000")
+    (set-face-attribute 'mode-line-inactive nil :height 120 :underline nil :overline nil
+                        :background "#000000" :foreground "#aaaaaa")
+    (let ((default-bg (face-background 'default))
+          (default-fg (face-foreground 'default))
+          (default-hl (face-background 'highlight))
+          (inactive-fg (face-foreground 'mode-line-inactive)))
+      (custom-set-faces
+       `(vertical-border ((t (:foreground ,(darken-color default-fg 60)))))
+       `(window-divider ((t (:foreground ,(darken-color default-fg 60)))))
+       `(fringe ((t (:foreground ,default-bg :background ,default-bg))))
+       `(tab-bar ((t (:inherit default :background ,default-bg :foreground ,default-fg))))
+       `(tab-bar-tab ((t (:inherit 'highlight :background ,selected-color :foreground "#000000"))))
+       `(tab-bar-tab-inactive ((t (:inherit default :background ,default-bg :foreground ,inactive-fg
+                                            :box (:line-width 2 :color ,default-bg :style released-button)))))))))
 
 (defun my/grep (search-term &optional directory glob)
   "Run ripgrep (rg) with SEARCH-TERM and optionally DIRECTORY and GLOB.
@@ -191,66 +206,18 @@ Enable `recentf-mode' if it isn't already."
                                  (interactive)
                                  (my/grep search-term directory glob))))))
 
-(defvar my/popper-current-popup nil
-  "Stores the currently active popup buffer for quick toggle.")
-;;
-(defun my/popper-toggle-popup ()
-  "Toggle visibility of pop-up buffers.
-Pop-ups are identified by their names and certain buffer modes.
-When toggled, the function displays the next available pop-up
-buffer or hides currently displayed pop-ups. Stores the last
-active popup in `my/popper-current-popup`."
-  (interactive)
-  (let* ((popup-patterns '("\\*Help\\*" "\\*eshell\.*\\*" "\\*eldoc\.*\\*"))
-         (popup-buffers (seq-filter (lambda (buf)
-                                      (let ((bufname (buffer-name buf)))
-                                        (seq-some (lambda (pattern)
-                                                    (string-match-p pattern bufname))
-                                                  popup-patterns)))
-                                    (buffer-list)))
-         (current-popup (car (seq-filter (lambda (win)
-                                           (member (window-buffer win) popup-buffers))
-                                         (window-list)))))
-    (if current-popup
-        ;; If a pop-up buffer is currently visible, bury it.
-        (let ((buf (window-buffer current-popup)))
-          (delete-window current-popup)
-          (bury-buffer buf)
-          (setq my/popper-current-popup nil) ;; Clear the currently tracked popup.
-          (message "Hid pop-up buffer: %s" (buffer-name buf)))
-      ;; Otherwise, display the first available pop-up buffer.
-      (if popup-buffers
-          (let ((buf (car popup-buffers)))
-            (pop-to-buffer buf
-                           '(display-buffer-at-bottom
-                             (inhibit-same-window . t)
-                             (window-height . 0.3)))
-            (setq my/popper-current-popup buf) ;; Store the displayed popup buffer.
-            (message "Displayed pop-up buffer: %s" (buffer-name buf)))
-        (message "No pop-up buffers to display!")))))
-;;
-(defun my/popper-toggle-current ()
-  "Toggle visibility of the last active popup buffer (`my/popper-current-popup`).
-If the popup is visible, hide it. If the popup is not visible, restore it."
-  (interactive)
-  (if (and my/popper-current-popup (buffer-live-p my/popper-current-popup))
-      (if (get-buffer-window my/popper-current-popup)
-          (progn
-            (delete-window (get-buffer-window my/popper-current-popup))
-            (message "Hid active popup buffer: %s" (buffer-name my/popper-current-popup)))
-        (pop-to-buffer my/popper-current-popup
-                       '(display-buffer-at-bottom
-                         (inhibit-same-window . t)
-                         (window-height . 0.3)))
-        (message "Restored active popup buffer: %s" (buffer-name my/popper-current-popup)))
-    ;; If no valid currently tracked popup:
-    (message "No active popup buffer to toggle.")))
-;;
-;; Cycle through popups or show the next popup.
-(global-set-key (kbd "C-c p") #'my/popper-toggle-popup)
-;;
-;; Toggle the currently selected popup.
-(global-set-key (kbd "C-c l") #'my/popper-toggle-current)
+(setq ispell-local-dictionary "en_GB")
+(setq ispell-program-name "hunspell")
+(setq dictionary-default-dictionary "*")
+(setq dictionary-server "dict.org")
+(setq dictionary-use-single-buffer t)
+(define-prefix-command 'my-spell-prefix-map)
+(global-set-key (kbd "C-c s") 'my-spell-prefix-map)
+(global-set-key (kbd "C-c s s") #'(lambda()(interactive)
+                                    (flyspell-buffer)
+                                    (call-interactively 'flyspell-mode)))
+(global-set-key (kbd "C-c s d") #'dictionary-lookup-definition)
+(global-set-key (kbd "C-0") #'ispell-word)
 
 (require 'cl-lib)
 (require 'color)
@@ -350,3 +317,74 @@ If the popup is visible, hide it. If the popup is not visible, restore it."
 (global-set-key (kbd "M-<left>") (lambda () (interactive) (my/decrease-hue-at-point 5)))
 (global-set-key (kbd "M-<right>") (lambda () (interactive) (my/increase-hue-at-point 5)))
 (global-set-key (kbd "M-<home>") 'my/insert-random-color-at-point)
+
+(defun my-icomplete-copy-candidate ()
+  "Copy the current Icomplete candidate to the kill ring."
+  (interactive)
+  (let ((candidate (car completion-all-sorted-completions)))
+    (when candidate
+      (kill-new (substring-no-properties candidate))
+      (abort-recursive-edit))))
+;;
+(define-key minibuffer-local-completion-map (kbd "C-c ,") 'my-icomplete-copy-candidate)
+
+(defvar my/popper-current-popup nil
+  "Stores the currently active popup buffer for quick toggle.")
+;;
+(defun my/popper-toggle-popup ()
+  "Toggle visibility of pop-up buffers.
+Pop-ups are identified by their names and certain buffer modes.
+When toggled, the function displays the next available pop-up
+buffer or hides currently displayed pop-ups. Stores the last
+active popup in `my/popper-current-popup`."
+  (interactive)
+  (let* ((popup-patterns '("\\*Help\\*" "\\*eshell\.*\\*" "\\*eldoc\.*\\*"))
+         (popup-buffers (seq-filter (lambda (buf)
+                                      (let ((bufname (buffer-name buf)))
+                                        (seq-some (lambda (pattern)
+                                                    (string-match-p pattern bufname))
+                                                  popup-patterns)))
+                                    (buffer-list)))
+         (current-popup (car (seq-filter (lambda (win)
+                                           (member (window-buffer win) popup-buffers))
+                                         (window-list)))))
+    (if current-popup
+        ;; If a pop-up buffer is currently visible, bury it.
+        (let ((buf (window-buffer current-popup)))
+          (delete-window current-popup)
+          (bury-buffer buf)
+          (setq my/popper-current-popup nil) ;; Clear the currently tracked popup.
+          (message "Hid pop-up buffer: %s" (buffer-name buf)))
+      ;; Otherwise, display the first available pop-up buffer.
+      (if popup-buffers
+          (let ((buf (car popup-buffers)))
+            (pop-to-buffer buf
+                           '(display-buffer-at-bottom
+                             (inhibit-same-window . t)
+                             (window-height . 0.3)))
+            (setq my/popper-current-popup buf) ;; Store the displayed popup buffer.
+            (message "Displayed pop-up buffer: %s" (buffer-name buf)))
+        (message "No pop-up buffers to display!")))))
+;;
+(defun my/popper-toggle-current ()
+  "Toggle visibility of the last active popup buffer (`my/popper-current-popup`).
+If the popup is visible, hide it. If the popup is not visible, restore it."
+  (interactive)
+  (if (and my/popper-current-popup (buffer-live-p my/popper-current-popup))
+      (if (get-buffer-window my/popper-current-popup)
+          (progn
+            (delete-window (get-buffer-window my/popper-current-popup))
+            (message "Hid active popup buffer: %s" (buffer-name my/popper-current-popup)))
+        (pop-to-buffer my/popper-current-popup
+                       '(display-buffer-at-bottom
+                         (inhibit-same-window . t)
+                         (window-height . 0.3)))
+        (message "Restored active popup buffer: %s" (buffer-name my/popper-current-popup)))
+    ;; If no valid currently tracked popup:
+    (message "No active popup buffer to toggle.")))
+;;
+;; Cycle through popups or show the next popup.
+(global-set-key (kbd "C-c p") #'my/popper-toggle-popup)
+;;
+;; Toggle the currently selected popup.
+(global-set-key (kbd "C-c l") #'my/popper-toggle-current)
