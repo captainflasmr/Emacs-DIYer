@@ -23,6 +23,7 @@ Used in concert with https://github.com/captainflasmr/Emacs-core
 * Whats New
 
 ** <2024-12-20>
+
 - Added defuns for pandoc md to org conversion, I guess I could check for =pandoc= being present on the system?
   
 ** <2024-12-20>
@@ -68,21 +69,21 @@ This commit adds clarity for users encountering the `Permission denied (publicke
 Here is a kanban of the features that will be (hopefully) converted to core/enhanced Emacs features and visually demonstrating their current status via a kanban board
 
 #+begin: kanban :layout ("..." . 50) :scope nil :range ("TODO" . "DONE") :sort "O" :depth 3 :match "roadmap" :compressed t
-| TODO               | DOING                       | DONE                        |
-|--------------------+-----------------------------+-----------------------------|
-| [[file:README.org::*htmlize][htmlize]]            | [[file:README.org::*embark][embark]]                      | [[file:README.org::*minibuffer completion][minibuffer completion]]       |
-| [[file:README.org::*shell / completion][shell / completion]] | [[file:README.org::*popper][popper]]                      | [[file:README.org::*ace-window][ace-window]]                  |
-| [[file:README.org::*capf-autosuggest][capf-autosuggest]]   | [[file:README.org::*pandoc md to org conversion][pandoc md to org conversion]] | [[file:README.org::*recentf-open][recentf-open]]                |
-| [[file:README.org::*Ada][Ada]]                |                             | [[file:README.org::*rainbow-mode][rainbow-mode]]                |
-|                    |                             | [[file:README.org::*visual-fill-column-mode][visual-fill-column-mode]]     |
-|                    |                             | [[file:README.org::*find-name-dired][find-name-dired]]             |
-|                    |                             | [[file:README.org::*magit][magit]]                       |
-|                    |                             | [[file:README.org::*tempel][tempel]]                      |
-|                    |                             | [[file:README.org::*image-dired][image-dired]]                 |
-|                    |                             | [[file:README.org::*selected-window-accent-mode][selected-window-accent-mode]] |
-|                    |                             | [[file:README.org::*deadgrep][deadgrep]]                    |
-|                    |                             | [[file:README.org::*jinx / powerthesaurus][jinx / powerthesaurus]]       |
-|                    |                             | [[file:README.org::*kurecolor][kurecolor]]                   |
+| TODO               | DOING                        | DONE                        |
+|--------------------+------------------------------+-----------------------------|
+| [[file:README.org::*htmlize][htmlize]]            | [[file:README.org::*embark][embark]]                       | [[file:README.org::*minibuffer completion][minibuffer completion]]       |
+| [[file:README.org::*shell / completion][shell / completion]] | [[file:README.org::*popper][popper]]                       | [[file:README.org::*ace-window][ace-window]]                  |
+| [[file:README.org::*capf-autosuggest][capf-autosuggest]]   | [[file:README.org::*pandoc md to org conversion][pandoc md to org conversion]]  | [[file:README.org::*recentf-open][recentf-open]]                |
+| [[file:README.org::*Ada][Ada]]                | [[file:README.org::*completion - corfu / company][completion - corfu / company]] | [[file:README.org::*rainbow-mode][rainbow-mode]]                |
+|                    |                              | [[file:README.org::*visual-fill-column-mode][visual-fill-column-mode]]     |
+|                    |                              | [[file:README.org::*find-name-dired][find-name-dired]]             |
+|                    |                              | [[file:README.org::*magit][magit]]                       |
+|                    |                              | [[file:README.org::*tempel][tempel]]                      |
+|                    |                              | [[file:README.org::*image-dired][image-dired]]                 |
+|                    |                              | [[file:README.org::*selected-window-accent-mode][selected-window-accent-mode]] |
+|                    |                              | [[file:README.org::*deadgrep][deadgrep]]                    |
+|                    |                              | [[file:README.org::*jinx / powerthesaurus][jinx / powerthesaurus]]       |
+|                    |                              | [[file:README.org::*kurecolor][kurecolor]]                   |
 #+end:
 
 * Roadmap                                                           :roadmap:
@@ -741,7 +742,7 @@ Potentially solved with the following, probably requires more testing:
      (dotimes (_ arg) (org-promote)))))
 #+end_src
 
-** TODO completion - corfu / company
+** DOING completion - corfu / company
 
 Can these in buffer completion systems be replaced by a simple in-built =icomplete= solution?
 
@@ -766,7 +767,11 @@ Lets give it a go!
 (setq icomplete-max-delay-chars 0)
 (setq icomplete-scroll t)
 (setq max-mini-window-height 2)
+(setq completion-auto-help nil)
+(setq completion-styles '(flex basic substring))
 #+end_src
+
+Note that the =completion-styles= is globally set to include =flex= because, by default, icomplete is the completion engine that works in the buffer. Since fido-mode, which is enabled by default, does not support flex (something I have now grown accustomed to) this adjustment is necessary.
 
 ** TODO htmlize
 
@@ -787,6 +792,7 @@ Unfortunately this may be the only elisp package that I may need to bake into th
 These is also the potential to use ada-mode-lite and leverage eglot for the rest.
 
 * TODO Features that won't be converted to core
+
 ** TODO ox-hugo
 
 ** TODO plantuml
