@@ -20,6 +20,31 @@ Perfect for lightweight usage in VMs or basic tasks.
 
 Used in concert with https://github.com/captainflasmr/Emacs-core
 
+* Kanban
+
+Here is a kanban of the features that will be (hopefully) converted to core/enhanced Emacs features and visually demonstrating their current status via a kanban board
+
+#+begin_src emacs-lisp :results table :exports results :tangle no
+  (my/kanban-to-table "roadmap")
+#+end_src
+
+#+RESULTS:
+| TODO             | DOING                        | DONE                        |
+|------------------+------------------------------+-----------------------------|
+| capf-autosuggest | embark                       | minibuffer completion       |
+|                  | popper                       | ace-window                  |
+|                  | pandoc md to org conversion  | recentf-open                |
+|                  | completion - corfu / company | rainbow-mode                |
+|                  | org-kanban                   | visual-fill-column-mode     |
+|                  |                              | find-name-dired             |
+|                  |                              | magit                       |
+|                  |                              | tempel                      |
+|                  |                              | image-dired                 |
+|                  |                              | selected-window-accent-mode |
+|                  |                              | deadgrep                    |
+|                  |                              | jinx / powerthesaurus       |
+|                  |                              | kurecolor                   |
+
 * Whats New
 
 ** <2024-12-22>
@@ -70,31 +95,6 @@ fix(README): add workaround for missing ssh-askpass in Emacs with vc-dir mode
 - Mentioned the potential QFSFileEngine error during `git push` with workaround applied.
 
 This commit adds clarity for users encountering the `Permission denied (publickey)` issue and provides a temporary fix until a better solution is implemented.
-
-* Kanban
-
-Here is a kanban of the features that will be (hopefully) converted to core/enhanced Emacs features and visually demonstrating their current status via a kanban board
-
-#+begin_src emacs-lisp :results table :exports results :tangle no
-  (my/kanban-to-table "roadmap")
-#+end_src
-
-#+RESULTS:
-| TODO             | DOING                        | DONE                        |
-|------------------+------------------------------+-----------------------------|
-| capf-autosuggest | embark                       | minibuffer completion       |
-|                  | popper                       | ace-window                  |
-|                  | pandoc md to org conversion  | recentf-open                |
-|                  | completion - corfu / company | rainbow-mode                |
-|                  | org-kanban                   | visual-fill-column-mode     |
-|                  |                              | find-name-dired             |
-|                  |                              | magit                       |
-|                  |                              | tempel                      |
-|                  |                              | image-dired                 |
-|                  |                              | selected-window-accent-mode |
-|                  |                              | deadgrep                    |
-|                  |                              | jinx / powerthesaurus       |
-|                  |                              | kurecolor                   |
 
 * Roadmap                                                           :roadmap:
 
