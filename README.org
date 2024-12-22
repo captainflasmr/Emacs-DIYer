@@ -22,6 +22,13 @@ Used in concert with https://github.com/captainflasmr/Emacs-core
 
 * Whats New
 
+** <2024-12-22>
+
+- Added =my/kanban-to-table= implementation detailing its structure and purpose.
+  - =my/kanban-to-table= dynamically formats Org-mode TODO headings into a Kanban-style Org table based on their TODO states.
+  - The function supports filtering entries by tags or property matches.
+  - Replaced the external package =org-kanban=
+
 ** <2024-12-20>
 
 - Added defuns for pandoc md to org conversion, I guess I could check for =pandoc= being present on the system?
@@ -68,23 +75,26 @@ This commit adds clarity for users encountering the `Permission denied (publicke
 
 Here is a kanban of the features that will be (hopefully) converted to core/enhanced Emacs features and visually demonstrating their current status via a kanban board
 
-#+begin: kanban :layout ("..." . 50) :scope nil :range ("TODO" . "DONE") :sort "O" :depth 3 :match "roadmap" :compressed t
+#+begin_src emacs-lisp :results table :exports results :tangle no
+  (my/kanban-to-table "roadmap")
+#+end_src
+
+#+RESULTS:
 | TODO               | DOING                        | DONE                        |
 |--------------------+------------------------------+-----------------------------|
-| [[file:README.org::*htmlize][htmlize]]            | [[file:README.org::*embark][embark]]                       | [[file:README.org::*minibuffer completion][minibuffer completion]]       |
-| [[file:README.org::*shell / completion][shell / completion]] | [[file:README.org::*popper][popper]]                       | [[file:README.org::*ace-window][ace-window]]                  |
-| [[file:README.org::*capf-autosuggest][capf-autosuggest]]   | [[file:README.org::*pandoc md to org conversion][pandoc md to org conversion]]  | [[file:README.org::*recentf-open][recentf-open]]                |
-| [[file:README.org::*Ada][Ada]]                | [[file:README.org::*completion - corfu / company][completion - corfu / company]] | [[file:README.org::*rainbow-mode][rainbow-mode]]                |
-|                    |                              | [[file:README.org::*visual-fill-column-mode][visual-fill-column-mode]]     |
-|                    |                              | [[file:README.org::*find-name-dired][find-name-dired]]             |
-|                    |                              | [[file:README.org::*magit][magit]]                       |
-|                    |                              | [[file:README.org::*tempel][tempel]]                      |
-|                    |                              | [[file:README.org::*image-dired][image-dired]]                 |
-|                    |                              | [[file:README.org::*selected-window-accent-mode][selected-window-accent-mode]] |
-|                    |                              | [[file:README.org::*deadgrep][deadgrep]]                    |
-|                    |                              | [[file:README.org::*jinx / powerthesaurus][jinx / powerthesaurus]]       |
-|                    |                              | [[file:README.org::*kurecolor][kurecolor]]                   |
-#+end:
+| htmlize            | embark                       | minibuffer completion       |
+| shell / completion | popper                       | ace-window                  |
+| capf-autosuggest   | pandoc md to org conversion  | recentf-open                |
+| Ada                | completion - corfu / company | rainbow-mode                |
+|                    | org-kanban                   | visual-fill-column-mode     |
+|                    |                              | find-name-dired             |
+|                    |                              | magit                       |
+|                    |                              | tempel                      |
+|                    |                              | image-dired                 |
+|                    |                              | selected-window-accent-mode |
+|                    |                              | deadgrep                    |
+|                    |                              | jinx / powerthesaurus       |
+|                    |                              | kurecolor                   |
 
 * Roadmap                                                           :roadmap:
 
@@ -772,6 +782,66 @@ Lets give it a go!
 #+end_src
 
 Note that the =completion-styles= is globally set to include =flex= because, by default, icomplete is the completion engine that works in the buffer. Since fido-mode, which is enabled by default, does not support flex (something I have now grown accustomed to) this adjustment is necessary.
+
+** DOING org-kanban
+
+Creating a kanban board for an org file, technically I should just be able to define a defun that can be embedded within something like:
+
+#+begin_src emacs-lisp :results table :exports results :tangle no
+  (my/kanban-to-table "roadmap")
+#+end_src
+
+Here is the current code, undergoing testing:
+
+#+begin_src elisp
+(defun my/kanban-to-table (&optional match)
+  "Format Org headings into a Kanban-style Org table.
+Each TODO state becomes a column, and headings under each state are placed in rows.
+Optionally filter headings by MATCH (e.g., a tag or property match)."
+  (interactive)
+  (let ((todo-states org-todo-keywords-1)  ;; Gather all TODO states defined in the current Org file.
+        (kanban-table (list))
+        (column-data (make-hash-table :test 'equal))) ;; Store TODO states and their associated headings.
+    ;; Initialize data structure for each TODO state (columns).
+    (dolist (state todo-states)
+      (puthash state '() column-data))
+    ;; Collect headlines into their respective TODO state buckets.
+    (save-excursion
+      (goto-char (point-min))
+      ;; Optionally filter entries using `match`.
+      (org-map-entries
+       (lambda ()
+         (let* ((todo (org-get-todo-state))       ;; Get the TODO state of the current heading.
+                (heading (org-get-heading t t t t))) ;; Get the heading text.
+           (when (and todo (not (string-empty-p todo))) ;; Check if the heading has a TODO state.
+             (puthash todo
+                      (append (gethash todo column-data) (list heading))
+                      column-data))))
+       match 'file)) ;; Search the entire file or based on optional `match`.
+    ;; Filter out empty columns
+    (setq todo-states (seq-filter (lambda (state)
+                                    (not (null (gethash state column-data))))
+                                  todo-states))
+    ;; Build the rows for the Kanban Org table.
+    (let ((max-rows 0))
+      (dolist (state todo-states)
+        (let ((headings (gethash state column-data)))
+          (setq max-rows (max max-rows (length headings)))
+          (push (list state headings) kanban-table)))
+      ;; Construct the table rows.
+      (let ((rows '()))
+        ;; Fill rows by extracting each heading under TODO states.
+        (dotimes (i max-rows)
+          (let ((row '()))
+            (dolist (state todo-states)
+              (let ((headings (gethash state column-data)))
+                (push (or (nth i headings) "") row))) ;; Add the heading or an empty string.
+            (push (reverse row) rows)))
+        (setq rows (nreverse rows))
+        (push 'hline rows)
+        ;; Insert TODO column headers at the top.
+        (push todo-states rows)))))
+#+end_src
 
 ** TODO htmlize
 

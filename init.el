@@ -464,3 +464,51 @@ If the popup is visible, hide it. If the popup is not visible, restore it."
 (setq max-mini-window-height 2)
 (setq completion-auto-help nil)
 (setq completion-styles '(flex basic substring))
+
+(defun my/kanban-to-table (&optional match)
+  "Format Org headings into a Kanban-style Org table.
+Each TODO state becomes a column, and headings under each state are placed in rows.
+Optionally filter headings by MATCH (e.g., a tag or property match)."
+  (interactive)
+  (let ((todo-states org-todo-keywords-1)  ;; Gather all TODO states defined in the current Org file.
+        (kanban-table (list))
+        (column-data (make-hash-table :test 'equal))) ;; Store TODO states and their associated headings.
+    ;; Initialize data structure for each TODO state (columns).
+    (dolist (state todo-states)
+      (puthash state '() column-data))
+    ;; Collect headlines into their respective TODO state buckets.
+    (save-excursion
+      (goto-char (point-min))
+      ;; Optionally filter entries using `match`.
+      (org-map-entries
+       (lambda ()
+         (let* ((todo (org-get-todo-state))       ;; Get the TODO state of the current heading.
+                (heading (org-get-heading t t t t))) ;; Get the heading text.
+           (when (and todo (not (string-empty-p todo))) ;; Check if the heading has a TODO state.
+             (puthash todo
+                      (append (gethash todo column-data) (list heading))
+                      column-data))))
+       match 'file)) ;; Search the entire file or based on optional `match`.
+    ;; Filter out empty columns
+    (setq todo-states (seq-filter (lambda (state)
+                                    (not (null (gethash state column-data))))
+                                  todo-states))
+    ;; Build the rows for the Kanban Org table.
+    (let ((max-rows 0))
+      (dolist (state todo-states)
+        (let ((headings (gethash state column-data)))
+          (setq max-rows (max max-rows (length headings)))
+          (push (list state headings) kanban-table)))
+      ;; Construct the table rows.
+      (let ((rows '()))
+        ;; Fill rows by extracting each heading under TODO states.
+        (dotimes (i max-rows)
+          (let ((row '()))
+            (dolist (state todo-states)
+              (let ((headings (gethash state column-data)))
+                (push (or (nth i headings) "") row))) ;; Add the heading or an empty string.
+            (push (reverse row) rows)))
+        (setq rows (nreverse rows))
+        (push 'hline rows)
+        ;; Insert TODO column headers at the top.
+        (push todo-states rows)))))
