@@ -80,21 +80,21 @@ Here is a kanban of the features that will be (hopefully) converted to core/enha
 #+end_src
 
 #+RESULTS:
-| TODO               | DOING                        | DONE                        |
-|--------------------+------------------------------+-----------------------------|
-| htmlize            | embark                       | minibuffer completion       |
-| shell / completion | popper                       | ace-window                  |
-| capf-autosuggest   | pandoc md to org conversion  | recentf-open                |
-| Ada                | completion - corfu / company | rainbow-mode                |
-|                    | org-kanban                   | visual-fill-column-mode     |
-|                    |                              | find-name-dired             |
-|                    |                              | magit                       |
-|                    |                              | tempel                      |
-|                    |                              | image-dired                 |
-|                    |                              | selected-window-accent-mode |
-|                    |                              | deadgrep                    |
-|                    |                              | jinx / powerthesaurus       |
-|                    |                              | kurecolor                   |
+| TODO             | DOING                        | DONE                        |
+|------------------+------------------------------+-----------------------------|
+| capf-autosuggest | embark                       | minibuffer completion       |
+|                  | popper                       | ace-window                  |
+|                  | pandoc md to org conversion  | recentf-open                |
+|                  | completion - corfu / company | rainbow-mode                |
+|                  | org-kanban                   | visual-fill-column-mode     |
+|                  |                              | find-name-dired             |
+|                  |                              | magit                       |
+|                  |                              | tempel                      |
+|                  |                              | image-dired                 |
+|                  |                              | selected-window-accent-mode |
+|                  |                              | deadgrep                    |
+|                  |                              | jinx / powerthesaurus       |
+|                  |                              | kurecolor                   |
 
 * Roadmap                                                           :roadmap:
 
@@ -843,23 +843,9 @@ Optionally filter headings by MATCH (e.g., a tag or property match)."
         (push todo-states rows)))))
 #+end_src
 
-** TODO htmlize
-
-Go through the Emacs export mechanism instead and open separate browser window, refreshing when exported each time?
-
-** TODO shell / completion
-
-Can I bring in cape-history into eshell/shell, the main issue is the inline fish type completion which I may be able to live without, but it is really fast and convenient!
-
 ** TODO capf-autosuggest
 
 Some elisp for some simple predictive inline completion, maybe take a look at how capf-autosuggest does it.
-
-** TODO Ada
-
-Unfortunately this may be the only elisp package that I may need to bake into this whole concept.  Current ada-mode isn't supported out of the box in Emacs, it is suggested to use the AdaCore ada-mode but that is a pain to compile (mainly due to trying to install gnatcoll), I have found the old ada mode used by Emacs for that adequate, so this may need to be separately downloaded and baked in.
-
-These is also the potential to use ada-mode-lite and leverage eglot for the rest.
 
 * TODO Features that won't be converted to core
 
