@@ -551,72 +551,53 @@ Optionally filter headings by MATCH (e.g., a tag or property match)."
          :recursive t
          :publishing-directory "~/publish/hugo-emacs/site/static/public_html/emacs"
          :publishing-function org-publish-attachment)
-        ("images-blog"
-         :base-directory "~/DCIM/content/blog"
-         :base-extension "jpg\\|gif\\|png"
-         :recursive t
-         :publishing-directory "~/publish/hugo-emacs/site/static/public_html/blog"
-         :publishing-function org-publish-attachment)
-        ("images-bingo"
-         :base-directory "~/DCIM/content/bingo"
-         :base-extension "jpg\\|gif\\|png"
-         :recursive t
-         :publishing-directory "~/publish/hugo-emacs/site/static/public_html/bingo"
-         :publishing-function org-publish-attachment)j
-        ("images-music"
-         :base-directory "~/DCIM/content/music"
-         :base-extension "jpg\\|gif\\|png"
-         :recursive t
-         :publishing-directory "~/publish/hugo-emacs/site/static/public_html/music"
-         :publishing-function org-publish-attachment)
-        ("images-dad--dictionary"
-         :base-directory "~/DCIM/content/dad--dictionary"
-         :base-extension "jpg\\|gif\\|png"
-         :recursive t
-         :publishing-directory "~/publish/hugo-emacs/site/static/public_html/dad--dictionary"
-         :publishing-function org-publish-attachment)
         ("blog" ;; Meta-project to combine phases
          :components ("split-emacs" "images-emacs" "blog-posts-emacs"))))
 ;;
 (defun my-org-publish-split-headings (plist filename pub-dir)
-  "Split an Org file into separate files, each corresponding to a top-level heading.
-Each file name is prefixed with the date in YYYYMMDD format extracted from the :EXPORT_HUGO_LASTMOD: property.
-PLIST is the property list for the publishing process,
-FILENAME is the input Org file, and PUB-DIR is the publishing directory."
+  "Split an Org file into separate files, each corresponding to a top-level heading
+that is marked as DONE.
+
+Each file name is prefixed with the date in YYYYMMDD format extracted from the
+:EXPORT_HUGO_LASTMOD: property. PLIST is the property list for the publishing
+process, FILENAME is the input Org file, and PUB-DIR is the publishing directory."
   (with-temp-buffer
     (insert-file-contents filename) ;; Load the content of the current Org file
     (goto-char (point-min))
     (let ((heading-level 1) ;; Level of the top-level heading to split by
           prev-start heading-title sanitized-title output-file lastmod-date)
       ;; Iterate over all top-level headings
-      (while (re-search-forward (format "^\\*\\{%d\\} \\(.*\\)" heading-level) nil t)
-        (setq prev-start (match-beginning 0)) ;; Start of the current heading
-        (setq heading-title (match-string 1)) ;; Extract heading text
-        (setq sanitized-title (when heading-title
-                                (replace-regexp-in-string "[^a-zA-Z0-9_-]" "_" heading-title))) ;; Sanitize
-        ;; Extract the :EXPORT_HUGO_LASTMOD: property for the current section
-        (save-excursion
-          (when (re-search-forward ":EXPORT_HUGO_LASTMOD: +\\(<.+>\\)" (save-excursion (re-search-forward "^\\* " nil t) (point)) t)
-            (let* ((raw-lastmod (match-string 1)) ;; Extract the timestamp string (e.g., "<2024-12-08 08:37>")
-                   (date-elements (when (string-match "<\\([0-9]+\\)-\\([0-9]+\\)-\\([0-9]+\\)" raw-lastmod)
-                                    (list (match-string 1 raw-lastmod) ;; Year
-                                          (match-string 2 raw-lastmod) ;; Month
-                                          (match-string 3 raw-lastmod))))) ;; Day
-              (setq lastmod-date (when date-elements
-                                   (apply #'concat date-elements)))))) ;; Combine YYYYMMDD
-        ;; Default to "00000000" if no valid lastmod-date is found
-        (setq lastmod-date (or lastmod-date "00000000"))
-        ;; Find the end of this section (right before the next top-level heading)
-        (let ((section-end (save-excursion
-                             (or (re-search-forward (format "^\\*\\{%d\\} " heading-level) nil t)
-                                 (point-max))))) ;; End of current section or end of file
-          ;; Only proceed if sanitized title exists and is valid
-          (when (and sanitized-title (not (string-empty-p sanitized-title)))
-            ;; Create the output file name (prepend the date)
-            (setq output-file (expand-file-name (format "%s-%s.org" lastmod-date sanitized-title) pub-dir))
-            ;; Write the section content (from prev-start to section-end)
-            (write-region prev-start section-end output-file)
-            (message "Wrote %s" output-file)))))
+      (while (re-search-forward (format "^\\*\\{%d\\} \\(?:\\([[:upper:]]+\\) \\)?\\(.*\\)" heading-level) nil t)
+        (let ((todo-keyword (match-string 1)) ;; Extract the TODO keyword (if it exists)
+              (heading-title (match-string 2))) ;; Extract the title of the heading
+          ;; Process only headings marked as DONE
+          (when (and todo-keyword (string-equal todo-keyword "DONE"))
+            (setq prev-start (match-beginning 0)) ;; Start of the current heading
+            (setq sanitized-title (when heading-title
+                                    (replace-regexp-in-string "[^a-zA-Z0-9_-]" "_" heading-title))) ;; Sanitize title
+            ;; Extract the :EXPORT_HUGO_LASTMOD: property for the current section
+            (save-excursion
+              (when (re-search-forward ":EXPORT_HUGO_LASTMOD: +\\(<.+>\\)" (save-excursion (re-search-forward "^\\* " nil t) (point)) t)
+                (let* ((raw-lastmod (match-string 1)) ;; Extract the timestamp string (e.g., "<2024-12-08 08:37>")
+                       (date-elements (when (string-match "<\\([0-9]+\\)-\\([0-9]+\\)-\\([0-9]+\\)" raw-lastmod)
+                                        (list (match-string 1 raw-lastmod) ;; Year
+                                              (match-string 2 raw-lastmod) ;; Month
+                                              (match-string 3 raw-lastmod))))) ;; Day
+                  (setq lastmod-date (when date-elements
+                                       (apply #'concat date-elements))))))
+            ;; Default to "00000000" if no valid lastmod-date is found
+            (setq lastmod-date (or lastmod-date "00000000"))
+            ;; Find the end of this section (right before the next top-level heading)
+            (let ((section-end (save-excursion
+                                 (or (re-search-forward (format "^\\*\\{%d\\} " heading-level) nil t)
+                                     (point-max))))) ;; End of current section or end of file
+              ;; Only proceed if sanitized title exists and is valid
+              (when (and sanitized-title (not (string-empty-p sanitized-title)))
+                ;; Create the output file name (prepend the date)
+                (setq output-file (expand-file-name (format "%s-%s.org" lastmod-date sanitized-title) pub-dir))
+                ;; Write the section content (from prev-start to section-end)
+                (write-region prev-start section-end output-file)
+                (message "Wrote %s" output-file)))))))
     ;; Return nil to indicate successful processing
     nil))
 ;;
