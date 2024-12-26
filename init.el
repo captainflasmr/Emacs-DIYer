@@ -517,15 +517,19 @@ Optionally filter headings by MATCH (e.g., a tag or property match)."
 ;;
 (setq org-publish-project-alist
       '(("split-org"
-         :base-directory "/home/jdyer/Downloads/test"
+         :base-directory "~/DCIM/content"
          :base-extension "org"
-         :publishing-directory "/home/jdyer/Downloads/split"
+         :publishing-directory "~/DCIM/content/split"
+         :exclude ".*"
+         :include ("linux--all.org"
+                   "emacs--all.org"
+                   "blog--all.org")
          :publishing-function my-org-publish-split-headings
          :recursive nil)
         ("blog-posts"
-         :base-directory "/home/jdyer/Downloads/split"
+         :base-directory "~/DCIM/content/split"
          :base-extension "org"
-         :publishing-directory "/home/jdyer/Downloads/org"
+         :publishing-directory "~/publish/public_html"
          :publishing-function org-html-publish-to-html
          :recursive t
          :section-numbers nil
@@ -534,11 +538,44 @@ Optionally filter headings by MATCH (e.g., a tag or property match)."
          :html-postamble t
          :auto-sitemap t
          :sitemap-filename "sitemap.org"
-         :sitemap-title "My Custom Sitemap"
+         :sitemap-title "the DyerDwelling"
+         :html-head "<link rel=\"stylesheet\"
+                    href=\"../other/mystyle.css\"
+                    type=\"text/css\"/>"
          :sitemap-function my-sitemap-format
-         :sitemap-sort-files anti-chronologically)
+         :sitemap-sort-files alphabetically)
+        ("images-emacs"
+         :base-directory "~/DCIM/content/emacs"
+         :base-extension "jpg\\|gif\\|png"
+         :recursive t
+         :publishing-directory "~/publish/public_html/emacs"
+         :publishing-function org-publish-attachment)
+        ("images-blog"
+         :base-directory "~/DCIM/content/blog"
+         :base-extension "jpg\\|gif\\|png"
+         :recursive t
+         :publishing-directory "~/publish/public_html/blog"
+         :publishing-function org-publish-attachment)
+        ("images-bingo"
+         :base-directory "~/DCIM/content/bingo"
+         :base-extension "jpg\\|gif\\|png"
+         :recursive t
+         :publishing-directory "~/publish/public_html/bingo"
+         :publishing-function org-publish-attachment)j
+        ("images-music"
+         :base-directory "~/DCIM/content/music"
+         :base-extension "jpg\\|gif\\|png"
+         :recursive t
+         :publishing-directory "~/publish/public_html/music"
+         :publishing-function org-publish-attachment)
+        ("images-dad--dictionary"
+         :base-directory "~/DCIM/content/dad--dictionary"
+         :base-extension "jpg\\|gif\\|png"
+         :recursive t
+         :publishing-directory "~/publish/public_html/dad--dictionary"
+         :publishing-function org-publish-attachment)
         ("blog" ;; Meta-project to combine phases
-         :components ("split-org" "blog-posts"))))
+         :components ("split-org" "images-emacs" "images-blog" "images-bingo" "images-music" "images-dad--dictionary" "blog-posts"))))
 ;;
 (defun my-org-publish-split-headings (plist filename pub-dir)
   "Split an Org file into separate files, each corresponding to a top-level heading.
@@ -583,11 +620,12 @@ FILENAME is the input Org file, and PUB-DIR is the publishing directory."
     nil))
 ;;
 (defun my-sitemap-format (title list)
-  "Generate a sitemap with TITLE and LIST of files."
+  "Generate a sitemap with TITLE and reverse-sorted LIST of files."
+  (setq list (nreverse (cdr list)))
   (concat "#+TITLE: " title "\n\n"
           "* Blog Posts\n"
           (mapconcat
            (lambda (entry)
              (format "- %s\n" (car entry)))
-           (cdr list))
-           "\n"))
+           list)
+          "\n"))
