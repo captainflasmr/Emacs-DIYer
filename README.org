@@ -851,20 +851,18 @@ Lets try and see how far we can get going through the =org-publish= mechanism fo
 (require 'ox-publish)
 ;;
 (setq org-publish-project-alist
-      '(("split-org"
+      '(("split-emacs"
          :base-directory "~/DCIM/content"
          :base-extension "org"
-         :publishing-directory "~/DCIM/content/split"
+         :publishing-directory "~/DCIM/content/split/emacs"
          :exclude ".*"
-         :include ("linux--all.org"
-                   "emacs--all.org"
-                   "blog--all.org")
+         :include ("emacs--all.org")
          :publishing-function my-org-publish-split-headings
          :recursive nil)
-        ("blog-posts"
-         :base-directory "~/DCIM/content/split"
+        ("blog-posts-emacs"
+         :base-directory "~/DCIM/content/split/emacs"
          :base-extension "org"
-         :publishing-directory "~/publish/public_html"
+         :publishing-directory "~/publish/hugo-emacs/site/static/public_html"
          :publishing-function org-html-publish-to-html
          :recursive t
          :section-numbers nil
@@ -872,10 +870,13 @@ Lets try and see how far we can get going through the =org-publish= mechanism fo
          :html-preamble t
          :html-postamble t
          :auto-sitemap t
-         :sitemap-filename "sitemap.org"
+         :sitemap-filename "index.org"
          :sitemap-title "the DyerDwelling"
          :html-head "<link rel=\"stylesheet\"
-                    href=\"../other/mystyle.css\"
+                    href=\"../assets/css//bootstrap.css\"
+                    type=\"text/css\"/>\n
+                    <link rel=\"stylesheet\"
+                    href=\"../assets/css//style-ignore.css\"
                     type=\"text/css\"/>"
          :sitemap-function my-sitemap-format
          :sitemap-sort-files alphabetically)
@@ -883,34 +884,34 @@ Lets try and see how far we can get going through the =org-publish= mechanism fo
          :base-directory "~/DCIM/content/emacs"
          :base-extension "jpg\\|gif\\|png"
          :recursive t
-         :publishing-directory "~/publish/public_html/emacs"
+         :publishing-directory "~/publish/hugo-emacs/site/static/public_html/emacs"
          :publishing-function org-publish-attachment)
         ("images-blog"
          :base-directory "~/DCIM/content/blog"
          :base-extension "jpg\\|gif\\|png"
          :recursive t
-         :publishing-directory "~/publish/public_html/blog"
+         :publishing-directory "~/publish/hugo-emacs/site/static/public_html/blog"
          :publishing-function org-publish-attachment)
         ("images-bingo"
          :base-directory "~/DCIM/content/bingo"
          :base-extension "jpg\\|gif\\|png"
          :recursive t
-         :publishing-directory "~/publish/public_html/bingo"
+         :publishing-directory "~/publish/hugo-emacs/site/static/public_html/bingo"
          :publishing-function org-publish-attachment)j
         ("images-music"
          :base-directory "~/DCIM/content/music"
          :base-extension "jpg\\|gif\\|png"
          :recursive t
-         :publishing-directory "~/publish/public_html/music"
+         :publishing-directory "~/publish/hugo-emacs/site/static/public_html/music"
          :publishing-function org-publish-attachment)
         ("images-dad--dictionary"
          :base-directory "~/DCIM/content/dad--dictionary"
          :base-extension "jpg\\|gif\\|png"
          :recursive t
-         :publishing-directory "~/publish/public_html/dad--dictionary"
+         :publishing-directory "~/publish/hugo-emacs/site/static/public_html/dad--dictionary"
          :publishing-function org-publish-attachment)
         ("blog" ;; Meta-project to combine phases
-         :components ("split-org" "images-emacs" "images-blog" "images-bingo" "images-music" "images-dad--dictionary" "blog-posts"))))
+         :components ("split-emacs" "images-emacs" "blog-posts-emacs"))))
 ;;
 (defun my-org-publish-split-headings (plist filename pub-dir)
   "Split an Org file into separate files, each corresponding to a top-level heading.
