@@ -512,3 +512,82 @@ Optionally filter headings by MATCH (e.g., a tag or property match)."
         (push 'hline rows)
         ;; Insert TODO column headers at the top.
         (push todo-states rows)))))
+
+(require 'ox-publish)
+;;
+(setq org-publish-project-alist
+      '(("split-org"
+         :base-directory "/home/jdyer/Downloads/test"
+         :base-extension "org"
+         :publishing-directory "/home/jdyer/Downloads/split"
+         :publishing-function my-org-publish-split-headings
+         :recursive nil)
+        ("blog-posts"
+         :base-directory "/home/jdyer/Downloads/split"
+         :base-extension "org"
+         :publishing-directory "/home/jdyer/Downloads/org"
+         :publishing-function org-html-publish-to-html
+         :recursive t
+         :section-numbers nil
+         :with-toc nil
+         :html-preamble t
+         :html-postamble t
+         :auto-sitemap t
+         :sitemap-filename "sitemap.org"
+         :sitemap-title "My Custom Sitemap"
+         :sitemap-function my-sitemap-format
+         :sitemap-sort-files anti-chronologically)
+        ("blog" ;; Meta-project to combine phases
+         :components ("split-org" "blog-posts"))))
+;;
+(defun my-org-publish-split-headings (plist filename pub-dir)
+  "Split an Org file into separate files, each corresponding to a top-level heading.
+Each file name is prefixed with the date in YYYYMMDD format extracted from the :EXPORT_HUGO_LASTMOD: property.
+PLIST is the property list for the publishing process,
+FILENAME is the input Org file, and PUB-DIR is the publishing directory."
+  (with-temp-buffer
+    (insert-file-contents filename) ;; Load the content of the current Org file
+    (goto-char (point-min))
+    (let ((heading-level 1) ;; Level of the top-level heading to split by
+          prev-start heading-title sanitized-title output-file lastmod-date)
+      ;; Iterate over all top-level headings
+      (while (re-search-forward (format "^\\*\\{%d\\} \\(.*\\)" heading-level) nil t)
+        (setq prev-start (match-beginning 0)) ;; Start of the current heading
+        (setq heading-title (match-string 1)) ;; Extract heading text
+        (setq sanitized-title (when heading-title
+                                (replace-regexp-in-string "[^a-zA-Z0-9_-]" "_" heading-title))) ;; Sanitize
+        ;; Extract the :EXPORT_HUGO_LASTMOD: property for the current section
+        (save-excursion
+          (when (re-search-forward ":EXPORT_HUGO_LASTMOD: +\\(<.+>\\)" (save-excursion (re-search-forward "^\\* " nil t) (point)) t)
+            (let* ((raw-lastmod (match-string 1)) ;; Extract the timestamp string (e.g., "<2024-12-08 08:37>")
+                   (date-elements (when (string-match "<\\([0-9]+\\)-\\([0-9]+\\)-\\([0-9]+\\)" raw-lastmod)
+                                    (list (match-string 1 raw-lastmod) ;; Year
+                                          (match-string 2 raw-lastmod) ;; Month
+                                          (match-string 3 raw-lastmod))))) ;; Day
+              (setq lastmod-date (when date-elements
+                                   (apply #'concat date-elements)))))) ;; Combine YYYYMMDD
+        ;; Default to "00000000" if no valid lastmod-date is found
+        (setq lastmod-date (or lastmod-date "00000000"))
+        ;; Find the end of this section (right before the next top-level heading)
+        (let ((section-end (save-excursion
+                             (or (re-search-forward (format "^\\*\\{%d\\} " heading-level) nil t)
+                                 (point-max))))) ;; End of current section or end of file
+          ;; Only proceed if sanitized title exists and is valid
+          (when (and sanitized-title (not (string-empty-p sanitized-title)))
+            ;; Create the output file name (prepend the date)
+            (setq output-file (expand-file-name (format "%s-%s.org" lastmod-date sanitized-title) pub-dir))
+            ;; Write the section content (from prev-start to section-end)
+            (write-region prev-start section-end output-file)
+            (message "Wrote %s" output-file)))))
+    ;; Return nil to indicate successful processing
+    nil))
+;;
+(defun my-sitemap-format (title list)
+  "Generate a sitemap with TITLE and LIST of files."
+  (concat "#+TITLE: " title "\n\n"
+          "* Blog Posts\n"
+          (mapconcat
+           (lambda (entry)
+             (format "- %s\n" (car entry)))
+           (cdr list))
+           "\n"))
