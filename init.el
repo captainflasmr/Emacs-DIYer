@@ -319,7 +319,7 @@ if COLOR is not provided as an argument."
 (defvar my/popper-current-popup nil
   "Stores the currently active popup buffer for quick toggle.")
 ;;
-(defun my/popper-toggle-popup ()
+(defun my/popper-cycle-popup ()
   "Toggle visibility of pop-up buffers.
 Pop-ups are identified by their names and certain buffer modes.
 When toggled, the function displays the next available pop-up
@@ -372,10 +372,10 @@ If the popup is visible, hide it. If the popup is not visible, restore it."
     (message "No active popup buffer to toggle.")))
 ;;
 ;; Cycle through popups or show the next popup.
-(global-set-key (kbd "C-c p") #'my/popper-toggle-popup)
+(global-set-key (kbd "C-c l") #'my/popper-cycle-popup)
 ;;
 ;; Toggle the currently selected popup.
-(global-set-key (kbd "C-c l") #'my/popper-toggle-current)
+(global-set-key (kbd "C-c k") #'my/popper-toggle-current)
 
 (defun my/md-to-org-convert-buffer ()
   "Convert the current buffer from Markdown to Org-mode format"
