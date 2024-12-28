@@ -306,6 +306,13 @@ if COLOR is not provided as an argument."
                   (my/rainbow-mode)))
 (global-set-key (kbd "M-<home>") 'my/insert-random-color-at-point)
 
+(global-set-key (kbd "M-g i") 'consult-imenu)
+(global-set-key (kbd "M-g o") 'consult-outline)
+
+(global-set-key (kbd "M-g o") #'org-goto)
+(setq org-goto-interface 'outline-path-completionp)
+(setq org-outline-path-complete-in-steps nil)
+
 (defun my-icomplete-copy-candidate ()
   "Copy the current Icomplete candidate to the kill ring."
   (interactive)

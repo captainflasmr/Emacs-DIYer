@@ -31,13 +31,13 @@ Here is a kanban of the features that will be (hopefully) converted to core/enha
 #+RESULTS:
 | TODO             | DOING                        | DONE                        |
 |------------------+------------------------------+-----------------------------|
-| capf-autosuggest | embark                       | minibuffer completion       |
-|                  | popper                       | ace-window                  |
-|                  | pandoc md to org conversion  | recentf-open                |
-|                  | completion - corfu / company | rainbow-mode                |
-|                  | org-kanban                   | visual-fill-column-mode     |
-|                  | ox-hugo                      | find-name-dired             |
-|                  |                              | magit                       |
+| capf-autosuggest | consult                      | minibuffer completion       |
+|                  | embark                       | ace-window                  |
+|                  | popper                       | recentf-open                |
+|                  | pandoc md to org conversion  | rainbow-mode                |
+|                  | completion - corfu / company | visual-fill-column-mode     |
+|                  | org-kanban                   | find-name-dired             |
+|                  | ox-hugo                      | magit                       |
 |                  |                              | tempel                      |
 |                  |                              | image-dired                 |
 |                  |                              | selected-window-accent-mode |
@@ -46,6 +46,10 @@ Here is a kanban of the features that will be (hopefully) converted to core/enha
 |                  |                              | kurecolor                   |
 
 * Whats New
+
+** <2024-12-28>
+
+- Added consult section for potential consult replacements.
 
 ** <2024-12-22>
 
@@ -584,6 +588,27 @@ Testing with the following code:
                   (my/rainbow-mode)))
 (global-set-key (kbd "M-<home>") 'my/insert-random-color-at-point)
 #+end_src
+
+** DOING consult
+
+Originally I had the following keybindings mapped :
+
+#+begin_src elisp
+(global-set-key (kbd "M-g i") 'consult-imenu)
+(global-set-key (kbd "M-g o") 'consult-outline)
+#+end_src
+
+The first one is easy, I am happy just to replace with =imenu= the interface brings up a simple minibuffer completing-read, I don't dynamically jump to the headline, but I'm not a fan of that anyway.
+
+The second one I think I can replace by using =org-goto= with a couple of tweaks
+
+#+begin_src emacs-lisp
+(global-set-key (kbd "M-g o") #'org-goto)
+(setq org-goto-interface 'outline-path-completionp)
+(setq org-outline-path-complete-in-steps nil)
+#+end_src
+
+Which turns the awkward =org-goto= interface into a better easier completing read one more akin to =consult-outline=
 
 ** DOING embark
 
