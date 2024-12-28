@@ -469,7 +469,6 @@ If the popup is visible, hide it. If the popup is not visible, restore it."
 (setq icomplete-max-delay-chars 0)
 (setq icomplete-scroll t)
 (setq max-mini-window-height 10)
-(setq completion-auto-help nil)
 (setq completion-styles '(flex basic substring))
 
 (defun my/kanban-to-table (&optional match)

@@ -802,7 +802,6 @@ Lets give it a go!
 (setq icomplete-max-delay-chars 0)
 (setq icomplete-scroll t)
 (setq max-mini-window-height 10)
-(setq completion-auto-help nil)
 (setq completion-styles '(flex basic substring))
 #+end_src
 
