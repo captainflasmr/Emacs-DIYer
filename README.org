@@ -52,12 +52,12 @@ Here is a kanban of the features that will be (hopefully) converted to core/enha
 #+end_src
 
 #+RESULTS:
-| TODO | Title                                     | Parent Title                 |
-|------+-------------------------------------------+------------------------------|
-| TODO | Apply css                                 | ox-hugo                      |
-| TODO | Generate RSS xml                          | ox-hugo                      |
-| TODO | Test completion through programming modes | completion - corfu / company |
-| TODO | push buffer to popup buffer               | popper                       |
+| TODO  | Title                                     | Parent Title                 |
+|-------+-------------------------------------------+------------------------------|
+| TODO  | Apply css                                 | ox-hugo                      |
+| DOING | Generate RSS xml                          | ox-hugo                      |
+| TODO  | Test completion through programming modes | completion - corfu / company |
+| TODO  | push buffer to popup buffer               | popper                       |
 
 * Whats New
 
@@ -996,7 +996,70 @@ process, FILENAME is the input Org file, and PUB-DIR is the publishing directory
           "\n"))
 #+end_src
 
-*** TODO Generate RSS xml                                          :issues:
+*** DOING Generate RSS xml                                         :issues:
+
+Starting with the following and adapting, it is a decent starting point:
+
+#+begin_src elisp
+(defun my-generate-rss-feed ()
+  "Generate a detailed RSS feed for Org-published blog posts."
+  (interactive)
+  (let* ((rss-file (expand-file-name "feed.xml" "/home/jdyer/source/test/elisp"))
+         (base-url "https://example.com/") ;; Replace with your actual website URL
+         (org-directory "/home/jdyer/source/test/elisp")    ;; Directory containing your Org files
+         (html-directory "/home/jdyer/source/test/elisp/html")  ;; Directory containing published HTML files
+         (rss-items ""))                  ;; Initialize RSS items string
+    ;; Iterate over all Org files in the directory
+    (dolist (org-file (directory-files org-directory t "\\.org$"))
+      (let* ((heading-level 1)
+             (html-file (concat (file-name-sans-extension
+                                 (file-name-nondirectory org-file)) ".html"))
+             (url (concat base-url html-file))
+             todo-keyword
+             title-raw
+             title
+             content)
+        (with-temp-buffer
+          (insert-file-contents org-file)
+          (goto-char (point-min))
+          (while (re-search-forward
+                  (format "^\\*\\{%d\\} \\(?:\\([[:upper:]]+\\) \\)?\\(.*\\)" heading-level) nil t)
+            (setq todo-keyword (match-string 1))
+            (setq title-raw (match-string 2))
+            (setq title (when title-raw
+                          (replace-regexp-in-string "_" " " title-raw)))))
+        (setq content (with-temp-buffer
+                        (insert-file-contents org-file)
+                        (goto-char (point-min))
+                        (org-element-map (org-element-parse-buffer) 'paragraph
+                          (lambda (p)
+                            (buffer-substring-no-properties
+                             (org-element-property :begin p)
+                             (org-element-property :end p)))
+                          nil t)))
+        ;; Add an item to the RSS feed
+        (setq rss-items
+              (concat rss-items (format "
+<item>
+  <title>%s</title>
+  <link>%s</link>
+  <pubDate><2024-12-29></pubDate>
+  <description><![CDATA[%s]]></description>
+</item>"
+                                        title url content)))))
+    ;; Write the RSS feed to the file
+    (with-temp-file rss-file
+      (insert "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>
+<rss version=\"2.0\">
+<channel>
+  <title>My Blog</title>
+  <link>" base-url "</link>
+  <description>A blog about Emacs and Org-mode</description>"
+  rss-items "
+</channel>
+</rss>"))
+    (message "RSS feed generated at %s" rss-file)))
+#+end_src
 
 *** TODO Apply css                                                 :issues:
 
