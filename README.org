@@ -45,7 +45,28 @@ Here is a kanban of the features that will be (hopefully) converted to core/enha
 |                  |                              | jinx / powerthesaurus       |
 |                  |                              | kurecolor                   |
 
+* Issues
+
+#+begin_src emacs-lisp :results table :exports results :tangle no
+  (my/collate-issues-into-table)
+#+end_src
+
+#+RESULTS:
+| TODO | Title                                     | Parent Title                 |
+|------+-------------------------------------------+------------------------------|
+| TODO | Apply css                                 | ox-hugo                      |
+| TODO | Generate RSS xml                          | ox-hugo                      |
+| TODO | Test completion through programming modes | completion - corfu / company |
+| TODO | push buffer to popup buffer               | popper                       |
+
 * Whats New
+
+** <2024-12-29>
+
+Add "Issues" section and link TODOs to project features in README
+
+- Added a new "Issues" section with TODOs, each linked to related project features.
+- Supplemented the section with Emacs Lisp code to auto-generate issue tables.
 
 ** <2024-12-28>
 
@@ -630,8 +651,7 @@ Solved with the code below:
 (define-key minibuffer-local-completion-map (kbd "C-c ,") 'my-icomplete-copy-candidate)
 #+end_src
   
-- collect
-- export
+collect/export could be solved with a TAB showing completions buffer
 
 ** DOING popper
 
@@ -701,6 +721,8 @@ If the popup is visible, hide it. If the popup is not visible, restore it."
 ;; Toggle the currently selected popup.
 (global-set-key (kbd "C-c k") #'my/popper-toggle-current)
 #+end_src
+
+*** TODO push buffer to popup buffer                               :issues:
 
 ** DOING pandoc md to org conversion
 
@@ -806,6 +828,8 @@ Lets give it a go!
 #+end_src
 
 Note that the =completion-styles= is globally set to include =flex= because, by default, icomplete is the completion engine that works in the buffer. Since fido-mode, which is enabled by default, does not support flex (something I have now grown accustomed to) this adjustment is necessary.
+
+*** TODO Test completion through programming modes                 :issues:
 
 ** DOING org-kanban
 
@@ -971,6 +995,10 @@ process, FILENAME is the input Org file, and PUB-DIR is the publishing directory
            list)
           "\n"))
 #+end_src
+
+*** TODO Generate RSS xml                                          :issues:
+
+*** TODO Apply css                                                 :issues:
 
 ** TODO capf-autosuggest
 
