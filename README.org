@@ -63,6 +63,10 @@ Here is a kanban of the features that will be (hopefully) converted to core/enha
 
 ** <2024-12-29>
 
+Added initial attempt at generating an RSS xml feed based on my org posts.
+
+** <2024-12-29>
+
 Add "Issues" section and link TODOs to project features in README
 
 - Added a new "Issues" section with TODOs, each linked to related project features.
@@ -1004,57 +1008,78 @@ Starting with the following and adapting, it is a decent starting point:
 (defun my-generate-rss-feed ()
   "Generate a detailed RSS feed for Org-published blog posts."
   (interactive)
-  (let* ((rss-file (expand-file-name "feed.xml" "/home/jdyer/source/test/elisp"))
-         (base-url "https://example.com/") ;; Replace with your actual website URL
-         (org-directory "/home/jdyer/source/test/elisp")    ;; Directory containing your Org files
-         (html-directory "/home/jdyer/source/test/elisp/html")  ;; Directory containing published HTML files
-         (rss-items ""))                  ;; Initialize RSS items string
+  (let* ((rss-file (expand-file-name "index.xml" "/home/jdyer/source/test/elisp"))
+         (base-url "https://www.emacs.dyerdwelling.family/public_html/")
+         (self-link "http://localhost:1313/index.xml") ;; Self-referencing link for Atom feeds
+         (last-build-date (format-time-string "%a, %d %b %Y %H:%M:%S %z")) ;; Current time as lastBuildDate
+         (org-directory "/home/jdyer/source/test/elisp")
+         (rss-items ""))
     ;; Iterate over all Org files in the directory
     (dolist (org-file (directory-files org-directory t "\\.org$"))
-      (let* ((heading-level 1)
-             (html-file (concat (file-name-sans-extension
+      (let* ((html-file (concat (file-name-sans-extension
                                  (file-name-nondirectory org-file)) ".html"))
              (url (concat base-url html-file))
-             todo-keyword
-             title-raw
+             (guid url) ;; Default GUID as the post URL
              title
-             content)
+             content
+             html-content
+             raw-pubdate
+             pubdate)
+        ;; Read and process the org file
         (with-temp-buffer
           (insert-file-contents org-file)
           (goto-char (point-min))
-          (while (re-search-forward
-                  (format "^\\*\\{%d\\} \\(?:\\([[:upper:]]+\\) \\)?\\(.*\\)" heading-level) nil t)
-            (setq todo-keyword (match-string 1))
-            (setq title-raw (match-string 2))
-            (setq title (when title-raw
-                          (replace-regexp-in-string "_" " " title-raw)))))
-        (setq content (with-temp-buffer
-                        (insert-file-contents org-file)
-                        (goto-char (point-min))
-                        (org-element-map (org-element-parse-buffer) 'paragraph
-                          (lambda (p)
-                            (buffer-substring-no-properties
-                             (org-element-property :begin p)
-                             (org-element-property :end p)))
-                          nil t)))
+          ;; Extract the title from the first heading
+          (when (re-search-forward "^\\* \\(.*\\)" nil t)
+            (setq title (match-string 1)))
+          ;; Extract the :EXPORT_HUGO_LASTMOD: property value
+          (when (re-search-forward "^.*EXPORT_HUGO_LASTMOD: *<\\([^>]+\\)>" nil t)
+            (setq raw-pubdate (match-string 1)))
+          ;; Convert the raw-pubdate to the RFC 822 format for <pubDate>
+          (when raw-pubdate
+            (setq pubdate (format-time-string
+                           "%a, %d %b %Y %H:%M:%S %z"
+                           (org-time-string-to-time (concat "<" raw-pubdate ">")))))
+          ;; Move to the end of :END: and extract the remaining contents
+          (when (re-search-forward "^:END:\n" nil t)
+            (setq content (buffer-substring-no-properties (point) (point-max)))
+            ;; Convert the content to HTML
+            (setq html-content (org-export-string-as content 'html t))))
         ;; Add an item to the RSS feed
         (setq rss-items
               (concat rss-items (format "
 <item>
   <title>%s</title>
   <link>%s</link>
-  <pubDate><2024-12-29></pubDate>
+  <guid>%s</guid>
+  <pubDate>%s</pubDate>
   <description><![CDATA[%s]]></description>
 </item>"
-                                        title url content)))))
+                                        (or title "Untitled Post")
+                                        url
+                                        guid ;; Use the generated GUID
+                                        (or pubdate last-build-date) ;; Fallback to lastBuildDate if missing
+                                        (or html-content "No content available"))))))
     ;; Write the RSS feed to the file
     (with-temp-file rss-file
       (insert "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>
-<rss version=\"2.0\">
+<rss version=\"2.0\" xmlns:atom=\"http://www.w3.org/2005/Atom\">
 <channel>
-  <title>My Blog</title>
+  <title>Emacs@Dyerdwelling</title>
+  <image>
+      <url>/images/banner/favicon-james.png</url>
+      <title>Emacs@ Dyerdwelling</title>
+      <link>http://localhost:1313/</link>
+      <width>32</width>
+      <height>32</height>
+  </image>
   <link>" base-url "</link>
-  <description>A blog about Emacs and Org-mode</description>"
+  <description>Recent content on Emacs@Dyerdwelling</description>
+  <language>en</language>
+  <managingEditor>captainflasmr@gmail.com (James Dyer)</managingEditor>
+  <webMaster>captainflasmr@gmail.com (James Dyer)</webMaster>
+  <lastBuildDate>" last-build-date "</lastBuildDate>
+  <atom:link href=\"" self-link "\" rel=\"self\" type=\"application/rss+xml\" />"
   rss-items "
 </channel>
 </rss>"))
