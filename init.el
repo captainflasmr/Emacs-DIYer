@@ -621,17 +621,20 @@ process, FILENAME is the input Org file, and PUB-DIR is the publishing directory
 (defun my-generate-rss-feed ()
   "Generate a detailed RSS feed for Org-published blog posts."
   (interactive)
-  (let* ((rss-file (expand-file-name "feed.xml" "/home/jdyer/publish/hugo-emacs/site/static/public_html"))
+  (let* ((rss-file (expand-file-name "index.xml" "/home/jdyer/publish/hugo-emacs/site/static/public_html"))
          (base-url "https://www.emacs.dyerdwelling.family/public_html/")
          (self-link "https://www.emacs.dyerdwelling.family/public_html/index.xml") ;; Self-referencing link for Atom feeds
          (last-build-date (format-time-string "%a, %d %b %Y %H:%M:%S %z")) ;; Current time as lastBuildDate
-         (org-directory "/home/jdyer/DCIM/content/split/emacs")
+         (org-directory "/home/jdyer/source/test/elisp")
+         (static-author "captainflasmr@gmail.com (James Dyer)") ;; Static author 
+         ;; (org-directory "/home/jdyer/DCIM/content/split/emacs")
          (rss-items ""))
     ;; Iterate over all Org files in the directory
     (dolist (org-file (directory-files org-directory t "\\.org$"))
       (let* ((html-file (concat (file-name-sans-extension
                                  (file-name-nondirectory org-file)) ".html"))
              (url (concat base-url html-file))
+             (heading-level 1)
              (guid url) ;; Default GUID as the post URL
              title
              content
@@ -643,8 +646,8 @@ process, FILENAME is the input Org file, and PUB-DIR is the publishing directory
           (insert-file-contents org-file)
           (goto-char (point-min))
           ;; Extract the title from the first heading
-          (when (re-search-forward "^\\* \\(.*\\)" nil t)
-            (setq title (match-string 1)))
+          (when  (re-search-forward (format "^\\*\\{%d\\} \\(?:\\([[:upper:]]+\\) \\)?\\(.*\\)" heading-level) nil t)
+            (setq title (match-string 2)))
           ;; Extract the :EXPORT_HUGO_LASTMOD: property value
           (when (re-search-forward "^.*EXPORT_HUGO_LASTMOD: *<\\([^>]+\\)>" nil t)
             (setq raw-pubdate (match-string 1)))
@@ -657,7 +660,9 @@ process, FILENAME is the input Org file, and PUB-DIR is the publishing directory
           (when (re-search-forward "^:END:\n" nil t)
             (setq content (buffer-substring-no-properties (point) (point-max)))
             ;; Convert the content to HTML
-            (setq html-content (org-export-string-as content 'html t))))
+            (setq html-content (org-export-string-as content 'html t '(:with-toc nil)))
+            ;; (setq html-content (xml-escape-string html-content))
+            ))
         ;; Add an item to the RSS feed
         (setq rss-items
               (concat rss-items (format "
@@ -666,12 +671,14 @@ process, FILENAME is the input Org file, and PUB-DIR is the publishing directory
   <link>%s</link>
   <guid>%s</guid>
   <pubDate>%s</pubDate>
+  <author>%s</author>
   <description><![CDATA[%s]]></description>
 </item>"
                                         (or title "Untitled Post")
                                         url
                                         guid ;; Use the generated GUID
                                         (or pubdate last-build-date) ;; Fallback to lastBuildDate if missing
+                                        static-author ;; Static author name
                                         (or html-content "No content available"))))))
     ;; Write the RSS feed to the file
     (with-temp-file rss-file
@@ -681,7 +688,7 @@ process, FILENAME is the input Org file, and PUB-DIR is the publishing directory
   <title>Emacs@Dyerdwelling</title>
   <image>
       <url>/images/banner/favicon-james.png</url>
-      <title>Emacs@ Dyerdwelling</title>
+      <title>Emacs@Dyerdwelling</title>
       <link>https://emacs.dyerdwelling.family/public_html/</link>
       <width>32</width>
       <height>32</height>
