@@ -153,13 +153,22 @@ Solved with the code below:
 #+begin_src elisp
 (defun my/quick-window-jump ()
   "Jump to a window by typing its assigned character label.
+If there is only a single window, split it horizontally.
 If there are only two windows, jump directly to the other window."
   (interactive)
   (let* ((window-list (window-list nil 'no-mini)))
-    (if (= (length window-list) 2)
-        ;; If there are only two windows, switch to the other one directly.
-        (select-window (other-window-for-scrolling))
-      ;; Otherwise, show the key selection interface.
+    (cond
+     ;; If there is only a single window, split it horizontally.
+     ((= (length window-list) 1)
+      (split-window-horizontally)
+      (other-window 1)) ;; Move focus to the new window immediately after splitting.
+
+     ;; If there are only two windows, switch to the other one directly.
+     ((= (length window-list) 2)
+      (select-window (other-window-for-scrolling)))
+
+     ;; Otherwise, present the key selection interface.
+     (t
       (let* ((my/quick-window-overlays nil)
              (sorted-windows (sort window-list
                                    (lambda (w1 w2)
@@ -187,7 +196,7 @@ If there are only two windows, jump directly to the other window."
           (mapc #'delete-overlay my/quick-window-overlays)
           (setq my/quick-window-overlays nil)
           (when-let ((selected-window (cdr (assoc (char-to-string key) window-map))))
-            (select-window selected-window)))))))
+            (select-window selected-window))))))))
 #+end_src
 
 ** DONE recentf-open
@@ -618,7 +627,7 @@ Testing with the following code:
 
 Originally I had the following keybindings mapped :
 
-#+begin_src elisp
+#+begin_src elisp :tangle no
 (global-set-key (kbd "M-g i") 'consult-imenu)
 (global-set-key (kbd "M-g o") 'consult-outline)
 #+end_src
@@ -720,10 +729,10 @@ If the popup is visible, hide it. If the popup is not visible, restore it."
     (message "No active popup buffer to toggle.")))
 ;;
 ;; Cycle through popups or show the next popup.
-(global-set-key (kbd "C-c l") #'my/popper-cycle-popup)
+(global-set-key (kbd "M-'") #'my/popper-cycle-popup)
 ;;
 ;; Toggle the currently selected popup.
-(global-set-key (kbd "C-c k") #'my/popper-toggle-current)
+(global-set-key (kbd "M-;") #'my/popper-toggle-current)
 #+end_src
 
 *** TODO push buffer to popup buffer                               :issues:

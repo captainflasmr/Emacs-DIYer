@@ -7,13 +7,22 @@
 
 (defun my/quick-window-jump ()
   "Jump to a window by typing its assigned character label.
+If there is only a single window, split it horizontally.
 If there are only two windows, jump directly to the other window."
   (interactive)
   (let* ((window-list (window-list nil 'no-mini)))
-    (if (= (length window-list) 2)
-        ;; If there are only two windows, switch to the other one directly.
-        (select-window (other-window-for-scrolling))
-      ;; Otherwise, show the key selection interface.
+    (cond
+     ;; If there is only a single window, split it horizontally.
+     ((= (length window-list) 1)
+      (split-window-horizontally)
+      (other-window 1)) ;; Move focus to the new window immediately after splitting.
+
+     ;; If there are only two windows, switch to the other one directly.
+     ((= (length window-list) 2)
+      (select-window (other-window-for-scrolling)))
+
+     ;; Otherwise, present the key selection interface.
+     (t
       (let* ((my/quick-window-overlays nil)
              (sorted-windows (sort window-list
                                    (lambda (w1 w2)
@@ -41,7 +50,7 @@ If there are only two windows, jump directly to the other window."
           (mapc #'delete-overlay my/quick-window-overlays)
           (setq my/quick-window-overlays nil)
           (when-let ((selected-window (cdr (assoc (char-to-string key) window-map))))
-            (select-window selected-window)))))))
+            (select-window selected-window))))))))
 
 (defun my/recentf-open (file)
   "Prompt for FILE in `recentf-list' and visit it.
@@ -306,9 +315,6 @@ if COLOR is not provided as an argument."
                   (my/rainbow-mode)))
 (global-set-key (kbd "M-<home>") 'my/insert-random-color-at-point)
 
-(global-set-key (kbd "M-g i") 'consult-imenu)
-(global-set-key (kbd "M-g o") 'consult-outline)
-
 (global-set-key (kbd "M-g o") #'org-goto)
 (setq org-goto-interface 'outline-path-completionp)
 (setq org-outline-path-complete-in-steps nil)
@@ -379,10 +385,10 @@ If the popup is visible, hide it. If the popup is not visible, restore it."
     (message "No active popup buffer to toggle.")))
 ;;
 ;; Cycle through popups or show the next popup.
-(global-set-key (kbd "C-c l") #'my/popper-cycle-popup)
+(global-set-key (kbd "M-'") #'my/popper-cycle-popup)
 ;;
 ;; Toggle the currently selected popup.
-(global-set-key (kbd "C-c k") #'my/popper-toggle-current)
+(global-set-key (kbd "M-;") #'my/popper-toggle-current)
 
 (defun my/md-to-org-convert-buffer ()
   "Convert the current buffer from Markdown to Org-mode format"
