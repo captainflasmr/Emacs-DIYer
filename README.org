@@ -83,48 +83,6 @@ Add "Issues" section and link TODOs to project features in README
   - The function supports filtering entries by tags or property matches.
   - Replaced the external package =org-kanban=
 
-** <2024-12-20>
-
-- Added defuns for pandoc md to org conversion, I guess I could check for =pandoc= being present on the system?
-  
-** <2024-12-20>
-
-Update roadmap, mark features as DONE, and enhance configurations:
-
-- *Features Marked as DONE:*
-  - *image-dired*: Marked as DONE after functionality was revisited and copied over.
-  - *selected-window-accent-mode*: Improved and marked as complete with updated configurations for synchronized highlighting of active windows and tabs.
-  - *jinx/powerthesaurus*: Replaced with a simpler configuration relying on `flyspell-buffer` and dictionary lookups.
-  - *deadgrep*: Transitioned to a lighter approach leveraging `grep-mode` and `ripgrep` while maintaining powerful search output.
-  - *kurecolor*: Achieved similar results with custom regular expressions and built-in Emacs color utilities.
-
-** <2024-12-19>
-
-- *Replaced Features:*
-  - *Minibuffer Completion*: Replaced `vertico`, `marginalia`, and other third-party tools with `fido-mode` and a workaround for exiting forced completion.
-  - *Magit*: Transitioned to built-in VC for Git workflows; includes instructions for addressing SSH-related issues during pushes.
-
-- *New Implementations:*
-  - *Popper Replacement*: Introduced custom Elisp functions for toggling and managing popup buffers, mimicking `popper` functionality.
-  - *Find-Name-Dired Alternative*: Enhanced file search functionality with fallback to `find`, `fd`, or `ripgrep` where available, maintaining compatibility with built-in `dired`.
-  - *Color Manipulation*: Added Elisp functions for adjusting color brightness, saturation, and hue, providing a lightweight alternative to `kurecolor`.
-    
-- Tidied up kanban focussing more on the features that I am replacing with elisp rather than just replacing with built-ins
-
-** <2024-12-18>
-
-Added abbrev to replace tempel
-
-** <2024-12-17>
-
-fix(README): add workaround for missing ssh-askpass in Emacs with vc-dir mode
-
-- Documented steps to resolve the issue where pushing to GitHub from Emacs using vc-dir mode fails due to missing ssh-askpass.
-- Added instructions for installing `openssh-askpass` and creating a symbolic link to `/usr/lib/ssh/ssh-askpass`.
-- Mentioned the potential QFSFileEngine error during `git push` with workaround applied.
-
-This commit adds clarity for users encountering the `Permission denied (publickey)` issue and provides a temporary fix until a better solution is implemented.
-
 * Roadmap                                                           :roadmap:
 
 Here are the features that will be (hopefully) converted to core.
