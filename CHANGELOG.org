@@ -10,6 +10,18 @@ This document contains the release notes for Emacs-enhanced
 
 * Versions
 
+** <2025-01-01>
+
+Refactor popup handling and improve buffer filtering logic
+
+- Updated =my/popper-show-hide-popup= to improve popup buffer filtering with =popup-patterns=,
+  allowing more flexible matching of buffers against patterns.
+- Adjusted logic to remove redundant comments and optimize control flow:
+  - Clearly separated cases for hiding the current popup and displaying the next valid popup.
+  - Refactored buffer filtering using =seq-filter= to enhance clarity and reduce redundancy.
+- Removed extraneous comments and dead code for improved readability.
+- No functional changes to existing behavior; this is a refactoring for code clarity and maintainability.
+
 ** <2024-12-29>
 
 Added initial attempt at generating an RSS xml feed based on my org posts.
