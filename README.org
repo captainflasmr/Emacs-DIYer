@@ -69,12 +69,13 @@ Here is a kanban of the features that will be (hopefully) converted to core/enha
 #+end_src
 
 #+RESULTS:
-| TODO  | Title                                     | Parent Title                 |
-|-------+-------------------------------------------+------------------------------|
-| TODO  | Apply css                                 | ox-hugo                      |
-| DOING | Generate RSS xml                          | ox-hugo                      |
-| TODO  | Test completion through programming modes | completion - corfu / company |
-| TODO  | push buffer to popup buffer               | popper                       |
+| TODO  | Title                                          | Parent Title                 |
+|-------+------------------------------------------------+------------------------------|
+| TODO  | Apply css                                      | ox-hugo                      |
+| DOING | Generate RSS xml                               | ox-hugo                      |
+| TODO  | Test completion through programming modes      | completion - corfu / company |
+| TODO  | pop in and out on initial not working too well | popper                       |
+| TODO  | push buffer to popup buffer and back           | popper                       |
 
 * Roadmap                                                           :roadmap:
 
@@ -86,6 +87,7 @@ fido-mode enabled replacing:
 
 - vertico
 - marginalia
+- orderless
 
 but also require the following for exiting a forced completion:
 
@@ -95,6 +97,8 @@ but also require the following for exiting a forced completion:
   (interactive)
   (exit-minibuffer))
 #+end_src
+
+Note that orderless isn't really replaced, I can enable flex but I don't feel I really need the orderless functionality anyway.
 
 ** DONE ace-window
 CLOSED: [2024-12-08 Sun 13:53]
@@ -153,7 +157,7 @@ If there are only two windows, jump directly to the other window."
 ** DONE recentf-open
 CLOSED: [2024-12-09 Mon 09:22]
 
-Given recentf-open was introduced in 29.1 it would probably be straightforward to create a general recentf passing through completing read.  Probably just copy what has been put into recentf.el
+Given recentf-open was introduced in 29.1, just copied what has been put into recentf.el for that version!
 
 Solved with the code below:
 
@@ -216,7 +220,7 @@ Solved with the code below:
 ** DONE find-name-dired
 CLOSED: [2024-12-18 Wed 09:27]
 
-Currently find file type jump key functionality for core is just find-name-dired but probably better to have a more flexible version that can still use =find-name-dired= but if ripgrep exists or even find then present those options.  This will then potentially be a more modern approach.
+Currently, the file type jump key functionality for core is limited to =find-name-dired=. However, it might be better to implement a more flexible version that defaults to =find-name-dired= but also presents additional options if tools like =ripgrep= or =find= are available. This would offer a potentially more modern and versatile approach.
 
 Being solved with the following code:
 
@@ -307,16 +311,100 @@ Although still raises the following:
 ** DONE tempel
 CLOSED: [2024-12-18 Wed 09:26]
 
-I use pretty simple, no yassnippet complexity here, so maybe I can adapt abbrev with some predefined functions for the most common completion replacements?
+I use pretty simple configurations (no yasnippet complexity here) so  adapting abbrev with some predefined functions for the most common completion replacements.
 
-Yes, adapted to using =abbrev-mode=, the syntax for the =abbrev_defs= is very similar to tempel configuration files so easy to adapt.
+Adapting to use =abbrev-mode=, the syntax for =abbrev_defs= is very similar to Tempel configuration files, making it easy to adapt.
 
-The only negative is the positional cursor options easily defined from tempel but if I really wanted to I could just include lambda functions to move th cursor.  But I don't think I am too bothered, I will just use the usual Emacs navigation keys.
+Replaced tempel with abbrev, will have to write a blog post about this but replacing the following tempel template :
+
+#+begin_src fundamental :tangle no
+fundamental-mode ;; Available everywhere
+;;
+(ja (format-time-string "<%Y-%m-%d>"))
+(jT (format-time-string "%Y%m%d%H%M%S"))
+(jt (format-time-string "%Y%m%d"))
+(ji "(interactive)")
+(jl "(lambda ()")
+;;
+org-mode
+;;
+(jm "#+hugo: more")
+(jg "#+attr_org: :width 300px" n "#+attr_html: :width 100%")
+(je "#+attr_org: :width 300px" n "#+attr_html: :class emacs-img")
+(jo "---" n "#+TOC: headlines 1 local" n "---")
+(jk "#+begin: kanban :layout (\"...\" . 40) :scope nil :range (\"TODO\" . \"DONE\") :sort \"O\" :depth 2 :compressed t" n "#+end:")
+(jp "~--APT--~ ")
+;;
+sh-mode
+(jd n "echo \"poop: " p "\"" n)
+;;
+emacs-lisp-mode
+(jd n "(message \"poop: " p "\"\)" n)
+;;
+ada-mode
+(jd n> "Ada.Text_Io.Put_Line \( \"poop: " p "\"\);" n)
+;;
+c++-mode
+(jd n> "std::cout << \"poop: " p "\" << std::endl;" n)
+;;
+c-mode
+(jd n> "fprintf(stderr, \"poop: " p "\"\);" n)
+#+end_src
+
+with the following abbrev =abbrev_defs=:
+
+#+begin_src fundamental-mode :tangle no
+;;-*-coding: utf-8;-*-
+(define-abbrev-table 'ada-mode-abbrev-table
+  '(
+    ("jd" "Ada.Text_Io.Put_Line (\"poop: \");" nil :count 0)
+   ))
+(define-abbrev-table 'c++-mode-abbrev-table
+  '(
+    ("jd" "std::cout << \"poop: \" << std::endl;" nil :count 0)
+   ))
+(define-abbrev-table 'c-mode-abbrev-table
+  '(
+    ("jd" "printf(stderr, \"poop: \");" nil :count 0)
+   ))
+(define-abbrev-table 'emacs-lisp-mode-abbrev-table
+  '(
+    ("jd" "(message \"poop: \")" nil :count 0)
+   ))
+(define-abbrev-table 'global-abbrev-table
+  '(
+    ("jT" "" (lambda nil (interactive) (insert (format-time-string "%Y%m%d%H%M%S"))) :count 0)
+    ("ja" "" (lambda nil (interactive) (insert (format-time-string "<%Y-%m-%d>"))) :count 1)
+    ("ji" "(interactive)" nil :count 1)
+    ("jl" "(lambda ()" nil :count 0)
+    ("jt" "" (lambda nil (interactive) (insert (format-time-string "%Y%m%d"))) :count 0)
+   ))
+(define-abbrev-table 'org-mode-abbrev-table
+  '(
+    ("je" "#+attr_org: :width 300px
+,#+attr_html: :class emacs-img" nil :count 0)
+    ("jg" "#+attr_org: :width 300px
+,#+attr_html: :width 100%" nil :count 0)
+    ("jk" "#+begin: kanban :layout (\"...\") :scope nil :range (\"TODO\" . \"DONE\") :sort \"O\" :depth 2 :compressed t
+,#+end:" nil :count 0)
+    ("jm" "#+hugo: more" nil :count 0)
+    ("jo" "---
+,#+TOC: headlines 1 local
+---" nil :count 0)
+    ("jp" "~--APT--~" nil :count 0)
+   ))
+(define-abbrev-table 'sh-mode-abbrev-table
+  '(
+    ("jd" "echo \"poop: \"" nil :count 0)
+   ))
+#+end_src
+
+The only downside is the lack of positional cursor options that are easily defined in Tempel, but if I really wanted to, I could just include lambda functions to move the cursor. However, I don't think I’m too bothered; I’ll just use the usual Emacs navigation keys.
 
 ** DONE image-dired
 CLOSED: [2024-12-19 Thu 11:44]
 
-Copy over functionality, no real external things, its just is it valuable given how little I use it? 
+This is mainly enhancements to provide a more comfortable Desktop feel to image navigation.
 
 ** DONE selected-window-accent-mode
 CLOSED: [2024-12-20 Fri 08:53]
@@ -355,13 +443,13 @@ if COLOR is not provided as an argument."
 ** DONE deadgrep
 CLOSED: [2024-12-20 Fri 08:54]
 
-Would rgrep be potentially good enough?, maybe, or maybe pull on ripgrep through a simple interface and re-use =grep-mode= so essentially it will look just like rgrep output except with more information about the ripgrep search in the style of deadgrep, for example:
+Would rgrep be potentially good enough?, maybe, or perhaps implement ripgrep through a simple interface while reusing `grep-mode`. Essentially, it would look similar to rgrep's output but include more detailed information from the ripgrep search, similar to the style of deadgrep. For example:
 
 - directory
 - search term
 - glob
 
-and like deadgrep have some local keybindings that can input the directory, search-term or glob
+And, like deadgrep, have some local keybindings that can input the directory, search term, or glob.
 
 Being solved with the following code:
 
@@ -439,14 +527,10 @@ Being solved with the following code:
                                  (my/grep search-term directory glob))))))
 #+end_src
 
-*** BUGS
-
-**** FIXED rgrep fallback doesn't have local keys option of "d" "s" "g" which would be a nice improvement
-
 ** DONE jinx / powerthesaurus
 CLOSED: [2024-12-20 Fri 09:04]
 
-I think I can probably just use =flyspell-buffer= and do I really need a thesaurus?, probably not, and just lean on =dictionary-lookup-definition=
+I think I can probably just use =flyspell-buffer=, and do I really need a thesaurus? Probably not, I can just rely on =dictionary-lookup-definition=.
 
 Solution is the following configuration:
 
@@ -465,9 +549,9 @@ Solution is the following configuration:
 (global-set-key (kbd "C-0") #'ispell-word)
 #+end_src
 
-Note that at the moment I don't really care about spell checking efficiency (which jinx was very good at), I am quite happy to wait for a few seconds for the (flyspell-buffer) to run, and in a narrowed region it wont take that long anyway.
+Note that at the moment, I don't really care about spell-checking efficiency (which Jinx was very good at). I am quite happy to wait a few seconds for the =flyspell-buffer= to run, and in a narrowed region, it won't take that long anyway.
 
-Also as a bonus I recently discovered the shortcut key of C-. which is to autocorrect cycle a word, this makes life much simpler.
+Also, as a bonus, I recently discovered the shortcut key `C-.`, which cycles through autocorrect suggestions for a word. This makes life much simpler.
 
 #+begin_quote
 (flyspell-auto-correct-word)
@@ -481,7 +565,7 @@ cycles through the possible corrections of the current word.
 ** DONE kurecolor
 CLOSED: [2024-12-20 Fri 08:54]
 
-Add some elisp with the requisite regex-search and elisp colour calls, I have achieved this in the past, before I found the more convenient option of kurecolor
+I have always found this very useful when customizing my system or webpage to incrementally tweak colours.
 
 Testing with the following code:
 
@@ -583,7 +667,7 @@ Originally I had the following keybindings mapped :
 (global-set-key (kbd "M-g o") 'consult-outline)
 #+end_src
 
-The first one is easy, I am happy just to replace with =imenu= the interface brings up a simple minibuffer completing-read, I don't dynamically jump to the headline, but I'm not a fan of that anyway.
+The first one is easy. I am happy to replace it with =imenu=; the interface brings up a simple minibuffer completing-read. I don't dynamically jump to the headline, but I'm not a fan of that approach anyway.
 
 The second one I think I can replace by using =org-goto= with a couple of tweaks
 
@@ -593,7 +677,7 @@ The second one I think I can replace by using =org-goto= with a couple of tweaks
 (setq org-outline-path-complete-in-steps nil)
 #+end_src
 
-Which turns the awkward =org-goto= interface into a better easier completing read one more akin to =consult-outline=
+This transforms the awkward =org-goto= interface into a better, easier, completing-read one, more akin to =consult-outline=.
 
 ** DOING embark
 
@@ -619,9 +703,7 @@ collect/export could be solved with a TAB showing completions buffer
 
 ** DOING popper
 
-Mainly used for popping and popping out shells, I'm sure I can code up an alternative solution here if I need to.
-
-Testing the following implementation:
+Mainly used for popping and popping out shells, testing the following implementation:
 
 #+begin_src elisp
 (defvar my/popper-current-popup nil
@@ -689,11 +771,13 @@ If the popup is visible, hide it. If the popup is not visible, restore it."
 (global-set-key (kbd "M-;") #'my/popper-toggle-current)
 #+end_src
 
-*** TODO push buffer to popup buffer                               :issues:
+*** TODO push buffer to popup buffer and back                      :issues:
+
+*** TODO pop in and out on initial not working too well            :issues:
 
 ** DOING pandoc md to org conversion
 
-Replacing external tool pandoc conversion from markdown (md) to org, especially useful when copy and pasting from AI chats
+Replacing the external tool Pandoc for converting Markdown (md) to Org format is especially useful when copying and pasting from AI chats.
 
 Potentially solved with the following, probably requires more testing:
 
@@ -794,13 +878,13 @@ Lets give it a go!
 (setq completion-styles '(flex basic substring))
 #+end_src
 
-Note that the =completion-styles= is globally set to include =flex= because, by default, icomplete is the completion engine that works in the buffer. Since fido-mode, which is enabled by default, does not support flex (something I have now grown accustomed to) this adjustment is necessary.
+Note that the =completion-styles= variable is globally set to include =flex= because, by default, Icomplete is the completion engine that operates in the buffer. Since Fido mode, which is enabled by default, does not support `flex` (something I have now grown accustomed to), this adjustment is necessary.
 
 *** TODO Test completion through programming modes                 :issues:
 
 ** DOING org-kanban
 
-Creating a kanban board for an org file, technically I should just be able to define a defun that can be embedded within something like:
+Creating a Kanban board for an org file: technically, I should just be able to define a =defun= that can be embedded within something like:
 
 #+begin_src emacs-lisp :results table :exports results :tangle no
 (my/kanban-to-table "roadmap")
