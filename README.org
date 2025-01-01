@@ -6,7 +6,7 @@
 #+todo: TODO DOING | DONE
 #+property: header-args :tangle ~/.emacs.d/Emacs-enhanced/init.el
 
-#+begin_src emacs-lisp
+#+begin_src emacs-lisp :exports none
 ;; -*- lexical-binding: t; -*-
 #+end_src
 
@@ -19,6 +19,42 @@ It is also a general comment on how I have moved to more a vanilla based Emacs s
 Perfect for lightweight usage in VMs or basic tasks.
 
 Used in concert with https://github.com/captainflasmr/Emacs-core
+
+* Whats New
+
+** <2025-01-01>
+
+Refactor popup handling and improve buffer filtering logic
+
+- Updated =my/popper-show-hide-popup= to improve popup buffer filtering with =popup-patterns=,
+  allowing more flexible matching of buffers against patterns.
+- Adjusted logic to remove redundant comments and optimize control flow:
+  - Clearly separated cases for hiding the current popup and displaying the next valid popup.
+  - Refactored buffer filtering using =seq-filter= to enhance clarity and reduce redundancy.
+- Removed extraneous comments and dead code for improved readability.
+- No functional changes to existing behavior; this is a refactoring for code clarity and maintainability.
+
+** <2024-12-29>
+
+Added initial attempt at generating an RSS xml feed based on my org posts.
+
+** <2024-12-29>
+
+Add "Issues" section and link TODOs to project features in README
+
+- Added a new "Issues" section with TODOs, each linked to related project features.
+- Supplemented the section with Emacs Lisp code to auto-generate issue tables.
+
+** <2024-12-28>
+
+- Added consult section for potential consult replacements.
+
+** <2024-12-22>
+
+- Added =my/kanban-to-table= implementation detailing its structure and purpose.
+  - =my/kanban-to-table= dynamically formats Org-mode TODO headings into a Kanban-style Org table based on their TODO states.
+  - The function supports filtering entries by tags or property matches.
+  - Replaced the external package =org-kanban=
 
 * Kanban
 
@@ -58,42 +94,6 @@ Here is a kanban of the features that will be (hopefully) converted to core/enha
 | DOING | Generate RSS xml                          | ox-hugo                      |
 | TODO  | Test completion through programming modes | completion - corfu / company |
 | TODO  | push buffer to popup buffer               | popper                       |
-
-* Whats New
-
-** <2025-01-01>
-
-Refactor popup handling and improve buffer filtering logic
-
-- Updated =my/popper-show-hide-popup= to improve popup buffer filtering with =popup-patterns=,
-  allowing more flexible matching of buffers against patterns.
-- Adjusted logic to remove redundant comments and optimize control flow:
-  - Clearly separated cases for hiding the current popup and displaying the next valid popup.
-  - Refactored buffer filtering using =seq-filter= to enhance clarity and reduce redundancy.
-- Removed extraneous comments and dead code for improved readability.
-- No functional changes to existing behavior; this is a refactoring for code clarity and maintainability.
-
-** <2024-12-29>
-
-Added initial attempt at generating an RSS xml feed based on my org posts.
-
-** <2024-12-29>
-
-Add "Issues" section and link TODOs to project features in README
-
-- Added a new "Issues" section with TODOs, each linked to related project features.
-- Supplemented the section with Emacs Lisp code to auto-generate issue tables.
-
-** <2024-12-28>
-
-- Added consult section for potential consult replacements.
-
-** <2024-12-22>
-
-- Added =my/kanban-to-table= implementation detailing its structure and purpose.
-  - =my/kanban-to-table= dynamically formats Org-mode TODO headings into a Kanban-style Org table based on their TODO states.
-  - The function supports filtering entries by tags or property matches.
-  - Replaced the external package =org-kanban=
 
 * Roadmap                                                           :roadmap:
 
