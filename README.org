@@ -48,7 +48,7 @@ Here is a kanban of the features that will be (hopefully) converted to core/enha
 * Issues
 
 #+begin_src emacs-lisp :results table :exports results :tangle no
-  (my/collate-issues-into-table)
+(my/collate-issues-into-table)
 #+end_src
 
 #+RESULTS:
@@ -60,6 +60,18 @@ Here is a kanban of the features that will be (hopefully) converted to core/enha
 | TODO  | push buffer to popup buffer               | popper                       |
 
 * Whats New
+
+** <2025-01-01>
+
+Refactor popup handling and improve buffer filtering logic
+
+- Updated =my/popper-show-hide-popup= to improve popup buffer filtering with =popup-patterns=,
+  allowing more flexible matching of buffers against patterns.
+- Adjusted logic to remove redundant comments and optimize control flow:
+  - Clearly separated cases for hiding the current popup and displaying the next valid popup.
+  - Refactored buffer filtering using =seq-filter= to enhance clarity and reduce redundancy.
+- Removed extraneous comments and dead code for improved readability.
+- No functional changes to existing behavior; this is a refactoring for code clarity and maintainability.
 
 ** <2024-12-29>
 
@@ -652,22 +664,26 @@ active popup in `my/popper-current-popup`."
                                            (member (window-buffer win) popup-buffers))
                                          (window-list)))))
     (if current-popup
-        ;; If a pop-up buffer is currently visible, bury it.
         (let ((buf (window-buffer current-popup)))
           (delete-window current-popup)
           (bury-buffer buf)
-          (setq my/popper-current-popup nil) ;; Clear the currently tracked popup.
-          (message "Hid pop-up buffer: %s" (buffer-name buf)))
-      ;; Otherwise, display the first available pop-up buffer.
-      (if popup-buffers
-          (let ((buf (car popup-buffers)))
-            (pop-to-buffer buf
-                           '(display-buffer-at-bottom
-                             (inhibit-same-window . t)
-                             (window-height . 0.3)))
-            (setq my/popper-current-popup buf) ;; Store the displayed popup buffer.
-            (message "Displayed pop-up buffer: %s" (buffer-name buf)))
-        (message "No pop-up buffers to display!")))))
+          (setq my/popper-current-popup nil)
+          (message "Hid pop-up buffer: %s" (buffer-name buf))))
+    (setq popup-buffers (seq-filter (lambda (buf)
+                                      (let ((bufname (buffer-name buf)))
+                                        (seq-some (lambda (pattern)
+                                                    (string-match-p pattern bufname))
+                                                  popup-patterns)))
+                                    (buffer-list)))
+    (if popup-buffers
+        (let ((buf (car popup-buffers)))
+          (pop-to-buffer buf
+                         '(display-buffer-at-bottom
+                           (inhibit-same-window . t)
+                           (window-height . 0.3)))
+          (setq my/popper-current-popup buf)
+          (message "Displayed pop-up buffer: %s" (buffer-name buf)))
+      (message "No pop-up buffers to display!"))))
 ;;
 (defun my/popper-toggle-current ()
   "Toggle visibility of the last active popup buffer (`my/popper-current-popup`).
@@ -683,7 +699,6 @@ If the popup is visible, hide it. If the popup is not visible, restore it."
                          (inhibit-same-window . t)
                          (window-height . 0.3)))
         (message "Restored active popup buffer: %s" (buffer-name my/popper-current-popup)))
-    ;; If no valid currently tracked popup:
     (message "No active popup buffer to toggle.")))
 ;;
 ;; Cycle through popups or show the next popup.

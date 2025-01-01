@@ -350,22 +350,26 @@ active popup in `my/popper-current-popup`."
                                            (member (window-buffer win) popup-buffers))
                                          (window-list)))))
     (if current-popup
-        ;; If a pop-up buffer is currently visible, bury it.
         (let ((buf (window-buffer current-popup)))
           (delete-window current-popup)
           (bury-buffer buf)
-          (setq my/popper-current-popup nil) ;; Clear the currently tracked popup.
-          (message "Hid pop-up buffer: %s" (buffer-name buf)))
-      ;; Otherwise, display the first available pop-up buffer.
-      (if popup-buffers
-          (let ((buf (car popup-buffers)))
-            (pop-to-buffer buf
-                           '(display-buffer-at-bottom
-                             (inhibit-same-window . t)
-                             (window-height . 0.3)))
-            (setq my/popper-current-popup buf) ;; Store the displayed popup buffer.
-            (message "Displayed pop-up buffer: %s" (buffer-name buf)))
-        (message "No pop-up buffers to display!")))))
+          (setq my/popper-current-popup nil)
+          (message "Hid pop-up buffer: %s" (buffer-name buf))))
+    (setq popup-buffers (seq-filter (lambda (buf)
+                                      (let ((bufname (buffer-name buf)))
+                                        (seq-some (lambda (pattern)
+                                                    (string-match-p pattern bufname))
+                                                  popup-patterns)))
+                                    (buffer-list)))
+    (if popup-buffers
+        (let ((buf (car popup-buffers)))
+          (pop-to-buffer buf
+                         '(display-buffer-at-bottom
+                           (inhibit-same-window . t)
+                           (window-height . 0.3)))
+          (setq my/popper-current-popup buf)
+          (message "Displayed pop-up buffer: %s" (buffer-name buf)))
+      (message "No pop-up buffers to display!"))))
 ;;
 (defun my/popper-toggle-current ()
   "Toggle visibility of the last active popup buffer (`my/popper-current-popup`).
@@ -381,7 +385,6 @@ If the popup is visible, hide it. If the popup is not visible, restore it."
                          (inhibit-same-window . t)
                          (window-height . 0.3)))
         (message "Restored active popup buffer: %s" (buffer-name my/popper-current-popup)))
-    ;; If no valid currently tracked popup:
     (message "No active popup buffer to toggle.")))
 ;;
 ;; Cycle through popups or show the next popup.
