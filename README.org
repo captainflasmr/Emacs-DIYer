@@ -706,9 +706,6 @@ collect/export could be solved with a TAB showing completions buffer
 Mainly used for popping and popping out shells, testing the following implementation:
 
 #+begin_src elisp
-(defvar my/popper-current-popup nil
-  "Stores the currently active popup buffer for quick toggle.")
-;;
 (defun my/popper-matching-buffers ()
   "Return a list of buffers matching pop-up patterns."
   (let ((popup-patterns '("\\*eshell\.*\\*" "\\*eldoc\.*\\*")))
@@ -725,12 +722,10 @@ Mainly used for popping and popping out shells, testing the following implementa
                  '(display-buffer-at-bottom
                    (inhibit-same-window . t)
                    (window-height . 0.3)))
-  (setq my/popper-current-popup buffer)
   (message "Displayed pop-up buffer: %s" (buffer-name buffer)))
 ;;
 (defun my/popper-cycle-popup ()
-  "Toggle visibility of pop-up buffers.
-Stores the last active popup in `my/popper-current-popup`."
+  "Cycle visibility of pop-up buffers."
   (interactive)
   (let* ((popup-buffers (my/popper-matching-buffers))
          (current-popup-window (car (seq-filter (lambda (win)
@@ -740,24 +735,23 @@ Stores the last active popup in `my/popper-current-popup`."
       (let ((buf (window-buffer current-popup-window)))
         (delete-window current-popup-window)
         (bury-buffer buf)
-        (setq my/popper-current-popup nil)
+        (setq popup-buffers (my/popper-matching-buffers))
         (message "Hid pop-up buffer: %s" (buffer-name buf))))
-    (setq popup-buffers (my/popper-matching-buffers))
     (if popup-buffers
         (my/popper-handle-popup (car popup-buffers))
       (message "No pop-up buffers to display!"))))
 ;;
 (defun my/popper-toggle-current ()
-  "Toggle visibility of the last active popup buffer (`my/popper-current-popup`)."
+  "Toggle visibility of pop-up buffers."
   (interactive)
   (let* ((popup-buffers (my/popper-matching-buffers))
-        (current-popup-window (car (seq-filter (lambda (win)
-                                                 (member (window-buffer win) popup-buffers))
-                                               (window-list)))))
+         (current-popup-window (car (seq-filter (lambda (win)
+                                                  (member (window-buffer win) popup-buffers))
+                                                (window-list)))))
     (if current-popup-window
-      (let ((buf (window-buffer current-popup-window)))
-        (delete-window current-popup-window)
-        (message "Hid pop-up buffer: %s" (buffer-name buf)))
+        (let ((buf (window-buffer current-popup-window)))
+          (delete-window current-popup-window)
+          (message "Hid pop-up buffer: %s" (buffer-name buf)))
       (if popup-buffers
           (my/popper-handle-popup (car popup-buffers))
         (message "No pop-up buffers to display!")))))
