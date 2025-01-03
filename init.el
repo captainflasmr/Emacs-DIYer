@@ -474,7 +474,6 @@ If the popup is visible, hide it. If the popup is not visible, restore it."
 (setq icomplete-hide-common-prefix nil)
 (setq icomplete-separator " | ")
 (setq icomplete-with-completion-tables t)
-(setq icomplete-in-buffer t)
 (setq icomplete-max-delay-chars 0)
 (setq icomplete-scroll t)
 (setq max-mini-window-height 10)
