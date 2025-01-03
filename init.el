@@ -339,7 +339,7 @@ When toggled, the function displays the next available pop-up
 buffer or hides currently displayed pop-ups. Stores the last
 active popup in `my/popper-current-popup`."
   (interactive)
-  (let* ((popup-patterns '("\\*Help\\*" "\\*eshell\.*\\*" "\\*eldoc\.*\\*"))
+  (let* ((popup-patterns '("\\*eshell\.*\\*" "\\*eldoc\.*\\*"))
          (popup-buffers (seq-filter (lambda (buf)
                                       (let ((bufname (buffer-name buf)))
                                         (seq-some (lambda (pattern)
@@ -349,18 +349,18 @@ active popup in `my/popper-current-popup`."
          (current-popup (car (seq-filter (lambda (win)
                                            (member (window-buffer win) popup-buffers))
                                          (window-list)))))
-    (if current-popup
+    (when current-popup
         (let ((buf (window-buffer current-popup)))
           (delete-window current-popup)
           (bury-buffer buf)
           (setq my/popper-current-popup nil)
-          (message "Hid pop-up buffer: %s" (buffer-name buf))))
-    (setq popup-buffers (seq-filter (lambda (buf)
-                                      (let ((bufname (buffer-name buf)))
-                                        (seq-some (lambda (pattern)
-                                                    (string-match-p pattern bufname))
-                                                  popup-patterns)))
-                                    (buffer-list)))
+          (message "Hid pop-up buffer: %s" (buffer-name buf))
+          (setq popup-buffers (seq-filter (lambda (buf)
+                                            (let ((bufname (buffer-name buf)))
+                                              (seq-some (lambda (pattern)
+                                                          (string-match-p pattern bufname))
+                                                        popup-patterns)))
+                                          (buffer-list)))))
     (if popup-buffers
         (let ((buf (car popup-buffers)))
           (pop-to-buffer buf
@@ -375,17 +375,44 @@ active popup in `my/popper-current-popup`."
   "Toggle visibility of the last active popup buffer (`my/popper-current-popup`).
 If the popup is visible, hide it. If the popup is not visible, restore it."
   (interactive)
-  (if (and my/popper-current-popup (buffer-live-p my/popper-current-popup))
-      (if (get-buffer-window my/popper-current-popup)
-          (progn
-            (delete-window (get-buffer-window my/popper-current-popup))
-            (message "Hid active popup buffer: %s" (buffer-name my/popper-current-popup)))
-        (pop-to-buffer my/popper-current-popup
-                       '(display-buffer-at-bottom
-                         (inhibit-same-window . t)
-                         (window-height . 0.3)))
-        (message "Restored active popup buffer: %s" (buffer-name my/popper-current-popup)))
-    (message "No active popup buffer to toggle.")))
+  (if my/popper-current-popup
+      (if (buffer-live-p my/popper-current-popup)
+          (if (get-buffer-window my/popper-current-popup)
+              (progn
+                (delete-window (get-buffer-window my/popper-current-popup))
+                (message "Hid active popup buffer: %s" (buffer-name my/popper-current-popup)))
+            (pop-to-buffer my/popper-current-popup
+                           '(display-buffer-at-bottom
+                             (inhibit-same-window . t)
+                             (window-height . 0.3)))
+            (message "Restored active popup buffer: %s" (buffer-name my/popper-current-popup)))
+        (message "No active popup buffer to toggle."))
+    ;; probably first time running, try and find a suitable candidate
+    (let* ((popup-patterns '("\\*eshell\.*\\*" "\\*eldoc\.*\\*"))
+           (popup-buffers (seq-filter (lambda (buf)
+                                        (let ((bufname (buffer-name buf)))
+                                          (seq-some (lambda (pattern)
+                                                      (string-match-p pattern bufname))
+                                                    popup-patterns)))
+                                      (buffer-list)))
+           (current-popup (car (seq-filter (lambda (win)
+                                             (member (window-buffer win) popup-buffers))
+                                           (window-list)))))
+      (if current-popup
+        (let ((buf (window-buffer current-popup)))
+          (delete-window current-popup)
+          (bury-buffer buf)
+          (setq my/popper-current-popup nil)
+          (message "Hid pop-up buffer: %s" (buffer-name buf)))
+        (if popup-buffers
+            (let ((buf (car popup-buffers)))
+              (pop-to-buffer buf
+                             '(display-buffer-at-bottom
+                               (inhibit-same-window . t)
+                               (window-height . 0.3)))
+              (setq my/popper-current-popup buf)
+              (message "Displayed pop-up buffer: %s" (buffer-name buf)))
+          (message "No pop-up buffers to display!"))))))
 ;;
 ;; Cycle through popups or show the next popup.
 (global-set-key (kbd "M-'") #'my/popper-cycle-popup)
