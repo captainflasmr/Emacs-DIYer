@@ -750,17 +750,14 @@ Stores the last active popup in `my/popper-current-popup`."
 (defun my/popper-toggle-current ()
   "Toggle visibility of the last active popup buffer (`my/popper-current-popup`)."
   (interactive)
-  (if my/popper-current-popup
-      (if (buffer-live-p my/popper-current-popup)
-          (if (get-buffer-window my/popper-current-popup)
-              (progn
-                (delete-window (get-buffer-window my/popper-current-popup))
-                (message "Hid active popup buffer: %s" (buffer-name my/popper-current-popup)))
-            (my/popper-handle-popup my/popper-current-popup)
-            (message "Restored active popup buffer: %s" (buffer-name my/popper-current-popup)))
-        (message "No active popup buffer to toggle."))
-    ;; First attempt at finding suitable popup buffer
-    (let ((popup-buffers (my/popper-matching-buffers)))
+  (let* ((popup-buffers (my/popper-matching-buffers))
+        (current-popup-window (car (seq-filter (lambda (win)
+                                                 (member (window-buffer win) popup-buffers))
+                                               (window-list)))))
+    (if current-popup-window
+      (let ((buf (window-buffer current-popup-window)))
+        (delete-window current-popup-window)
+        (message "Hid pop-up buffer: %s" (buffer-name buf)))
       (if popup-buffers
           (my/popper-handle-popup (car popup-buffers))
         (message "No pop-up buffers to display!")))))
