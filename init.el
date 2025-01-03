@@ -331,7 +331,7 @@ if COLOR is not provided as an argument."
 
 (defun my/popper-matching-buffers ()
   "Return a list of buffers matching pop-up patterns."
-  (let ((popup-patterns '("\\*eshell\.*\\*" "\\*eldoc\.*\\*")))
+  (let ((popup-patterns '("\\*eshell\.*\\*" "\\*eldoc\.*\\*" "\\*Flymake\.*")))
     (seq-filter (lambda (buf)
                   (let ((bufname (buffer-name buf)))
                     (seq-some (lambda (pattern)
