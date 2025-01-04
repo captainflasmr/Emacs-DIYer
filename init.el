@@ -342,9 +342,9 @@ if COLOR is not provided as an argument."
 (defun my/popper-handle-popup (buffer)
   "Display BUFFER as a popup, setting it as the current popup."
   (pop-to-buffer buffer
-                 '(display-buffer-at-bottom
-                   (inhibit-same-window . t)
-                   (window-height . 0.3)))
+               '((display-buffer-reuse-window display-buffer-at-bottom)
+                 (inhibit-same-window . t)
+                 (window-height . 0.3)))
   (message "Displayed pop-up buffer: %s" (buffer-name buffer)))
 ;;
 (defun my/popper-cycle-popup ()
