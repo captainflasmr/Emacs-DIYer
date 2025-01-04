@@ -214,6 +214,13 @@ if COLOR is not provided as an argument."
       (local-set-key (kbd "g") (lambda () 
                                  (interactive)
                                  (my/grep search-term directory glob))))))
+;;
+(defun my-org-reveal-on-next-error ()
+  "Reveal the location of search results in an Org file."
+  (when (derived-mode-p 'org-mode)
+    (org-reveal)))
+;;
+(add-hook 'next-error-hook 'my-org-reveal-on-next-error)
 
 (setq ispell-local-dictionary "en_GB")
 (setq ispell-program-name "hunspell")
