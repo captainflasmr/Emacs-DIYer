@@ -10,6 +10,14 @@ This document contains the release notes for Emacs-enhanced
 
 * Versions
 
+** <2025-01-05>
+
+icomplete-in-buffer setup and completion functions to try and replace corfu/company
+
+- Added `(setq icomplete-in-buffer t)` to improve in-buffer completion behavior.
+- Documented custom functions =my/simple-completion-at-point= utilizing =completion-in-region= and =completing-read=
+- Introduced `C-c TAB` keybinding for invoking custom completion.
+
 ** <2025-01-01>
 
 Refactor popup handling and improve buffer filtering logic

@@ -472,11 +472,46 @@ if COLOR is not provided as an argument."
 (setq icomplete-show-matches-on-no-input t)
 (setq icomplete-hide-common-prefix nil)
 (setq icomplete-separator " | ")
+(setq icomplete-in-buffer t)
 (setq icomplete-with-completion-tables t)
 (setq icomplete-max-delay-chars 0)
 (setq icomplete-scroll t)
 (setq max-mini-window-height 10)
 (setq completion-styles '(flex basic substring))
+
+(defun my/simple-completion-at-point ()
+  "Use completion-in-region for in-buffer completion."
+  (interactive)
+  (let* ((completion-data (run-hook-with-args-until-success 
+                          'completion-at-point-functions))
+         (beg (nth 0 completion-data))
+         (end (nth 1 completion-data))
+         (table (nth 2 completion-data))
+         (pred (plist-get (nthcdr 3 completion-data) :predicate)))
+    (when completion-data
+      (completion-in-region beg end table pred))))
+;;
+(defun my/simple-completion-at-point ()
+  "Use completing-read-in-buffer for completion at point."
+  (interactive)
+  (let* ((completion-data (run-hook-with-args-until-success 
+                           'completion-at-point-functions))
+         (beg (nth 0 completion-data))
+         (end (nth 1 completion-data))
+         (table (nth 2 completion-data))
+         (pred (plist-get (nthcdr 3 completion-data) :predicate))
+         (prefix (buffer-substring-no-properties beg end))
+         (completion (completing-read-default
+                      "Complete: "
+                      table
+                      pred
+                      nil  ; no require-match
+                      prefix)))
+    (when completion
+      (delete-region beg end)
+      (insert completion))))
+;;
+(global-set-key (kbd "C-c TAB") #'my/simple-completion-at-point)
 
 (defun my/kanban-to-table (&optional match)
   "Format Org headings into a Kanban-style Org table.

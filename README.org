@@ -21,6 +21,14 @@ Used in concert with https://github.com/captainflasmr/Emacs-core
 
 * Whats New
 
+** <2025-01-05>
+
+icomplete-in-buffer setup and completion functions to try and replace corfu/company
+
+- Added `(setq icomplete-in-buffer t)` to improve in-buffer completion behavior.
+- Documented custom functions =my/simple-completion-at-point= utilizing =completion-in-region= and =completing-read=
+- Introduced `C-c TAB` keybinding for invoking custom completion.
+
 ** <2025-01-01>
 
 Refactor popup handling and improve buffer filtering logic
@@ -869,6 +877,7 @@ Lets give it a go!
 (setq icomplete-show-matches-on-no-input t)
 (setq icomplete-hide-common-prefix nil)
 (setq icomplete-separator " | ")
+(setq icomplete-in-buffer t)
 (setq icomplete-with-completion-tables t)
 (setq icomplete-max-delay-chars 0)
 (setq icomplete-scroll t)
@@ -877,6 +886,44 @@ Lets give it a go!
 #+end_src
 
 Note that the =completion-styles= variable is globally set to include =flex= because, by default, Icomplete is the completion engine that operates in the buffer. Since Fido mode, which is enabled by default, does not support `flex` (something I have now grown accustomed to), this adjustment is necessary.
+
+As another option, how about a simple defun leveraging =completion-in-region= or =completing-read= :
+
+#+begin_src elisp
+(defun my/simple-completion-at-point ()
+  "Use completion-in-region for in-buffer completion."
+  (interactive)
+  (let* ((completion-data (run-hook-with-args-until-success 
+                          'completion-at-point-functions))
+         (beg (nth 0 completion-data))
+         (end (nth 1 completion-data))
+         (table (nth 2 completion-data))
+         (pred (plist-get (nthcdr 3 completion-data) :predicate)))
+    (when completion-data
+      (completion-in-region beg end table pred))))
+;;
+(defun my/simple-completion-at-point ()
+  "Use completing-read-in-buffer for completion at point."
+  (interactive)
+  (let* ((completion-data (run-hook-with-args-until-success 
+                           'completion-at-point-functions))
+         (beg (nth 0 completion-data))
+         (end (nth 1 completion-data))
+         (table (nth 2 completion-data))
+         (pred (plist-get (nthcdr 3 completion-data) :predicate))
+         (prefix (buffer-substring-no-properties beg end))
+         (completion (completing-read-default
+                      "Complete: "
+                      table
+                      pred
+                      nil  ; no require-match
+                      prefix)))
+    (when completion
+      (delete-region beg end)
+      (insert completion))))
+;;
+(global-set-key (kbd "C-c TAB") #'my/simple-completion-at-point)
+#+end_src
 
 *** TODO Test completion through programming modes                 :issues:
 
