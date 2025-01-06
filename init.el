@@ -461,17 +461,19 @@ if COLOR is not provided as an argument."
 
 (define-key icomplete-minibuffer-map (kbd "C-n") #'icomplete-forward-completions)
 (define-key icomplete-minibuffer-map (kbd "C-p") #'icomplete-backward-completions)
-(define-key icomplete-minibuffer-map (kbd "C-s") #'icomplete-forward-completions)
-(define-key icomplete-minibuffer-map (kbd "C-r") #'icomplete-backward-completions)
-(define-key icomplete-minibuffer-map (kbd "C-v") #'icomplete-vertical-toggle)
 (define-key icomplete-minibuffer-map (kbd "RET") #'icomplete-force-complete-and-exit)
 (add-hook 'after-init-hook (lambda () (fido-mode 1)))
+(setq completion-styles '(flex basic substring))
 (setq tab-always-indent t)
 (setq icomplete-delay-completions-threshold 0)
+(setq icomplete-max-delay-chars 0)
 (setq icomplete-compute-delay 0)
 (setq icomplete-show-matches-on-no-input t)
-(setq icomplete-hide-common-prefix nil)
 (setq icomplete-separator " | ")
+(add-hook 'buffer-list-update-hook
+          (lambda ()
+            (unless (minibufferp)
+              (setq-local icomplete-separator "\n"))))
 (setq icomplete-in-buffer t)
 (setq completion-auto-help nil)
 (define-key minibuffer-local-completion-map (kbd "TAB")
@@ -481,23 +483,9 @@ if COLOR is not provided as an argument."
                 (minibuffer-complete))))
 (setq completion-show-help nil)
 (setq icomplete-with-completion-tables t)
-(setq icomplete-max-delay-chars 0)
+(setq icomplete-prospects-height 2)
 (setq icomplete-scroll t)
-(setq max-mini-window-height 10)
-(setq completion-styles '(flex basic substring))
 
-(defun my/simple-completion-at-point ()
-  "Use completion-in-region for in-buffer completion."
-  (interactive)
-  (let* ((completion-data (run-hook-with-args-until-success 
-                          'completion-at-point-functions))
-         (beg (nth 0 completion-data))
-         (end (nth 1 completion-data))
-         (table (nth 2 completion-data))
-         (pred (plist-get (nthcdr 3 completion-data) :predicate)))
-    (when completion-data
-      (completion-in-region beg end table pred))))
-;;
 (defun my/simple-completion-at-point ()
   "Use completing-read-in-buffer for completion at point."
   (interactive)
