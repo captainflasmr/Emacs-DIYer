@@ -10,6 +10,16 @@ This document contains the release notes for Emacs-enhanced
 
 * Versions
 
+** <2025-01-07>
+
+Add eglot replacement using custom etags functions and keybindings
+
+- Added `my/etags-load`: Locate and load the nearest TAGS file.
+- Added `my/etags-update`: Generate etags using an external script if available.
+- Added `my/generate-etags`: Recursively create etags for C, C++, C#, and Ada files.
+- Introduced `predicate-exclusion-p` for directory exclusion logic.
+- Bound `my/etags-load` to `C-x p l` and `my/etags-update` to `C-x p u`.
+
 ** <2025-01-05>
 
 icomplete-in-buffer setup and completion functions to try and replace corfu/company
