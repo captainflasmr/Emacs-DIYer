@@ -58,21 +58,21 @@ Here is a kanban of the features that will be (hopefully) converted to core/enha
 #+end_src
 
 #+RESULTS:
-| TODO             | DOING                        | DONE                        |
-|------------------+------------------------------+-----------------------------|
-| capf-autosuggest | consult                      | minibuffer completion       |
-|                  | embark                       | ace-window                  |
-|                  | popper                       | recentf-open                |
-|                  | pandoc md to org conversion  | rainbow-mode                |
-|                  | completion - corfu / company | visual-fill-column-mode     |
-|                  | org-kanban                   | find-name-dired             |
-|                  | ox-hugo                      | magit                       |
-|                  |                              | tempel                      |
-|                  |                              | image-dired                 |
-|                  |                              | selected-window-accent-mode |
-|                  |                              | deadgrep                    |
-|                  |                              | jinx / powerthesaurus       |
-|                  |                              | kurecolor                   |
+| TODO                                 | DOING                                          | DONE                        |
+|--------------------------------------+------------------------------------------------+-----------------------------|
+| push buffer to popup buffer and back | consult                                        | minibuffer completion       |
+| Apply css                            | embark                                         | ace-window                  |
+| capf-autosuggest                     | popper                                         | recentf-open                |
+|                                      | pop in and out on initial not working too well | rainbow-mode                |
+|                                      | pandoc md to org conversion                    | visual-fill-column-mode     |
+|                                      | completion - corfu / company                   | find-name-dired             |
+|                                      | Test completion through programming modes      | magit                       |
+|                                      | org-kanban                                     | tempel                      |
+|                                      | ox-hugo                                        | image-dired                 |
+|                                      | Generate RSS xml                               | selected-window-accent-mode |
+|                                      |                                                | deadgrep                    |
+|                                      |                                                | jinx / powerthesaurus       |
+|                                      |                                                | kurecolor                   |
 
 * Issues
 
@@ -85,8 +85,8 @@ Here is a kanban of the features that will be (hopefully) converted to core/enha
 |-------+------------------------------------------------+------------------------------|
 | TODO  | Apply css                                      | ox-hugo                      |
 | DOING | Generate RSS xml                               | ox-hugo                      |
-| TODO  | Test completion through programming modes      | completion - corfu / company |
-| TODO  | pop in and out on initial not working too well | popper                       |
+| DOING | Test completion through programming modes      | completion - corfu / company |
+| DOING | pop in and out on initial not working too well | popper                       |
 | TODO  | push buffer to popup buffer and back           | popper                       |
 
 * Roadmap                                                           :roadmap:
@@ -784,7 +784,7 @@ Mainly used for popping and popping out shells, testing the following implementa
 
 *** TODO push buffer to popup buffer and back                      :issues:
 
-*** TODO pop in and out on initial not working too well            :issues:
+*** DOING pop in and out on initial not working too well           :issues:
 
 ** DOING pandoc md to org conversion
 
@@ -932,7 +932,7 @@ As another option, how about a simple defun leveraging =completion-in-region= or
 (global-set-key (kbd "C-c TAB") #'my/simple-completion-at-point)
 #+end_src
 
-*** TODO Test completion through programming modes                 :issues:
+*** DOING Test completion through programming modes                :issues:
 
 ** DOING org-kanban
 
