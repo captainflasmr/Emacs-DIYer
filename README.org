@@ -23,7 +23,9 @@ Used in concert with https://github.com/captainflasmr/Emacs-core
 
 ** <2025-01-08>
 
-Added open-with replacement using dired.
+- Added open-with replacement using dired.
+- Replacing =dired-async-mode= with =my/rsync= function to enable asynchronous copy directly from dired.
+- Bind `C` in `dired-mode-map` to invoke the new rsync functionality.
 
 ** <2025-01-07>
 
@@ -83,7 +85,7 @@ Here is a kanban of the features that will be (hopefully) converted to core/enha
 |                  | ox-hugo                      | magit                       |
 |                  | eglot                        | tempel                      |
 |                  | open-with                    | image-dired                 |
-|                  |                              | selected-window-accent-mode |
+|                  | dired-async-mode             | selected-window-accent-mode |
 |                  |                              | deadgrep                    |
 |                  |                              | jinx / powerthesaurus       |
 |                  |                              | kurecolor                   |
@@ -1330,6 +1332,40 @@ Opening a file, generally from dired, a solution as below:
           ("\\.\\(odt\\|ods\\|doc\\|docx\\)$" "libreoffice")
           ("\\.\\(html\\|htm\\)$" "firefox")
           ("\\.\\(pdf\\|epub\\)$" "xournalpp"))))
+#+end_src
+
+** DOING dired-async-mode
+
+Does dired actions asynchronously, originally I thought this was built-in but I think you require the following for activation:
+
+#+begin_src elisp :tangle no
+(use-package async)
+(require 'dired-async)
+(dired-async-mode 1)
+#+end_src
+
+Could I just call out to =async-shell-command=, something like:
+
+#+begin_src elisp
+(define-key dired-mode-map (kbd "C") 'my/rsync)
+;;
+(defun my/rsync (dest)
+  "Rsync copy."
+  (interactive
+    (list
+      (expand-file-name (read-file-name "rsync to:"
+                          (dired-dwim-target-directory)))))
+  (let ((files (dired-get-marked-files nil current-prefix-arg))
+         (command "rsync -arvz --progress --no-g "))
+    (dolist (file files)
+      (setq command (concat command (shell-quote-argument file) " ")))
+    (setq command (concat command (shell-quote-argument dest)))
+    (async-shell-command command "*rsync*")
+    (dired-unmark-all-marks)
+    (other-window 1)
+    (sleep-for 1)
+    (dired-revert)
+    (revert-buffer nil t nil)))
 #+end_src
 
 ** TODO capf-autosuggest

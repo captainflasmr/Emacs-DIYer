@@ -791,3 +791,23 @@ process, FILENAME is the input Org file, and PUB-DIR is the publishing directory
           ("\\.\\(odt\\|ods\\|doc\\|docx\\)$" "libreoffice")
           ("\\.\\(html\\|htm\\)$" "firefox")
           ("\\.\\(pdf\\|epub\\)$" "xournalpp"))))
+
+(define-key dired-mode-map (kbd "C") 'my/rsync)
+;;
+(defun my/rsync (dest)
+  "Rsync copy."
+  (interactive
+    (list
+      (expand-file-name (read-file-name "rsync to:"
+                          (dired-dwim-target-directory)))))
+  (let ((files (dired-get-marked-files nil current-prefix-arg))
+         (command "rsync -arvz --progress --no-g "))
+    (dolist (file files)
+      (setq command (concat command (shell-quote-argument file) " ")))
+    (setq command (concat command (shell-quote-argument dest)))
+    (async-shell-command command "*rsync*")
+    (dired-unmark-all-marks)
+    (other-window 1)
+    (sleep-for 1)
+    (dired-revert)
+    (revert-buffer nil t nil)))
