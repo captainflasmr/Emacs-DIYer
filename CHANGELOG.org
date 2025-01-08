@@ -10,6 +10,10 @@ This document contains the release notes for Emacs-enhanced
 
 * Versions
 
+** <2025-01-08>
+
+Added open-with replacement using dired.
+
 ** <2025-01-07>
 
 Add eglot replacement using custom etags functions and keybindings

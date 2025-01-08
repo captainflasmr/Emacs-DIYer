@@ -21,6 +21,10 @@ Used in concert with https://github.com/captainflasmr/Emacs-core
 
 * Whats New
 
+** <2025-01-08>
+
+Added open-with replacement using dired.
+
 ** <2025-01-07>
 
 Add eglot replacement using custom etags functions and keybindings
@@ -64,25 +68,25 @@ Added initial attempt at generating an RSS xml feed based on my org posts.
 Here is a kanban of the features that will be (hopefully) converted to core/enhanced Emacs features and visually demonstrating their current status via a kanban board
 
 #+begin_src emacs-lisp :results table :exports results :tangle no
-(my/kanban-to-table "roadmap")
+(my/kanban-to-table "roadmap" "issues")
 #+end_src
 
 #+RESULTS:
-| TODO                                 | DOING                                     | DONE                        |
-|--------------------------------------+-------------------------------------------+-----------------------------|
-| push buffer to popup buffer and back | consult                                   | minibuffer completion       |
-| Apply css                            | embark                                    | ace-window                  |
-| capf-autosuggest                     | popper                                    | recentf-open                |
-|                                      | pandoc md to org conversion               | rainbow-mode                |
-|                                      | completion - corfu / company              | visual-fill-column-mode     |
-|                                      | Test completion through programming modes | find-name-dired             |
-|                                      | org-kanban                                | magit                       |
-|                                      | ox-hugo                                   | tempel                      |
-|                                      | Generate RSS xml                          | image-dired                 |
-|                                      | eglot                                     | selected-window-accent-mode |
-|                                      |                                           | deadgrep                    |
-|                                      |                                           | jinx / powerthesaurus       |
-|                                      |                                           | kurecolor                   |
+| TODO             | DOING                        | DONE                        |
+|------------------+------------------------------+-----------------------------|
+| capf-autosuggest | consult                      | minibuffer completion       |
+|                  | embark                       | ace-window                  |
+|                  | popper                       | recentf-open                |
+|                  | pandoc md to org conversion  | rainbow-mode                |
+|                  | completion - corfu / company | visual-fill-column-mode     |
+|                  | org-kanban                   | find-name-dired             |
+|                  | ox-hugo                      | magit                       |
+|                  | eglot                        | tempel                      |
+|                  | open-with                    | image-dired                 |
+|                  |                              | selected-window-accent-mode |
+|                  |                              | deadgrep                    |
+|                  |                              | jinx / powerthesaurus       |
+|                  |                              | kurecolor                   |
 
 * Issues
 
@@ -711,7 +715,8 @@ This transforms the awkward =org-goto= interface into a better, easier, completi
 
 I am not using too many aspects mainly the following:
 
-- copy command - probably easy to replicate
+- copy command from the minibuffer
+- find file at point
 
 Solved with the code below:
 
@@ -724,6 +729,7 @@ Solved with the code below:
       (kill-new (substring-no-properties candidate))
       (abort-recursive-edit))))
 ;;
+(global-set-key (kbd "C-c ,") 'find-file-at-point)
 (define-key minibuffer-local-completion-map (kbd "C-c ,") 'my-icomplete-copy-candidate)
 #+end_src
   
@@ -952,30 +958,27 @@ Creating a Kanban board for an org file: technically, I should just be able to d
 Here is the current code, undergoing testing:
 
 #+begin_src elisp
-(defun my/kanban-to-table (&optional match)
-  "Format Org headings into a Kanban-style Org table.
-Each TODO state becomes a column, and headings under each state are placed in rows.
-Optionally filter headings by MATCH (e.g., a tag or property match)."
+(defun my/kanban-to-table (&optional match exclude-tag)
+  "Format Org headings into a Kanban-style Org table, filtering by MATCH and excluding EXCLUDE-TAG."
   (interactive)
-  (let ((todo-states org-todo-keywords-1)  ;; Gather all TODO states defined in the current Org file.
+  (let ((todo-states org-todo-keywords-1)
         (kanban-table (list))
-        (column-data (make-hash-table :test 'equal))) ;; Store TODO states and their associated headings.
-    ;; Initialize data structure for each TODO state (columns).
+        (column-data (make-hash-table :test 'equal)))
     (dolist (state todo-states)
       (puthash state '() column-data))
-    ;; Collect headlines into their respective TODO state buckets.
     (save-excursion
       (goto-char (point-min))
-      ;; Optionally filter entries using `match`.
       (org-map-entries
        (lambda ()
-         (let* ((todo (org-get-todo-state))       ;; Get the TODO state of the current heading.
-                (heading (org-get-heading t t t t))) ;; Get the heading text.
-           (when (and todo (not (string-empty-p todo))) ;; Check if the heading has a TODO state.
+         (let* ((todo (org-get-todo-state))
+                (heading (org-get-heading t t t t))
+                (tags (org-get-tags))) ;; Get tags for current heading.
+           (when (and todo (not (string-empty-p todo))
+                      (not (member exclude-tag tags))) ;; Exclude headings with the `exclude-tag`.
              (puthash todo
                       (append (gethash todo column-data) (list heading))
                       column-data))))
-       match 'file)) ;; Search the entire file or based on optional `match`.
+       match 'file))
     ;; Filter out empty columns
     (setq todo-states (seq-filter (lambda (state)
                                     (not (null (gethash state column-data))))
@@ -1309,6 +1312,24 @@ or maybe the more elisp based approach:
       (shell-command (format "etags --append \%s -o %s" file tags-file-path)))))
 (global-set-key (kbd "C-x p l") 'my/etags-load)
 (global-set-key (kbd "C-x p u") 'my/etags-update)
+#+end_src
+
+** DOING open-with
+
+Opening a file, generally from dired, a solution as below:
+
+#+begin_src elisp
+(with-eval-after-load 'dired
+  (define-key dired-mode-map (kbd "W") 'dired-do-async-shell-command)
+  (setq dired-guess-shell-alist-user
+        '(("\\.\\(jpg\\|jpeg\\|png\\|gif\\|bmp\\)$" "gthumb")
+          ("\\.\\(mp4\\|mkv\\|avi\\|mov\\|wmv\\|flv\\|mpg\\)$" "mpv")
+          ("\\.\\(mp3\\|wav\\|ogg\\|\\)$" "mpv")
+          ("\\.\\(kra\\)$" "org.kde.krita")
+          ("\\.\\(xcf\\)$" "gimp")
+          ("\\.\\(odt\\|ods\\|doc\\|docx\\)$" "libreoffice")
+          ("\\.\\(html\\|htm\\)$" "firefox")
+          ("\\.\\(pdf\\|epub\\)$" "xournalpp"))))
 #+end_src
 
 ** TODO capf-autosuggest

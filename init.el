@@ -334,6 +334,7 @@ if COLOR is not provided as an argument."
       (kill-new (substring-no-properties candidate))
       (abort-recursive-edit))))
 ;;
+(global-set-key (kbd "C-c ,") 'find-file-at-point)
 (define-key minibuffer-local-completion-map (kbd "C-c ,") 'my-icomplete-copy-candidate)
 
 (defun my/popper-matching-buffers ()
@@ -508,30 +509,27 @@ if COLOR is not provided as an argument."
 ;;
 (global-set-key (kbd "C-c TAB") #'my/simple-completion-at-point)
 
-(defun my/kanban-to-table (&optional match)
-  "Format Org headings into a Kanban-style Org table.
-Each TODO state becomes a column, and headings under each state are placed in rows.
-Optionally filter headings by MATCH (e.g., a tag or property match)."
+(defun my/kanban-to-table (&optional match exclude-tag)
+  "Format Org headings into a Kanban-style Org table, filtering by MATCH and excluding EXCLUDE-TAG."
   (interactive)
-  (let ((todo-states org-todo-keywords-1)  ;; Gather all TODO states defined in the current Org file.
+  (let ((todo-states org-todo-keywords-1)
         (kanban-table (list))
-        (column-data (make-hash-table :test 'equal))) ;; Store TODO states and their associated headings.
-    ;; Initialize data structure for each TODO state (columns).
+        (column-data (make-hash-table :test 'equal)))
     (dolist (state todo-states)
       (puthash state '() column-data))
-    ;; Collect headlines into their respective TODO state buckets.
     (save-excursion
       (goto-char (point-min))
-      ;; Optionally filter entries using `match`.
       (org-map-entries
        (lambda ()
-         (let* ((todo (org-get-todo-state))       ;; Get the TODO state of the current heading.
-                (heading (org-get-heading t t t t))) ;; Get the heading text.
-           (when (and todo (not (string-empty-p todo))) ;; Check if the heading has a TODO state.
+         (let* ((todo (org-get-todo-state))
+                (heading (org-get-heading t t t t))
+                (tags (org-get-tags))) ;; Get tags for current heading.
+           (when (and todo (not (string-empty-p todo))
+                      (not (member exclude-tag tags))) ;; Exclude headings with the `exclude-tag`.
              (puthash todo
                       (append (gethash todo column-data) (list heading))
                       column-data))))
-       match 'file)) ;; Search the entire file or based on optional `match`.
+       match 'file))
     ;; Filter out empty columns
     (setq todo-states (seq-filter (lambda (state)
                                     (not (null (gethash state column-data))))
@@ -781,3 +779,15 @@ process, FILENAME is the input Org file, and PUB-DIR is the publishing directory
       (shell-command (format "etags --append \%s -o %s" file tags-file-path)))))
 (global-set-key (kbd "C-x p l") 'my/etags-load)
 (global-set-key (kbd "C-x p u") 'my/etags-update)
+
+(with-eval-after-load 'dired
+  (define-key dired-mode-map (kbd "W") 'dired-do-async-shell-command)
+  (setq dired-guess-shell-alist-user
+        '(("\\.\\(jpg\\|jpeg\\|png\\|gif\\|bmp\\)$" "gthumb")
+          ("\\.\\(mp4\\|mkv\\|avi\\|mov\\|wmv\\|flv\\|mpg\\)$" "mpv")
+          ("\\.\\(mp3\\|wav\\|ogg\\|\\)$" "mpv")
+          ("\\.\\(kra\\)$" "org.kde.krita")
+          ("\\.\\(xcf\\)$" "gimp")
+          ("\\.\\(odt\\|ods\\|doc\\|docx\\)$" "libreoffice")
+          ("\\.\\(html\\|htm\\)$" "firefox")
+          ("\\.\\(pdf\\|epub\\)$" "xournalpp"))))
