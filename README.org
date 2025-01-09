@@ -729,7 +729,10 @@ Solved with the code below:
   (let ((candidate (car completion-all-sorted-completions)))
     (when candidate
       (kill-new (substring-no-properties candidate))
-      (abort-recursive-edit))))
+      (let ((copied-text candidate))
+        (run-with-timer 0 nil (lambda () 
+          (message "Copied: %s" copied-text)))
+        (abort-recursive-edit)))))
 ;;
 (global-set-key (kbd "C-c ,") 'find-file-at-point)
 (define-key minibuffer-local-completion-map (kbd "C-c ,") 'my-icomplete-copy-candidate)
