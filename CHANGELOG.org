@@ -12,6 +12,16 @@ This document contains the release notes for Emacs-enhanced
 
 ** <2025-01-11>
 
+shell/eshell - improve history management and completion
+
+- Add `my/load-bash-history` to load `.bash_history` into `comint-input-ring`.
+- Add `my/shell-history-complete` for shell history completion (`M-r`).
+- Introduce `my/eshell-history-capf` and `my/shell-history-capf` for dynamic shell/eshell history completions.
+- Setup `completion-at-point` integrations for shell and eshell history.
+- Customize `completion-category-overrides` for improved matching in eshell and shell modes.
+
+** <2025-01-11>
+
 - =consult-history= potential replacement using enhanced eshell setup
   - Appended Bash history to eshell history on load.
   - Introduced `my/eshell-history-completing-read`.

@@ -23,6 +23,16 @@ Used in concert with https://github.com/captainflasmr/Emacs-core
 
 ** <2025-01-11>
 
+shell/eshell - improve history management and completion
+
+- Add `my/load-bash-history` to load `.bash_history` into `comint-input-ring`.
+- Add `my/shell-history-complete` for shell history completion (`M-r`).
+- Introduce `my/eshell-history-capf` and `my/shell-history-capf` for dynamic shell/eshell history completions.
+- Setup `completion-at-point` integrations for shell and eshell history.
+- Customize `completion-category-overrides` for improved matching in eshell and shell modes.
+
+** <2025-01-11>
+
 - =consult-history= potential replacement using enhanced eshell setup
   - Appended Bash history to eshell history on load.
   - Introduced `my/eshell-history-completing-read`.
@@ -84,18 +94,21 @@ Here is a kanban of the features that will be (hopefully) converted to core/enha
 | TODO             | DOING                        | DONE                        |
 |------------------+------------------------------+-----------------------------|
 | capf-autosuggest | consult                      | minibuffer completion       |
-|                  | embark                       | ace-window                  |
-|                  | popper                       | recentf-open                |
-|                  | pandoc md to org conversion  | rainbow-mode                |
-|                  | completion - corfu / company | visual-fill-column-mode     |
-|                  | org-kanban                   | find-name-dired             |
-|                  | ox-hugo                      | magit                       |
-|                  | eglot                        | tempel                      |
-|                  | open-with                    | image-dired                 |
-|                  | dired-async-mode             | selected-window-accent-mode |
-|                  |                              | deadgrep                    |
-|                  |                              | jinx / powerthesaurus       |
-|                  |                              | kurecolor                   |
+|                  | consult-imenu                | ace-window                  |
+|                  | consult-outline              | recentf-open                |
+|                  | consult-history for =eshell= | rainbow-mode                |
+|                  | consult-history for =shell=  | visual-fill-column-mode     |
+|                  | embark                       | find-name-dired             |
+|                  | popper                       | magit                       |
+|                  | pandoc md to org conversion  | tempel                      |
+|                  | completion - corfu / company | image-dired                 |
+|                  | capf for =eshell=            | selected-window-accent-mode |
+|                  | capf for =shell=             | deadgrep                    |
+|                  | org-kanban                   | jinx / powerthesaurus       |
+|                  | ox-hugo                      | kurecolor                   |
+|                  | eglot                        |                             |
+|                  | open-with                    |                             |
+|                  | dired-async-mode             |                             |
 
 * Issues
 
@@ -709,7 +722,11 @@ Originally I had the following keybindings mapped :
 (define-key eshell-hist-mode-map (kbd "M-r") #'consult-history)
 #+end_src
 
+*** DOING consult-imenu
+
 The first one is easy. I am happy to replace it with =imenu=; the interface brings up a simple minibuffer completing-read. I don't dynamically jump to the headline, but I'm not a fan of that approach anyway.
+
+*** DOING consult-outline
 
 The second one I think I can replace by using =org-goto= with a couple of tweaks
 
@@ -720,6 +737,8 @@ The second one I think I can replace by using =org-goto= with a couple of tweaks
 #+end_src
 
 This transforms the awkward =org-goto= interface into a better, easier, completing-read one, more akin to =consult-outline=.
+
+*** DOING consult-history for =eshell=
 
 The third one can be roughly accomplished by passing eshell history through =completing-read=
 
@@ -747,6 +766,45 @@ The third one can be roughly accomplished by passing eshell history through =com
 #+end_src
 
 Note: I needed to transfer the local shell history into eshell for a better history experience.
+
+*** DOING consult-history for =shell=
+
+This overall setup is similar to eshell.
+
+#+begin_src elisp
+(defun my/load-bash-history ()
+  "Load commands from .bash_history into shell history ring."
+  (interactive)
+  (let* ((bash-history-file (expand-file-name "~/.bash_history"))
+         (existing-history (ring-elements comint-input-ring))
+         (bash-history
+          (when (file-exists-p bash-history-file)
+            (with-temp-buffer
+              (insert-file-contents bash-history-file)
+              (split-string (buffer-string) "\n" t)))))
+    ;; Add bash history entries to comint history ring
+    (when bash-history
+      (dolist (cmd (reverse bash-history))
+        (unless (member cmd existing-history)
+          (comint-add-to-input-history cmd))))))
+;;
+(add-hook 'shell-mode-hook 'my/load-bash-history)
+;;
+(defun my/shell-history-complete ()
+  "Search shell history with completion."
+  (interactive)
+  (let* ((history (ring-elements comint-input-ring))
+         (selection (completing-read "Shell history: " 
+                                   (delete-dups history)
+                                   nil 
+                                   t)))
+    (when selection
+      (delete-region (comint-line-beginning-position)
+                    (line-end-position))
+      (insert selection))))
+;;
+(define-key shell-mode-map (kbd "M-r") #'my/shell-history-complete)
+#+end_src
 
 ** DOING embark
 
@@ -918,7 +976,7 @@ Potentially solved with the following, probably requires more testing:
 
 Can these in buffer completion systems be replaced by a simple in-built =icomplete= solution?
 
-Lets give it a go!
+Lets give it a go!, here is the general in buffer completion setup:
 
 #+begin_src elisp
 (define-key icomplete-minibuffer-map (kbd "C-n") #'icomplete-forward-completions)
@@ -983,6 +1041,67 @@ As another option, how about a simple defun leveraging =completion-in-region= or
       (insert completion))))
 ;;
 (global-set-key (kbd "C-c TAB") #'my/simple-completion-at-point)
+#+end_src
+
+More bonus points here for in buffer completion in shells, this includes eshell and shell
+
+*** DOING capf for =eshell=
+
+#+begin_src elisp
+(defun my/eshell-history-capf ()
+  "Completion-at-point function for eshell history."
+  (let* ((beg (save-excursion
+                (eshell-bol)
+                (point)))
+         (end (point))
+         (prefix (buffer-substring-no-properties beg end))
+         (candidates (delete-dups
+                      (ring-elements eshell-history-ring))))
+    (list beg end candidates
+          :exclusive 'no
+          :annotation-function
+          (lambda (_) " (history)"))))
+;;
+(defun my/setup-eshell-history-completion ()
+  "Setup eshell history completion."
+  (add-hook 'completion-at-point-functions #'my/eshell-history-capf nil t))
+;;
+(add-hook 'eshell-mode-hook #'my/setup-eshell-history-completion)
+;;
+(with-eval-after-load 'em-cmpl
+  (add-to-list 'completion-category-overrides
+               '(eshell-history (styles basic substring initials)))
+  (define-key eshell-cmpl-mode-map (kbd "C-M-i") #'completion-at-point))
+#+end_src
+
+*** DOING capf for =shell=
+
+#+begin_src elisp
+(defun my/shell-history-capf ()
+  "Completion-at-point function for shell history completion."
+  (let* ((beg (comint-line-beginning-position))
+         (end (point))
+         (prefix (buffer-substring-no-properties beg end))
+         (history (ring-elements comint-input-ring))
+         (matching-history
+          (cl-remove-if-not
+           (lambda (cmd)
+             (string-prefix-p prefix cmd))
+           history)))
+    (list beg end matching-history
+          :exclusive 'no
+          :annotation-function
+          (lambda (_) " (history)"))))
+;;
+(defun my/setup-shell-history-completion ()
+  "Setup shell history completion."
+  (add-hook 'completion-at-point-functions #'my/shell-history-capf nil t))
+;;
+(add-hook 'shell-mode-hook #'my/setup-shell-history-completion)
+;;
+(with-eval-after-load 'shell
+  (add-to-list 'completion-category-overrides
+               '(shell-history (styles basic substring initials))))
 #+end_src
 
 *** DOING Test completion through programming modes                :issues:

@@ -347,6 +347,39 @@ if COLOR is not provided as an argument."
 (with-eval-after-load 'em-hist
   (define-key eshell-hist-mode-map (kbd "M-r") #'my/eshell-history-completing-read))
 
+(defun my/load-bash-history ()
+  "Load commands from .bash_history into shell history ring."
+  (interactive)
+  (let* ((bash-history-file (expand-file-name "~/.bash_history"))
+         (existing-history (ring-elements comint-input-ring))
+         (bash-history
+          (when (file-exists-p bash-history-file)
+            (with-temp-buffer
+              (insert-file-contents bash-history-file)
+              (split-string (buffer-string) "\n" t)))))
+    ;; Add bash history entries to comint history ring
+    (when bash-history
+      (dolist (cmd (reverse bash-history))
+        (unless (member cmd existing-history)
+          (comint-add-to-input-history cmd))))))
+;;
+(add-hook 'shell-mode-hook 'my/load-bash-history)
+;;
+(defun my/shell-history-complete ()
+  "Search shell history with completion."
+  (interactive)
+  (let* ((history (ring-elements comint-input-ring))
+         (selection (completing-read "Shell history: " 
+                                   (delete-dups history)
+                                   nil 
+                                   t)))
+    (when selection
+      (delete-region (comint-line-beginning-position)
+                    (line-end-position))
+      (insert selection))))
+;;
+(define-key shell-mode-map (kbd "M-r") #'my/shell-history-complete)
+
 (defun my-icomplete-copy-candidate ()
   "Copy the current Icomplete candidate to the kill ring."
   (interactive)
@@ -532,6 +565,57 @@ if COLOR is not provided as an argument."
       (insert completion))))
 ;;
 (global-set-key (kbd "C-c TAB") #'my/simple-completion-at-point)
+
+(defun my/eshell-history-capf ()
+  "Completion-at-point function for eshell history."
+  (let* ((beg (save-excursion
+                (eshell-bol)
+                (point)))
+         (end (point))
+         (prefix (buffer-substring-no-properties beg end))
+         (candidates (delete-dups
+                      (ring-elements eshell-history-ring))))
+    (list beg end candidates
+          :exclusive 'no
+          :annotation-function
+          (lambda (_) " (history)"))))
+;;
+(defun my/setup-eshell-history-completion ()
+  "Setup eshell history completion."
+  (add-hook 'completion-at-point-functions #'my/eshell-history-capf nil t))
+;;
+(add-hook 'eshell-mode-hook #'my/setup-eshell-history-completion)
+;;
+(with-eval-after-load 'em-cmpl
+  (add-to-list 'completion-category-overrides
+               '(eshell-history (styles basic substring initials)))
+  (define-key eshell-cmpl-mode-map (kbd "C-M-i") #'completion-at-point))
+
+(defun my/shell-history-capf ()
+  "Completion-at-point function for shell history completion."
+  (let* ((beg (comint-line-beginning-position))
+         (end (point))
+         (prefix (buffer-substring-no-properties beg end))
+         (history (ring-elements comint-input-ring))
+         (matching-history
+          (cl-remove-if-not
+           (lambda (cmd)
+             (string-prefix-p prefix cmd))
+           history)))
+    (list beg end matching-history
+          :exclusive 'no
+          :annotation-function
+          (lambda (_) " (history)"))))
+;;
+(defun my/setup-shell-history-completion ()
+  "Setup shell history completion."
+  (add-hook 'completion-at-point-functions #'my/shell-history-capf nil t))
+;;
+(add-hook 'shell-mode-hook #'my/setup-shell-history-completion)
+;;
+(with-eval-after-load 'shell
+  (add-to-list 'completion-category-overrides
+               '(shell-history (styles basic substring initials))))
 
 (defun my/kanban-to-table (&optional match exclude-tag)
   "Format Org headings into a Kanban-style Org table, filtering by MATCH and excluding EXCLUDE-TAG."
