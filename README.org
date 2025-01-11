@@ -637,7 +637,7 @@ Testing with the following code:
                         (lambda (c)
                           (if (= max 0.0)
                               c
-                            (+ (* c (- 1 delta)) (* max delta))))
+                            (+ (* c (+ 1 delta)) (* max (- delta)))))
                         rgb)))
     (my/color-rgb-to-hex adjusted-rgb)))
 ;;

@@ -268,7 +268,7 @@ if COLOR is not provided as an argument."
                         (lambda (c)
                           (if (= max 0.0)
                               c
-                            (+ (* c (- 1 delta)) (* max delta))))
+                            (+ (* c (+ 1 delta)) (* max (- delta)))))
                         rgb)))
     (my/color-rgb-to-hex adjusted-rgb)))
 ;;
