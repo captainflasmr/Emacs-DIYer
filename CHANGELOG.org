@@ -10,6 +10,13 @@ This document contains the release notes for Emacs-enhanced
 
 * Versions
 
+** <2025-01-11>
+
+- =consult-history= potential replacement using enhanced eshell setup
+  - Appended Bash history to eshell history on load.
+  - Introduced `my/eshell-history-completing-read`.
+  - Added `M-r` for eshell history search.
+    
 ** <2025-01-08>
 
 - Added open-with replacement using dired.

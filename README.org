@@ -21,6 +21,13 @@ Used in concert with https://github.com/captainflasmr/Emacs-core
 
 * Whats New
 
+** <2025-01-11>
+
+- =consult-history= potential replacement using enhanced eshell setup
+  - Appended Bash history to eshell history on load.
+  - Introduced `my/eshell-history-completing-read`.
+  - Added `M-r` for eshell history search.
+    
 ** <2025-01-08>
 
 - Added open-with replacement using dired.
@@ -699,6 +706,7 @@ Originally I had the following keybindings mapped :
 #+begin_src elisp :tangle no
 (global-set-key (kbd "M-g i") 'consult-imenu)
 (global-set-key (kbd "M-g o") 'consult-outline)
+(define-key eshell-hist-mode-map (kbd "M-r") #'consult-history)
 #+end_src
 
 The first one is easy. I am happy to replace it with =imenu=; the interface brings up a simple minibuffer completing-read. I don't dynamically jump to the headline, but I'm not a fan of that approach anyway.
@@ -712,6 +720,33 @@ The second one I think I can replace by using =org-goto= with a couple of tweaks
 #+end_src
 
 This transforms the awkward =org-goto= interface into a better, easier, completing-read one, more akin to =consult-outline=.
+
+The third one can be roughly accomplished by passing eshell history through =completing-read=
+
+#+begin_src elisp
+(let ((bash-history-file "~/.bash_history")
+      (eshell-history-file (expand-file-name "eshell/history" user-emacs-directory)))
+  (when (file-exists-p bash-history-file)
+    (with-temp-buffer
+      (insert-file-contents bash-history-file)
+      (append-to-file (buffer-string) nil eshell-history-file))))
+;;      
+(defun my/eshell-history-completing-read ()
+  "Search eshell history using completing-read"
+  (interactive)
+  (insert
+   (completing-read "Eshell history: "
+                   (delete-dups
+                    (ring-elements eshell-history-ring)))))
+;;
+(setq eshell-history-size 10000)
+(setq eshell-save-history-on-exit t)
+(setq eshell-hist-ignoredups t)
+(with-eval-after-load 'em-hist
+  (define-key eshell-hist-mode-map (kbd "M-r") #'my/eshell-history-completing-read))
+#+end_src
+
+Note: I needed to transfer the local shell history into eshell for a better history experience.
 
 ** DOING embark
 

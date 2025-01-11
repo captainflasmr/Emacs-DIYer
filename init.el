@@ -326,6 +326,27 @@ if COLOR is not provided as an argument."
 (setq org-goto-interface 'outline-path-completionp)
 (setq org-outline-path-complete-in-steps nil)
 
+(let ((bash-history-file "~/.bash_history")
+      (eshell-history-file (expand-file-name "eshell/history" user-emacs-directory)))
+  (when (file-exists-p bash-history-file)
+    (with-temp-buffer
+      (insert-file-contents bash-history-file)
+      (append-to-file (buffer-string) nil eshell-history-file))))
+;;      
+(defun my/eshell-history-completing-read ()
+  "Search eshell history using completing-read"
+  (interactive)
+  (insert
+   (completing-read "Eshell history: "
+                   (delete-dups
+                    (ring-elements eshell-history-ring)))))
+;;
+(setq eshell-history-size 10000)
+(setq eshell-save-history-on-exit t)
+(setq eshell-hist-ignoredups t)
+(with-eval-after-load 'em-hist
+  (define-key eshell-hist-mode-map (kbd "M-r") #'my/eshell-history-completing-read))
+
 (defun my-icomplete-copy-candidate ()
   "Copy the current Icomplete candidate to the kill ring."
   (interactive)
