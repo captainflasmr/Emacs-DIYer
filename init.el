@@ -344,8 +344,30 @@ if COLOR is not provided as an argument."
 (setq eshell-history-size 10000)
 (setq eshell-save-history-on-exit t)
 (setq eshell-hist-ignoredups t)
-(with-eval-after-load 'em-hist
-  (define-key eshell-hist-mode-map (kbd "M-r") #'my/eshell-history-completing-read))
+;; Eshell configuration with version compatibility and fallbacks
+(defun my/setup-eshell-keybindings ()
+  "Setup eshell keybindings with version compatibility checks and fallbacks."
+  ;; Try modern mode-specific maps first
+  (with-eval-after-load 'em-hist
+    (if (boundp 'eshell-hist-mode-map)
+        (progn
+          (define-key eshell-hist-mode-map (kbd "M-r") #'my/eshell-history-completing-read)
+          (define-key eshell-hist-mode-map (kbd "M-s") nil))
+      ;; Fallback to eshell-mode-map if specific mode maps don't exist
+      (when (boundp 'eshell-mode-map)
+        (define-key eshell-mode-map (kbd "M-r") #'my/eshell-history-completing-read)
+        (define-key eshell-mode-map (kbd "M-s") nil))))
+  (with-eval-after-load 'em-cmpl
+    ;; Add completion category overrides
+    (add-to-list 'completion-category-overrides
+                 '(eshell-history (styles basic substring initials)))
+    ;; Try modern completion map first, fallback to general map
+    (if (boundp 'eshell-cmpl-mode-map)
+        (define-key eshell-cmpl-mode-map (kbd "C-M-i") #'completion-at-point)
+      (when (boundp 'eshell-mode-map)
+        (define-key eshell-mode-map (kbd "C-M-i") #'completion-at-point)))))
+;;
+(add-hook 'eshell-mode-hook #'my/setup-eshell-keybindings)
 
 (defun my/load-bash-history ()
   "Load commands from .bash_history into shell history ring."
@@ -586,10 +608,6 @@ if COLOR is not provided as an argument."
 ;;
 (add-hook 'eshell-mode-hook #'my/setup-eshell-history-completion)
 ;;
-(with-eval-after-load 'em-cmpl
-  (add-to-list 'completion-category-overrides
-               '(eshell-history (styles basic substring initials)))
-  (define-key eshell-cmpl-mode-map (kbd "C-M-i") #'completion-at-point))
 
 (defun my/shell-history-capf ()
   "Completion-at-point function for shell history completion."
@@ -706,7 +724,6 @@ if COLOR is not provided as an argument."
 (defun my-org-publish-split-headings (plist filename pub-dir)
   "Split an Org file into separate files, each corresponding to a top-level heading
 that is marked as DONE.
-
 Each file name is prefixed with the date in YYYYMMDD format extracted from the
 :EXPORT_HUGO_LASTMOD: property. PLIST is the property list for the publishing
 process, FILENAME is the input Org file, and PUB-DIR is the publishing directory."
@@ -900,8 +917,6 @@ process, FILENAME is the input Org file, and PUB-DIR is the publishing directory
           ("\\.\\(html\\|htm\\)$" "firefox")
           ("\\.\\(pdf\\|epub\\)$" "xournalpp"))))
 
-(define-key dired-mode-map (kbd "C") 'my/rsync)
-;;
 (defun my/rsync (dest)
   "Rsync copy."
   (interactive

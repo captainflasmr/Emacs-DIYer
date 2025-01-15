@@ -10,6 +10,16 @@ This document contains the release notes for Emacs-enhanced
 
 * Versions
 
+** <2025-01-15>
+
+Enhance Eshell keybinding setup with compatibility and fallbacks
+
+- Refactored Eshell keybindings setup:
+  - Introduced `my/setup-eshell-keybindings` to handle version compatibility and fallbacks.
+  - Added conditional checks for `eshell-hist-mode-map`, `eshell-mode-map`, and `eshell-cmpl-mode-map` to ensure compatibility with different Emacs versions.
+  - Assigned `M-r` to `my/eshell-history-completing-read` and unbound `M-s` when applicable.
+  - Added `C-M-i` for `completion-at-point` with fallback to general key maps when specific maps aren't available.
+
 ** <2025-01-11>
 
 shell/eshell - improve history management and completion
