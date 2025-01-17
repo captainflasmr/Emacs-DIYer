@@ -934,3 +934,83 @@ process, FILENAME is the input Org file, and PUB-DIR is the publishing directory
     (sleep-for 1)
     (dired-revert)
     (revert-buffer nil t nil)))
+
+(require 'dabbrev)
+
+(defun simple-autosuggest--get-completion (input &optional bounds)
+  "Core function handling all suggestion logic for INPUT with optional BOUNDS.
+Handles bounds detection, suggestion generation and overlay updates in one pass.
+Returns the suggestion if found, nil otherwise."
+  (let* ((bounds (or bounds
+                    (cond ((derived-mode-p 'comint-mode)
+                          (let ((proc-mark (process-mark (get-buffer-process (current-buffer)))))
+                            (when (>= (point) proc-mark)
+                              (cons proc-mark (line-end-position)))))
+                         ((derived-mode-p 'eshell-mode)
+                          (when (>= (point) eshell-last-output-end)
+                            (cons (save-excursion (eshell-bol) (point))
+                                 (point-max))))
+                         (t (bounds-of-thing-at-point 'symbol)))))
+         (input (or input (and bounds (buffer-substring-no-properties
+                                     (car bounds) (cdr bounds)))))
+         suggestion)
+    (when (and input (>= (length input) 3)) ; Inline min-length
+      (setq suggestion
+            (cond ((derived-mode-p 'comint-mode)
+                  (when (and (ring-p comint-input-ring)
+                           (not (ring-empty-p comint-input-ring)))
+                    (seq-find (lambda (h) (string-prefix-p input h t))
+                             (ring-elements comint-input-ring))))
+                 ((derived-mode-p 'eshell-mode)
+                  (when (and (ring-p eshell-history-ring)
+                           (not (ring-empty-p eshell-history-ring)))
+                    (seq-find (lambda (h) (string-prefix-p input h t))
+                             (ring-elements eshell-history-ring))))
+                 (t
+                  (let ((dabbrev-case-fold-search t)
+                        (dabbrev-case-replace nil))
+                    (condition-case nil
+                        (progn
+                          (dabbrev--reset-global-variables)
+                          (dabbrev--find-expansion input 0 t)) ; Inline completion function
+                      (error nil))))))
+      (when (and suggestion (not (string= input suggestion)))
+        (let ((suffix (substring suggestion (length input))))
+          (put-text-property 0 1 'cursor 0 suffix)
+          (overlay-put simple-autosuggest--overlay 'after-string
+                     (propertize suffix 'face '((t :inherit shadow)))) ; Inline face
+          (move-overlay simple-autosuggest--overlay (point) (point))
+          suggestion)))))
+
+(defun simple-autosuggest-update ()
+  "Update the auto-suggestion overlay."
+  (when simple-autosuggest--overlay
+    (unless (simple-autosuggest--get-completion nil nil)
+      (overlay-put simple-autosuggest--overlay 'after-string nil))))
+
+(defun simple-autosuggest-move-end-of-line (arg)
+  "Move to end of line, accepting any suggestion first.
+With argument ARG not nil or 1, move forward ARG - 1 lines first."
+  (interactive "^p")
+  (when (and simple-autosuggest--overlay
+             (overlay-get simple-autosuggest--overlay 'after-string))
+    (insert (substring-no-properties (overlay-get simple-autosuggest--overlay 'after-string)))
+    (overlay-put simple-autosuggest--overlay 'after-string nil))
+  (move-end-of-line arg))
+
+(define-minor-mode simple-autosuggest-mode
+  "Minor mode for showing auto-suggestions from history or dabbrev completion."
+  :lighter " SAM"
+  :keymap (let ((map (make-sparse-keymap)))
+           (define-key map [remap move-end-of-line] #'simple-autosuggest-move-end-of-line)
+           map)
+  (if simple-autosuggest-mode
+      (progn
+        (setq-local simple-autosuggest--overlay (make-overlay (point) (point) nil t t))
+        (add-hook 'post-command-hook #'simple-autosuggest-update nil t))
+    (when simple-autosuggest--overlay
+      (delete-overlay simple-autosuggest--overlay)
+      (setq simple-autosuggest--overlay nil))
+    (remove-hook 'post-command-hook #'simple-autosuggest-update t)))
+
+(provide 'simple-autosuggest)

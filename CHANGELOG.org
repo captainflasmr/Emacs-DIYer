@@ -10,6 +10,10 @@ This document contains the release notes for Emacs-enhanced
 
 * Versions
 
+** <2025-01-17>
+
+Added =capf-autosuggest= replacement and possible a replacement for =fancy-dabbrev=, it allows for inline autosuggestions in eshell, comint (inlining based on history, like capf-autosuggest) and also in-buffer using dabbrev.
+
 ** <2025-01-15>
 
 Enhance Eshell keybinding setup with compatibility and fallbacks

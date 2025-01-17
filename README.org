@@ -21,6 +21,10 @@ Used in concert with https://github.com/captainflasmr/Emacs-core
 
 * Whats New
 
+** <2025-01-17>
+
+Added =capf-autosuggest= replacement and possible a replacement for =fancy-dabbrev=, it allows for inline autosuggestions in eshell, comint (inlining based on history, like capf-autosuggest) and also in-buffer using dabbrev.
+
 ** <2025-01-15>
 
 Enhance Eshell keybinding setup with compatibility and fallbacks
@@ -101,24 +105,25 @@ Here is a kanban of the features that will be (hopefully) converted to core/enha
 #+end_src
 
 #+RESULTS:
-| TODO             | DOING                        | DONE                        |
-|------------------+------------------------------+-----------------------------|
-| capf-autosuggest | consult                      | minibuffer completion       |
-|                  | consult-imenu                | ace-window                  |
-|                  | consult-outline              | recentf-open                |
-|                  | consult-history for =eshell= | rainbow-mode                |
-|                  | consult-history for =shell=  | visual-fill-column-mode     |
-|                  | embark                       | find-name-dired             |
-|                  | popper                       | magit                       |
-|                  | pandoc md to org conversion  | tempel                      |
-|                  | completion - corfu / company | image-dired                 |
-|                  | capf for =eshell=            | selected-window-accent-mode |
-|                  | capf for =shell=             | deadgrep                    |
-|                  | org-kanban                   | jinx / powerthesaurus       |
-|                  | ox-hugo                      | kurecolor                   |
-|                  | eglot                        |                             |
-|                  | open-with                    |                             |
-|                  | dired-async-mode             |                             |
+| DOING                        | DONE                        |
+|------------------------------+-----------------------------|
+| consult                      | minibuffer completion       |
+| consult-imenu                | ace-window                  |
+| consult-outline              | recentf-open                |
+| consult-history for =eshell= | rainbow-mode                |
+| consult-history for =shell=  | visual-fill-column-mode     |
+| embark                       | find-name-dired             |
+| popper                       | magit                       |
+| pandoc md to org conversion  | tempel                      |
+| completion - corfu / company | image-dired                 |
+| capf for =eshell=            | selected-window-accent-mode |
+| capf for =shell=             | deadgrep                    |
+| org-kanban                   | jinx / powerthesaurus       |
+| ox-hugo                      | kurecolor                   |
+| eglot                        |                             |
+| open-with                    |                             |
+| dired-async-mode             |                             |
+| capf-autosuggest             |                             |
 
 * Issues
 
@@ -1550,6 +1555,99 @@ Could I just call out to =async-shell-command=, something like:
     (revert-buffer nil t nil)))
 #+end_src
 
-** TODO capf-autosuggest
+** DOING capf-autosuggest
 
 Some elisp for some simple predictive inline completion, maybe take a look at how capf-autosuggest does it or the new completion preview in Emacs 30.
+
+Also looked at =fancy-dabbrev= as I typically mainly use the simple dabbrev for completion.
+
+I'm currently developing a very simple mode (I probably won't release as a package as my idea is to make it small enough to insert directly into an Emacs config) - I'm currently in the process of coding up and simplifying all those use-packages I frequently use - which comes in useful for offline or airgapped Emacs installs.
+
+This prototype allows inline autosuggestions in eshell, comint (inlining based on history, like capf-autosuggest) and also in-buffer using the mighty dabbrev (like fancy-dabbrev), here is what I have so far. (see below)
+
+After evaluating, just run M-x simple-autosuggest-mode and there will be an inline autosuggestion appearing with acceptance using C-e
+
+Oh, it's also like the completion-preview coming to Emacs 30 but the in buffer inline is just using dabbrev as this is strangely the completion I find I use all the time.
+
+#+begin_src elisp
+(require 'dabbrev)
+
+(defun simple-autosuggest--get-completion (input &optional bounds)
+  "Core function handling all suggestion logic for INPUT with optional BOUNDS.
+Handles bounds detection, suggestion generation and overlay updates in one pass.
+Returns the suggestion if found, nil otherwise."
+  (let* ((bounds (or bounds
+                    (cond ((derived-mode-p 'comint-mode)
+                          (let ((proc-mark (process-mark (get-buffer-process (current-buffer)))))
+                            (when (>= (point) proc-mark)
+                              (cons proc-mark (line-end-position)))))
+                         ((derived-mode-p 'eshell-mode)
+                          (when (>= (point) eshell-last-output-end)
+                            (cons (save-excursion (eshell-bol) (point))
+                                 (point-max))))
+                         (t (bounds-of-thing-at-point 'symbol)))))
+         (input (or input (and bounds (buffer-substring-no-properties
+                                     (car bounds) (cdr bounds)))))
+         suggestion)
+    (when (and input (>= (length input) 3)) ; Inline min-length
+      (setq suggestion
+            (cond ((derived-mode-p 'comint-mode)
+                  (when (and (ring-p comint-input-ring)
+                           (not (ring-empty-p comint-input-ring)))
+                    (seq-find (lambda (h) (string-prefix-p input h t))
+                             (ring-elements comint-input-ring))))
+                 ((derived-mode-p 'eshell-mode)
+                  (when (and (ring-p eshell-history-ring)
+                           (not (ring-empty-p eshell-history-ring)))
+                    (seq-find (lambda (h) (string-prefix-p input h t))
+                             (ring-elements eshell-history-ring))))
+                 (t
+                  (let ((dabbrev-case-fold-search t)
+                        (dabbrev-case-replace nil))
+                    (condition-case nil
+                        (progn
+                          (dabbrev--reset-global-variables)
+                          (dabbrev--find-expansion input 0 t)) ; Inline completion function
+                      (error nil))))))
+      (when (and suggestion (not (string= input suggestion)))
+        (let ((suffix (substring suggestion (length input))))
+          (put-text-property 0 1 'cursor 0 suffix)
+          (overlay-put simple-autosuggest--overlay 'after-string
+                     (propertize suffix 'face '((t :inherit shadow)))) ; Inline face
+          (move-overlay simple-autosuggest--overlay (point) (point))
+          suggestion)))))
+
+(defun simple-autosuggest-update ()
+  "Update the auto-suggestion overlay."
+  (when simple-autosuggest--overlay
+    (unless (simple-autosuggest--get-completion nil nil)
+      (overlay-put simple-autosuggest--overlay 'after-string nil))))
+
+(defun simple-autosuggest-move-end-of-line (arg)
+  "Move to end of line, accepting any suggestion first.
+With argument ARG not nil or 1, move forward ARG - 1 lines first."
+  (interactive "^p")
+  (when (and simple-autosuggest--overlay
+             (overlay-get simple-autosuggest--overlay 'after-string))
+    (insert (substring-no-properties (overlay-get simple-autosuggest--overlay 'after-string)))
+    (overlay-put simple-autosuggest--overlay 'after-string nil))
+  (move-end-of-line arg))
+
+(define-minor-mode simple-autosuggest-mode
+  "Minor mode for showing auto-suggestions from history or dabbrev completion."
+  :lighter " SAM"
+  :keymap (let ((map (make-sparse-keymap)))
+           (define-key map [remap move-end-of-line] #'simple-autosuggest-move-end-of-line)
+           map)
+  (if simple-autosuggest-mode
+      (progn
+        (setq-local simple-autosuggest--overlay (make-overlay (point) (point) nil t t))
+        (add-hook 'post-command-hook #'simple-autosuggest-update nil t))
+    (when simple-autosuggest--overlay
+      (delete-overlay simple-autosuggest--overlay)
+      (setq simple-autosuggest--overlay nil))
+    (remove-hook 'post-command-hook #'simple-autosuggest-update t)))
+
+(provide 'simple-autosuggest)
+#+end_src
+
