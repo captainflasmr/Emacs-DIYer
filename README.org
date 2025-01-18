@@ -611,12 +611,28 @@ Solution is the following configuration:
 (setq dictionary-default-dictionary "*")
 (setq dictionary-server "dict.org")
 (setq dictionary-use-single-buffer t)
-(define-prefix-command 'my-spell-prefix-map)
-(global-set-key (kbd "C-c s") 'my-spell-prefix-map)
-(global-set-key (kbd "C-c s s") #'(lambda()(interactive)
-                                    (flyspell-buffer)
-                                    (call-interactively 'flyspell-mode)))
-(global-set-key (kbd "C-c s d") #'dictionary-lookup-definition)
+(defun spelling-menu ()
+  "Menu for spelling."
+  (interactive)
+  (let ((key (read-key
+              (propertize
+               "------- Spelling [q] Quit: -------
+Run        [s] Spelling
+Dictionary [l] Check"
+               'face 'minibuffer-prompt))))
+    (pcase key
+      ;; Spelling
+      (?s (progn
+            (flyspell-buffer)
+            (call-interactively 'flyspell-mode)))
+      (?l (call-interactively 'ispell-word))
+      ;; Quit
+      (?q (message "Quit Build menu."))
+      (?\C-g (message "Quit Build menu."))
+      ;; Default Invalid Key
+      (_ (message "Invalid key: %c" key)))))
+;;
+(global-set-key (kbd "C-c s") #'spelling-menu)
 (global-set-key (kbd "C-0") #'ispell-word)
 #+end_src
 
