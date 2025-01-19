@@ -482,11 +482,11 @@ Dictionary [l] Check"
           (my/popper-handle-popup (car popup-buffers))
         (message "No pop-up buffers to display!")))))
 ;;
-;; Cycle through popups or show the next popup.
-(global-set-key (kbd "M-'") #'my/popper-cycle-popup)
-;;
 ;; Toggle the currently selected popup.
-(global-set-key (kbd "M-;") #'my/popper-toggle-current)
+(global-set-key (kbd "M-'") #'my/popper-toggle-current)
+;;
+;; Cycle through popups or show the next popup.
+(global-set-key (kbd "M-#") #'my/popper-cycle-popup)
 
 (defun my/md-to-org-convert-buffer ()
   "Convert the current buffer from Markdown to Org-mode format"

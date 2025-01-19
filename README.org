@@ -943,11 +943,11 @@ Mainly used for popping and popping out shells, testing the following implementa
           (my/popper-handle-popup (car popup-buffers))
         (message "No pop-up buffers to display!")))))
 ;;
-;; Cycle through popups or show the next popup.
-(global-set-key (kbd "M-'") #'my/popper-cycle-popup)
-;;
 ;; Toggle the currently selected popup.
-(global-set-key (kbd "M-;") #'my/popper-toggle-current)
+(global-set-key (kbd "M-'") #'my/popper-toggle-current)
+;;
+;; Cycle through popups or show the next popup.
+(global-set-key (kbd "M-#") #'my/popper-cycle-popup)
 #+end_src
 
 *** TODO push buffer to popup buffer and back                      :issues:
