@@ -1022,3 +1022,11 @@ process, FILENAME is the input Org file, and PUB-DIR is the publishing directory
       (setq simple-autosuggest--overlay nil))))
 
 (provide 'simple-autosuggest)
+
+(define-globalized-minor-mode global-simple-autosuggest-mode
+  simple-autosuggest-mode       ;; The mode to be globalized
+  (lambda ()                    ;; A function to enable the mode
+    (unless (minibufferp)       ;; Avoid enabling the mode in the minibuffer
+      (simple-autosuggest-mode 1))))
+
+(global-simple-autosuggest-mode 1)
