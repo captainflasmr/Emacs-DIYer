@@ -12,16 +12,11 @@ If there are only two windows, jump directly to the other window."
   (interactive)
   (let* ((window-list (window-list nil 'no-mini)))
     (cond
-     ;; If there is only a single window, split it horizontally.
      ((= (length window-list) 1)
       (split-window-horizontally)
-      (other-window 1)) ;; Move focus to the new window immediately after splitting.
-
-     ;; If there are only two windows, switch to the other one directly.
+      (other-window 1))
      ((= (length window-list) 2)
       (select-window (other-window-for-scrolling)))
-
-     ;; Otherwise, present the key selection interface.
      (t
       (let* ((my/quick-window-overlays nil)
              (sorted-windows (sort window-list
@@ -75,7 +70,7 @@ Enable `recentf-mode' if it isn't already."
           (if (string-greaterp color "#888888")
               (overlay-put overlay 'face `(:background ,color :foreground "black"))
             (overlay-put overlay 'face `(:background ,color :foreground "white"))))))))
-;;
+
 (defun my/rainbow-mode-clear ()
   "Remove all hex color overlays in the current buffer."
   (interactive)
@@ -214,12 +209,12 @@ if COLOR is not provided as an argument."
       (local-set-key (kbd "g") (lambda () 
                                  (interactive)
                                  (my/grep search-term directory glob))))))
-;;
+
 (defun my-org-reveal-on-next-error ()
   "Reveal the location of search results in an Org file."
   (when (derived-mode-p 'org-mode)
     (org-reveal)))
-;;
+
 (add-hook 'next-error-hook 'my-org-reveal-on-next-error)
 
 (setq ispell-local-dictionary "en_GB")
@@ -247,13 +242,13 @@ Dictionary [l] Check"
       (?\C-g (message "Quit Build menu."))
       ;; Default Invalid Key
       (_ (message "Invalid key: %c" key)))))
-;;
+
 (global-set-key (kbd "C-c s") #'spelling-menu)
 (global-set-key (kbd "C-0") #'ispell-word)
 
 (require 'cl-lib)
 (require 'color)
-;;
+
 (defun my/color-hex-to-rgb (hex-color)
   "Convert a HEX-COLOR string to a list of RGB values."
   (unless (string-match "^#[0-9a-fA-F]\\{6\\}$" hex-color)
@@ -262,20 +257,20 @@ Dictionary [l] Check"
           (list (substring hex-color 1 3)
                 (substring hex-color 3 5)
                 (substring hex-color 5 7))))
-;;
+
 (defun my/color-rgb-to-hex (rgb)
   "Convert a list of RGB values to a hex color string."
   (format "#%02x%02x%02x"
           (round (* 255 (nth 0 rgb)))
           (round (* 255 (nth 1 rgb)))
           (round (* 255 (nth 2 rgb)))))
-;;
+
 (defun my/color-adjust-brightness (hex-color delta)
   "Adjust the brightness of HEX-COLOR by DELTA (-1.0 to 1.0)."
   (let* ((rgb (my/color-hex-to-rgb hex-color))
          (adjusted-rgb (mapcar (lambda (c) (min 1.0 (max 0.0 (+ c delta)))) rgb)))
     (my/color-rgb-to-hex adjusted-rgb)))
-;;
+
 (defun my/color-adjust-saturation (hex-color delta)
   "Adjust the saturation of HEX-COLOR by DELTA (-1.0 to 1.0)."
   (let* ((rgb (my/color-hex-to-rgb hex-color))
@@ -287,7 +282,7 @@ Dictionary [l] Check"
                             (+ (* c (+ 1 delta)) (* max (- delta)))))
                         rgb)))
     (my/color-rgb-to-hex adjusted-rgb)))
-;;
+
 (defun my/color-adjust-hue (hex-color delta)
   "Adjust the hue of HEX-COLOR by DELTA (in degrees)."
   (let* ((rgb (my/color-hex-to-rgb hex-color))
@@ -295,7 +290,7 @@ Dictionary [l] Check"
          (new-h (mod (+ (nth 0 hsl) (/ delta 360.0)) 1.0)) ;; Wrap hue around
          (new-rgb (apply 'color-hsl-to-rgb (list new-h (nth 1 hsl) (nth 2 hsl)))))
     (my/color-rgb-to-hex new-rgb)))
-;;
+
 (defun my/replace-color-at-point (transform-fn &rest args)
   "Replace the hex color code at point using TRANSFORM-FN with ARGS."
   (let ((bounds (bounds-of-thing-at-point 'sexp))
@@ -305,7 +300,7 @@ Dictionary [l] Check"
           (delete-region (car bounds) (cdr bounds))
           (insert new-color))
       (error "No valid hex color code at point"))))
-;;
+
 (global-set-key (kbd "M-<up>") 
                 (lambda () 
                   (interactive) 
@@ -348,7 +343,7 @@ Dictionary [l] Check"
     (with-temp-buffer
       (insert-file-contents bash-history-file)
       (append-to-file (buffer-string) nil eshell-history-file))))
-;;      
+
 (defun my/eshell-history-completing-read ()
   "Search eshell history using completing-read"
   (interactive)
@@ -356,11 +351,11 @@ Dictionary [l] Check"
    (completing-read "Eshell history: "
                    (delete-dups
                     (ring-elements eshell-history-ring)))))
-;;
+
 (setq eshell-history-size 10000)
 (setq eshell-save-history-on-exit t)
 (setq eshell-hist-ignoredups t)
-;; Eshell configuration with version compatibility and fallbacks
+
 (defun my/setup-eshell-keybindings ()
   "Setup eshell keybindings with version compatibility checks and fallbacks."
   ;; Try modern mode-specific maps first
@@ -382,7 +377,7 @@ Dictionary [l] Check"
         (define-key eshell-cmpl-mode-map (kbd "C-M-i") #'completion-at-point)
       (when (boundp 'eshell-mode-map)
         (define-key eshell-mode-map (kbd "C-M-i") #'completion-at-point)))))
-;;
+
 (add-hook 'eshell-mode-hook #'my/setup-eshell-keybindings)
 
 (defun my/load-bash-history ()
@@ -400,9 +395,9 @@ Dictionary [l] Check"
       (dolist (cmd (reverse bash-history))
         (unless (member cmd existing-history)
           (comint-add-to-input-history cmd))))))
-;;
+
 (add-hook 'shell-mode-hook 'my/load-bash-history)
-;;
+
 (defun my/shell-history-complete ()
   "Search shell history with completion."
   (interactive)
@@ -415,7 +410,7 @@ Dictionary [l] Check"
       (delete-region (comint-line-beginning-position)
                     (line-end-position))
       (insert selection))))
-;;
+
 (define-key shell-mode-map (kbd "M-r") #'my/shell-history-complete)
 
 (defun my-icomplete-copy-candidate ()
@@ -428,7 +423,7 @@ Dictionary [l] Check"
         (run-with-timer 0 nil (lambda () 
           (message "Copied: %s" copied-text)))
         (abort-recursive-edit)))))
-;;
+
 (global-set-key (kbd "C-c ,") 'find-file-at-point)
 (define-key minibuffer-local-completion-map (kbd "C-c ,") 'my-icomplete-copy-candidate)
 
@@ -441,7 +436,7 @@ Dictionary [l] Check"
                                 (string-match-p pattern bufname))
                               popup-patterns)))
                 (buffer-list))))
-;;
+
 (defun my/popper-handle-popup (buffer)
   "Display BUFFER as a popup, setting it as the current popup."
   (pop-to-buffer buffer
@@ -449,7 +444,7 @@ Dictionary [l] Check"
                  (inhibit-same-window . t)
                  (window-height . 0.3)))
   (message "Displayed pop-up buffer: %s" (buffer-name buffer)))
-;;
+
 (defun my/popper-cycle-popup ()
   "Cycle visibility of pop-up buffers."
   (interactive)
@@ -466,7 +461,7 @@ Dictionary [l] Check"
     (if popup-buffers
         (my/popper-handle-popup (car popup-buffers))
       (message "No pop-up buffers to display!"))))
-;;
+
 (defun my/popper-toggle-current ()
   "Toggle visibility of pop-up buffers."
   (interactive)
@@ -481,10 +476,10 @@ Dictionary [l] Check"
       (if popup-buffers
           (my/popper-handle-popup (car popup-buffers))
         (message "No pop-up buffers to display!")))))
-;;
+
 ;; Toggle the currently selected popup.
 (global-set-key (kbd "M-'") #'my/popper-toggle-current)
-;;
+
 ;; Cycle through popups or show the next popup.
 (global-set-key (kbd "M-#") #'my/popper-cycle-popup)
 
@@ -528,14 +523,14 @@ Dictionary [l] Check"
     ;; Headers: Adjust '#'
     (while (re-search-forward "^\\(#+\\) " nil t)
       (replace-match (make-string (length (match-string 1)) ?*) nil nil nil 1))))
-;;
+
 (defun my/md-to-org-convert-file (input-file output-file)
   "Convert a Markdown file INPUT-FILE to an Org-mode file OUTPUT-FILE."
   (with-temp-buffer
     (insert-file-contents input-file)
     (md-to-org-convert-buffer)
     (write-file output-file)))
-;;
+
 (defun my/convert-markdown-clipboard-to-org ()
   "Convert Markdown content from clipboard to Org format and insert it at point."
   (interactive)
@@ -547,7 +542,7 @@ Dictionary [l] Check"
       (let ((org-content (buffer-string)))
         (with-current-buffer original-buffer
           (insert org-content))))))
-;;
+
 (defun my/org-promote-all-headings (&optional arg)
   "Promote all headings in the current Org buffer along with their subheadings."
   (interactive "p")
@@ -601,7 +596,7 @@ Dictionary [l] Check"
     (when completion
       (delete-region beg end)
       (insert completion))))
-;;
+
 (global-set-key (kbd "C-c TAB") #'my/simple-completion-at-point)
 
 (defun my/eshell-history-capf ()
@@ -617,13 +612,12 @@ Dictionary [l] Check"
           :exclusive 'no
           :annotation-function
           (lambda (_) " (history)"))))
-;;
+
 (defun my/setup-eshell-history-completion ()
   "Setup eshell history completion."
   (add-hook 'completion-at-point-functions #'my/eshell-history-capf nil t))
-;;
+
 (add-hook 'eshell-mode-hook #'my/setup-eshell-history-completion)
-;;
 
 (defun my/shell-history-capf ()
   "Completion-at-point function for shell history completion."
@@ -640,13 +634,13 @@ Dictionary [l] Check"
           :exclusive 'no
           :annotation-function
           (lambda (_) " (history)"))))
-;;
+
 (defun my/setup-shell-history-completion ()
   "Setup shell history completion."
   (add-hook 'completion-at-point-functions #'my/shell-history-capf nil t))
-;;
+
 (add-hook 'shell-mode-hook #'my/setup-shell-history-completion)
-;;
+
 (with-eval-after-load 'shell
   (add-to-list 'completion-category-overrides
                '(shell-history (styles basic substring initials))))
@@ -697,7 +691,14 @@ Dictionary [l] Check"
         (push todo-states rows)))))
 
 (require 'ox-publish)
-;;
+
+(defun my/org-html-src-block-filter (text backend info)
+  (when (org-export-derived-backend-p backend 'html)
+    (replace-regexp-in-string "\n\\s-*\n" "<br>\n" text)))
+
+(add-to-list 'org-export-filter-src-block-functions
+             'my/org-html-src-block-filter)
+
 (setq org-publish-project-alist
       '(("split-emacs"
          :base-directory "~/DCIM/content"
@@ -736,7 +737,7 @@ Dictionary [l] Check"
          :publishing-function org-publish-attachment)
         ("blog" ;; Meta-project to combine phases
          :components ("split-emacs" "images-emacs" "blog-posts-emacs"))))
-;;
+
 (defun my-org-publish-split-headings (plist filename pub-dir)
   "Split an Org file into separate files, each corresponding to a top-level heading
 that is marked as DONE.
@@ -782,7 +783,7 @@ process, FILENAME is the input Org file, and PUB-DIR is the publishing directory
                 (message "Wrote %s" output-file)))))))
     ;; Return nil to indicate successful processing
     nil))
-;;
+
 (defun my-sitemap-format (title list)
   "Generate a sitemap with TITLE and reverse-sorted LIST of files."
   (setq list (nreverse (cdr list)))
@@ -888,20 +889,20 @@ process, FILENAME is the input Org file, and PUB-DIR is the publishing directory
     (when my-tags-file
       (message "Loading tags file: %s" my-tags-file)
       (visit-tags-table my-tags-file))))
-;;
+
 (when (executable-find "my-generate-etags.sh")
   (defun my/etags-update ()
     "Call external bash script to generate new etags for all languages it can find."
     (interactive)
     (async-shell-command "my-generate-etags.sh" "*etags*")))
-;;
+
 (defun predicate-exclusion-p (dir)
   "exclusion of directories"
   (not
    (or
     (string-match "/home/jdyer/examples/CPPrograms/nil" dir)
     )))
-;;
+
 (defun my/generate-etags ()
   "Generate TAGS file for various source files in `default-directory` and its subdirectories."
   (interactive)
@@ -968,8 +969,7 @@ process, FILENAME is the input Org file, and PUB-DIR is the publishing directory
                            ((derived-mode-p 'eshell-mode) 0)
                            (t 3)))
          (suggestion (and input (>= (length input) min-length)
-                          (or (derived-mode-p 'comint-mode 'eshell-mode)
-                             (memq last-command '(self-insert-command yank)))
+                          (memq last-command '(org-self-insert-command self-insert-command yank))
                           (cond ((derived-mode-p 'comint-mode)
                                  (when-let ((ring comint-input-ring))
                                    (seq-find (lambda (h) (string-prefix-p input h t))

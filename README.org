@@ -177,16 +177,11 @@ If there are only two windows, jump directly to the other window."
   (interactive)
   (let* ((window-list (window-list nil 'no-mini)))
     (cond
-     ;; If there is only a single window, split it horizontally.
      ((= (length window-list) 1)
       (split-window-horizontally)
-      (other-window 1)) ;; Move focus to the new window immediately after splitting.
-
-     ;; If there are only two windows, switch to the other one directly.
+      (other-window 1))
      ((= (length window-list) 2)
       (select-window (other-window-for-scrolling)))
-
-     ;; Otherwise, present the key selection interface.
      (t
       (let* ((my/quick-window-overlays nil)
              (sorted-windows (sort window-list
@@ -256,7 +251,7 @@ Solved with the code below:
           (if (string-greaterp color "#888888")
               (overlay-put overlay 'face `(:background ,color :foreground "black"))
             (overlay-put overlay 'face `(:background ,color :foreground "white"))))))))
-;;
+
 (defun my/rainbow-mode-clear ()
   "Remove all hex color overlays in the current buffer."
   (interactive)
@@ -589,12 +584,12 @@ Being solved with the following code:
       (local-set-key (kbd "g") (lambda () 
                                  (interactive)
                                  (my/grep search-term directory glob))))))
-;;
+
 (defun my-org-reveal-on-next-error ()
   "Reveal the location of search results in an Org file."
   (when (derived-mode-p 'org-mode)
     (org-reveal)))
-;;
+
 (add-hook 'next-error-hook 'my-org-reveal-on-next-error)
 #+end_src
 
@@ -631,7 +626,7 @@ Dictionary [l] Check"
       (?\C-g (message "Quit Build menu."))
       ;; Default Invalid Key
       (_ (message "Invalid key: %c" key)))))
-;;
+
 (global-set-key (kbd "C-c s") #'spelling-menu)
 (global-set-key (kbd "C-0") #'ispell-word)
 #+end_src
@@ -659,7 +654,7 @@ Testing with the following code:
 #+begin_src elisp
 (require 'cl-lib)
 (require 'color)
-;;
+
 (defun my/color-hex-to-rgb (hex-color)
   "Convert a HEX-COLOR string to a list of RGB values."
   (unless (string-match "^#[0-9a-fA-F]\\{6\\}$" hex-color)
@@ -668,20 +663,20 @@ Testing with the following code:
           (list (substring hex-color 1 3)
                 (substring hex-color 3 5)
                 (substring hex-color 5 7))))
-;;
+
 (defun my/color-rgb-to-hex (rgb)
   "Convert a list of RGB values to a hex color string."
   (format "#%02x%02x%02x"
           (round (* 255 (nth 0 rgb)))
           (round (* 255 (nth 1 rgb)))
           (round (* 255 (nth 2 rgb)))))
-;;
+
 (defun my/color-adjust-brightness (hex-color delta)
   "Adjust the brightness of HEX-COLOR by DELTA (-1.0 to 1.0)."
   (let* ((rgb (my/color-hex-to-rgb hex-color))
          (adjusted-rgb (mapcar (lambda (c) (min 1.0 (max 0.0 (+ c delta)))) rgb)))
     (my/color-rgb-to-hex adjusted-rgb)))
-;;
+
 (defun my/color-adjust-saturation (hex-color delta)
   "Adjust the saturation of HEX-COLOR by DELTA (-1.0 to 1.0)."
   (let* ((rgb (my/color-hex-to-rgb hex-color))
@@ -693,7 +688,7 @@ Testing with the following code:
                             (+ (* c (+ 1 delta)) (* max (- delta)))))
                         rgb)))
     (my/color-rgb-to-hex adjusted-rgb)))
-;;
+
 (defun my/color-adjust-hue (hex-color delta)
   "Adjust the hue of HEX-COLOR by DELTA (in degrees)."
   (let* ((rgb (my/color-hex-to-rgb hex-color))
@@ -701,7 +696,7 @@ Testing with the following code:
          (new-h (mod (+ (nth 0 hsl) (/ delta 360.0)) 1.0)) ;; Wrap hue around
          (new-rgb (apply 'color-hsl-to-rgb (list new-h (nth 1 hsl) (nth 2 hsl)))))
     (my/color-rgb-to-hex new-rgb)))
-;;
+
 (defun my/replace-color-at-point (transform-fn &rest args)
   "Replace the hex color code at point using TRANSFORM-FN with ARGS."
   (let ((bounds (bounds-of-thing-at-point 'sexp))
@@ -711,7 +706,7 @@ Testing with the following code:
           (delete-region (car bounds) (cdr bounds))
           (insert new-color))
       (error "No valid hex color code at point"))))
-;;
+
 (global-set-key (kbd "M-<up>") 
                 (lambda () 
                   (interactive) 
@@ -782,7 +777,7 @@ The third one can be roughly accomplished by passing eshell history through =com
     (with-temp-buffer
       (insert-file-contents bash-history-file)
       (append-to-file (buffer-string) nil eshell-history-file))))
-;;      
+
 (defun my/eshell-history-completing-read ()
   "Search eshell history using completing-read"
   (interactive)
@@ -790,11 +785,11 @@ The third one can be roughly accomplished by passing eshell history through =com
    (completing-read "Eshell history: "
                    (delete-dups
                     (ring-elements eshell-history-ring)))))
-;;
+
 (setq eshell-history-size 10000)
 (setq eshell-save-history-on-exit t)
 (setq eshell-hist-ignoredups t)
-;; Eshell configuration with version compatibility and fallbacks
+
 (defun my/setup-eshell-keybindings ()
   "Setup eshell keybindings with version compatibility checks and fallbacks."
   ;; Try modern mode-specific maps first
@@ -816,7 +811,7 @@ The third one can be roughly accomplished by passing eshell history through =com
         (define-key eshell-cmpl-mode-map (kbd "C-M-i") #'completion-at-point)
       (when (boundp 'eshell-mode-map)
         (define-key eshell-mode-map (kbd "C-M-i") #'completion-at-point)))))
-;;
+
 (add-hook 'eshell-mode-hook #'my/setup-eshell-keybindings)
 #+end_src
 
@@ -842,9 +837,9 @@ This overall setup is similar to eshell.
       (dolist (cmd (reverse bash-history))
         (unless (member cmd existing-history)
           (comint-add-to-input-history cmd))))))
-;;
+
 (add-hook 'shell-mode-hook 'my/load-bash-history)
-;;
+
 (defun my/shell-history-complete ()
   "Search shell history with completion."
   (interactive)
@@ -857,7 +852,7 @@ This overall setup is similar to eshell.
       (delete-region (comint-line-beginning-position)
                     (line-end-position))
       (insert selection))))
-;;
+
 (define-key shell-mode-map (kbd "M-r") #'my/shell-history-complete)
 #+end_src
 
@@ -881,7 +876,7 @@ Solved with the code below:
         (run-with-timer 0 nil (lambda () 
           (message "Copied: %s" copied-text)))
         (abort-recursive-edit)))))
-;;
+
 (global-set-key (kbd "C-c ,") 'find-file-at-point)
 (define-key minibuffer-local-completion-map (kbd "C-c ,") 'my-icomplete-copy-candidate)
 #+end_src
@@ -902,7 +897,7 @@ Mainly used for popping and popping out shells, testing the following implementa
                                 (string-match-p pattern bufname))
                               popup-patterns)))
                 (buffer-list))))
-;;
+
 (defun my/popper-handle-popup (buffer)
   "Display BUFFER as a popup, setting it as the current popup."
   (pop-to-buffer buffer
@@ -910,7 +905,7 @@ Mainly used for popping and popping out shells, testing the following implementa
                  (inhibit-same-window . t)
                  (window-height . 0.3)))
   (message "Displayed pop-up buffer: %s" (buffer-name buffer)))
-;;
+
 (defun my/popper-cycle-popup ()
   "Cycle visibility of pop-up buffers."
   (interactive)
@@ -927,7 +922,7 @@ Mainly used for popping and popping out shells, testing the following implementa
     (if popup-buffers
         (my/popper-handle-popup (car popup-buffers))
       (message "No pop-up buffers to display!"))))
-;;
+
 (defun my/popper-toggle-current ()
   "Toggle visibility of pop-up buffers."
   (interactive)
@@ -942,10 +937,10 @@ Mainly used for popping and popping out shells, testing the following implementa
       (if popup-buffers
           (my/popper-handle-popup (car popup-buffers))
         (message "No pop-up buffers to display!")))))
-;;
+
 ;; Toggle the currently selected popup.
 (global-set-key (kbd "M-'") #'my/popper-toggle-current)
-;;
+
 ;; Cycle through popups or show the next popup.
 (global-set-key (kbd "M-#") #'my/popper-cycle-popup)
 #+end_src
@@ -999,14 +994,14 @@ Potentially solved with the following, probably requires more testing:
     ;; Headers: Adjust '#'
     (while (re-search-forward "^\\(#+\\) " nil t)
       (replace-match (make-string (length (match-string 1)) ?*) nil nil nil 1))))
-;;
+
 (defun my/md-to-org-convert-file (input-file output-file)
   "Convert a Markdown file INPUT-FILE to an Org-mode file OUTPUT-FILE."
   (with-temp-buffer
     (insert-file-contents input-file)
     (md-to-org-convert-buffer)
     (write-file output-file)))
-;;
+
 (defun my/convert-markdown-clipboard-to-org ()
   "Convert Markdown content from clipboard to Org format and insert it at point."
   (interactive)
@@ -1018,7 +1013,7 @@ Potentially solved with the following, probably requires more testing:
       (let ((org-content (buffer-string)))
         (with-current-buffer original-buffer
           (insert org-content))))))
-;;
+
 (defun my/org-promote-all-headings (&optional arg)
   "Promote all headings in the current Org buffer along with their subheadings."
   (interactive "p")
@@ -1094,7 +1089,7 @@ As another option, how about a simple defun leveraging =completion-in-region= or
     (when completion
       (delete-region beg end)
       (insert completion))))
-;;
+
 (global-set-key (kbd "C-c TAB") #'my/simple-completion-at-point)
 #+end_src
 
@@ -1116,13 +1111,12 @@ More bonus points here for in buffer completion in shells, this includes eshell 
           :exclusive 'no
           :annotation-function
           (lambda (_) " (history)"))))
-;;
+
 (defun my/setup-eshell-history-completion ()
   "Setup eshell history completion."
   (add-hook 'completion-at-point-functions #'my/eshell-history-capf nil t))
-;;
+
 (add-hook 'eshell-mode-hook #'my/setup-eshell-history-completion)
-;;
 #+end_src
 
 *** DOING capf for =shell=
@@ -1143,13 +1137,13 @@ More bonus points here for in buffer completion in shells, this includes eshell 
           :exclusive 'no
           :annotation-function
           (lambda (_) " (history)"))))
-;;
+
 (defun my/setup-shell-history-completion ()
   "Setup shell history completion."
   (add-hook 'completion-at-point-functions #'my/shell-history-capf nil t))
-;;
+
 (add-hook 'shell-mode-hook #'my/setup-shell-history-completion)
-;;
+
 (with-eval-after-load 'shell
   (add-to-list 'completion-category-overrides
                '(shell-history (styles basic substring initials))))
@@ -1220,7 +1214,14 @@ Lets try and see how far we can get going through the =org-publish= mechanism fo
 
 #+begin_src elisp
 (require 'ox-publish)
-;;
+
+(defun my/org-html-src-block-filter (text backend info)
+  (when (org-export-derived-backend-p backend 'html)
+    (replace-regexp-in-string "\n\\s-*\n" "<br>\n" text)))
+
+(add-to-list 'org-export-filter-src-block-functions
+             'my/org-html-src-block-filter)
+
 (setq org-publish-project-alist
       '(("split-emacs"
          :base-directory "~/DCIM/content"
@@ -1259,7 +1260,7 @@ Lets try and see how far we can get going through the =org-publish= mechanism fo
          :publishing-function org-publish-attachment)
         ("blog" ;; Meta-project to combine phases
          :components ("split-emacs" "images-emacs" "blog-posts-emacs"))))
-;;
+
 (defun my-org-publish-split-headings (plist filename pub-dir)
   "Split an Org file into separate files, each corresponding to a top-level heading
 that is marked as DONE.
@@ -1305,7 +1306,7 @@ process, FILENAME is the input Org file, and PUB-DIR is the publishing directory
                 (message "Wrote %s" output-file)))))))
     ;; Return nil to indicate successful processing
     nil))
-;;
+
 (defun my-sitemap-format (title list)
   "Generate a sitemap with TITLE and reverse-sorted LIST of files."
   (setq list (nreverse (cdr list)))
@@ -1489,20 +1490,20 @@ or maybe the more elisp based approach:
     (when my-tags-file
       (message "Loading tags file: %s" my-tags-file)
       (visit-tags-table my-tags-file))))
-;;
+
 (when (executable-find "my-generate-etags.sh")
   (defun my/etags-update ()
     "Call external bash script to generate new etags for all languages it can find."
     (interactive)
     (async-shell-command "my-generate-etags.sh" "*etags*")))
-;;
+
 (defun predicate-exclusion-p (dir)
   "exclusion of directories"
   (not
    (or
     (string-match "/home/jdyer/examples/CPPrograms/nil" dir)
     )))
-;;
+
 (defun my/generate-etags ()
   "Generate TAGS file for various source files in `default-directory` and its subdirectories."
   (interactive)
@@ -1605,8 +1606,7 @@ Oh, it's also like the completion-preview coming to Emacs 30 but the in buffer i
                            ((derived-mode-p 'eshell-mode) 0)
                            (t 3)))
          (suggestion (and input (>= (length input) min-length)
-                          (or (derived-mode-p 'comint-mode 'eshell-mode)
-                             (memq last-command '(self-insert-command yank)))
+                          (memq last-command '(org-self-insert-command self-insert-command yank))
                           (cond ((derived-mode-p 'comint-mode)
                                  (when-let ((ring comint-input-ring))
                                    (seq-find (lambda (h) (string-prefix-p input h t))
