@@ -37,7 +37,7 @@ If there are only two windows, jump directly to the other window."
                                (overlay (make-overlay start start (window-buffer window))))
                           (overlay-put overlay 'after-string 
                                        (propertize (format "[%s]" key)
-                                                   'face '(:foreground "white" :background "blue" :weight bold)))
+                                                   'face 'highlight))
                           (overlay-put overlay 'window window)
                           overlay))
                       window-map))
