@@ -173,15 +173,21 @@ Solved with the code below:
 (defun my/quick-window-jump ()
   "Jump to a window by typing its assigned character label.
 If there is only a single window, split it horizontally.
-If there are only two windows, jump directly to the other window."
+If there are only two windows, jump directly to the other window.
+Side windows are ignored."
   (interactive)
-  (let* ((window-list (window-list nil 'no-mini)))
+  (let* ((window-list (seq-filter (lambda (w)
+                                    (not (window-parameter w 'window-side)))
+                                  (window-list nil 'no-mini))))
     (cond
      ((= (length window-list) 1)
       (split-window-horizontally)
       (other-window 1))
      ((= (length window-list) 2)
-      (select-window (other-window-for-scrolling)))
+      (let ((other-window (if (eq (selected-window) (nth 0 window-list))
+                              (nth 1 window-list)
+                            (nth 0 window-list))))
+        (select-window other-window)))
      (t
       (let* ((my/quick-window-overlays nil)
              (sorted-windows (sort window-list
