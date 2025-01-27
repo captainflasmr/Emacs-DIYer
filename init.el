@@ -127,9 +127,9 @@ if COLOR is not provided as an argument."
   ;; Determine the color to use
   (let ((selected-color (or color (read-color "Select mode-line background color: "))))
     (set-hl-line-darker-background)
-    (set-face-attribute 'mode-line nil :height 120 :underline nil :overline nil :box nil
+    (set-face-attribute 'mode-line nil :height 140 :underline nil :overline nil :box nil
                         :background selected-color :foreground "#000000")
-    (set-face-attribute 'mode-line-inactive nil :height 120 :underline nil :overline nil
+    (set-face-attribute 'mode-line-inactive nil :height 140 :underline nil :overline nil
                         :background "#000000" :foreground "#aaaaaa")
     (let ((default-bg (face-background 'default))
           (default-fg (face-foreground 'default))
@@ -435,7 +435,10 @@ Dictionary [l] Check"
 
 (defun my/popper-matching-buffers ()
   "Return a list of buffers matching pop-up patterns."
-  (let ((popup-patterns '("\\*\.*shell\.*\\*" "\\*eldoc\.*\\*" "\\*Flymake\.*")))
+  (let ((popup-patterns '("\\*\.*shell\.*\\*"
+                          "\\*\.*term\.*\\*"
+                          "\\*eldoc\.*\\*"
+                          "\\*Flymake\.*")))
     (seq-filter (lambda (buf)
                   (let ((bufname (buffer-name buf)))
                     (seq-some (lambda (pattern)
@@ -503,8 +506,8 @@ Dictionary [l] Check"
       (replace-match "*\\1*"))
     ;; Italics: `_italic_` -> `/italic/`
     (goto-char (point-min))
-    (while (re-search-forward "\\b_\\([^ ]\\(.*?\\)[^ ]\\)_\\b" nil t)
-      (replace-match "/\\1/"))
+    (while (re-search-forward "\\([ \n]\\)_\\([^ ].*?[^ ]\\)_\\([ \n]\\)" nil t)
+      (replace-match "\\1/\\2/\\3"))
     ;; Links: `[text](url)` -> `[[url][text]]`
     (goto-char (point-min))
     (while (re-search-forward "\\[\\(.*?\\)\\](\\(.*?\\))" nil t)
@@ -580,7 +583,7 @@ Dictionary [l] Check"
                 (minibuffer-complete))))
 (setq completion-show-help nil)
 (setq icomplete-with-completion-tables t)
-(setq icomplete-prospects-height 2)
+(setq icomplete-prospects-height 1)
 (setq icomplete-scroll t)
 
 (defun my/simple-completion-at-point ()
@@ -993,9 +996,19 @@ process, FILENAME is the input Org file, and PUB-DIR is the publishing directory
       (let ((suffix (substring suggestion (length input))))
         (put-text-property 0 1 'cursor 0 suffix)
         (overlay-put simple-autosuggest--overlay 'after-string
-                     (propertize suffix 'face '((t :inherit shadow))))
+                     (propertize suffix 'face '(:inherit shadow)))
         (move-overlay simple-autosuggest--overlay (point) (point))
         suggestion))))
+
+(defun simple-autosuggest-move-end-of-line (arg)
+  "Move to end of line, accepting suggestion first if available."
+  (interactive "^p")
+  (if-let ((overlay simple-autosuggest--overlay)
+           (suggestion (overlay-get overlay 'after-string)))
+      (progn
+        (insert (substring-no-properties suggestion))
+        (overlay-put overlay 'after-string nil))
+    (move-end-of-line arg)))
 
 (defun simple-autosuggest-update ()
   "Update the auto-suggestion overlay."
@@ -1003,20 +1016,11 @@ process, FILENAME is the input Org file, and PUB-DIR is the publishing directory
     (unless (simple-autosuggest--get-completion nil nil)
       (overlay-put simple-autosuggest--overlay 'after-string nil))))
 
-(defun simple-autosuggest-move-end-of-line (arg)
-  "Move to end of line, accepting suggestion first."
-  (interactive "^p")
-  (when-let ((overlay simple-autosuggest--overlay)
-             (suggestion (overlay-get overlay 'after-string)))
-    (insert (substring-no-properties suggestion))
-    (overlay-put overlay 'after-string nil))
-  (move-end-of-line arg))
-
 (define-minor-mode simple-autosuggest-mode
   "Minor mode for showing auto-suggestions from history or dabbrev completion."
   :lighter " SAM"
   :keymap (let ((map (make-sparse-keymap)))
-           (define-key map [remap move-end-of-line] #'simple-autosuggest-move-end-of-line)
+            (define-key map [remap move-end-of-line] #'simple-autosuggest-move-end-of-line)
            map)
   (if simple-autosuggest-mode
       (progn
