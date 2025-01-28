@@ -10,6 +10,15 @@ This document contains the release notes for Emacs-enhanced
 
 * Versions
 
+** <2025-01-28>
+
+Enhance mode-line and UI customization logic
+
+- Improve `mode-line` color handling by dynamically adjusting inactive backgrounds based on theme brightness.
+- Replace `darken-color` with `adjust-color` for versatile color adjustments.
+- Refactor associated faces (e.g., `hl-line`, `vertical-border`, `tab-bar`) to align with updated color logic.
+- Ensure greater visual consistency across dark and light themes.
+
 ** <2025-01-27>
 
 Improve UI, regex handling, and autosuggestion behavior

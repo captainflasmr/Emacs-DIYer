@@ -125,24 +125,28 @@ mode-line background color interactively using `read-color`
 if COLOR is not provided as an argument."
   (interactive (list (when current-prefix-arg (read-color "Color: "))))
   ;; Determine the color to use
-  (let ((selected-color (or color (read-color "Select mode-line background color: "))))
-    (set-hl-line-darker-background)
+  (let* ((selected-color (or color (read-color "Select mode-line background color: ")))
+         (default-bg (face-background 'default))
+         (default-fg (face-foreground 'default))
+         (default-hl (face-background 'highlight))
+         (inactive-fg (face-foreground 'mode-line-inactive))
+         (is-dark (not (string-greaterp default-bg "#888888")))
+         (adjusted-bg (if is-dark
+                          (adjust-color default-bg 20)
+                        (adjust-color default-bg -5))))
     (set-face-attribute 'mode-line nil :height 140 :underline nil :overline nil :box nil
                         :background selected-color :foreground "#000000")
     (set-face-attribute 'mode-line-inactive nil :height 140 :underline nil :overline nil
-                        :background "#000000" :foreground "#aaaaaa")
-    (let ((default-bg (face-background 'default))
-          (default-fg (face-foreground 'default))
-          (default-hl (face-background 'highlight))
-          (inactive-fg (face-foreground 'mode-line-inactive)))
-      (custom-set-faces
-       `(vertical-border ((t (:foreground ,(darken-color default-fg 60)))))
-       `(window-divider ((t (:foreground ,(darken-color default-fg 60)))))
-       `(fringe ((t (:foreground ,default-bg :background ,default-bg))))
-       `(tab-bar ((t (:inherit default :background ,default-bg :foreground ,default-fg))))
-       `(tab-bar-tab ((t (:inherit 'highlight :background ,selected-color :foreground "#000000"))))
-       `(tab-bar-tab-inactive ((t (:inherit default :background ,default-bg :foreground ,inactive-fg
-                                            :box (:line-width 2 :color ,default-bg :style released-button)))))))))
+                        :background adjusted-bg :foreground "#aaaaaa")
+    (custom-set-faces
+     `(hl-line ((t (:background, adjusted-bg))))
+     `(vertical-border ((t (:foreground ,(adjust-color default-fg -60)))))
+     `(window-divider ((t (:foreground ,(adjust-color default-fg -60)))))
+     `(fringe ((t (:foreground ,default-bg :background ,default-bg))))
+     `(tab-bar ((t (:inherit default :background ,default-bg :foreground ,default-fg))))
+     `(tab-bar-tab ((t (:inherit 'highlight :background ,selected-color :foreground "#000000"))))
+     `(tab-bar-tab-inactive ((t (:inherit default :background ,default-bg :foreground ,inactive-fg
+                                          :box (:line-width 2 :color ,default-bg :style pressed-button))))))))
 
 (defun my/grep (search-term &optional directory glob)
   "Run ripgrep (rg) with SEARCH-TERM and optionally DIRECTORY and GLOB.
