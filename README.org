@@ -21,6 +21,12 @@ Used in concert with https://github.com/captainflasmr/Emacs-core
 
 * Whats New
 
+** <2025-01-30>
+
+Improved html export backend logic
+
+- Enhanced `org-export-before-processing` to dynamically set src block filters
+
 ** <2025-01-28>
 
 Enhance mode-line and UI customization logic
@@ -165,12 +171,9 @@ Here is a kanban of the features that will be (hopefully) converted to core/enha
 #+RESULTS:
 | TODO  | Title                                     | Parent Title                 |
 |-------+-------------------------------------------+------------------------------|
-| TODO  | possibly enabling for all buffers?        | capf-autosuggest             |
-| TODO  | autosuggest not working in org mode       | capf-autosuggest             |
 | TODO  | Apply css                                 | ox-hugo                      |
 | DOING | Generate RSS xml                          | ox-hugo                      |
 | DOING | Test completion through programming modes | completion - corfu / company |
-| DONE  | underscores replaced by /                 | pandoc md to org conversion  |
 | TODO  | push buffer to popup buffer and back      | popper                       |
 
 * Roadmap                                                           :roadmap:
@@ -1067,8 +1070,6 @@ Potentially solved with the following, probably requires more testing:
      (dotimes (_ arg) (org-promote)))))
 #+end_src
 
-*** DONE underscores replaced by /                                 :issues:
-
 ** DOING completion - corfu / company
 
 Can these in buffer completion systems be replaced by a simple in-built =icomplete= solution?
@@ -1266,8 +1267,17 @@ Lets try and see how far we can get going through the =org-publish= mechanism fo
   (when (org-export-derived-backend-p backend 'html)
     (replace-regexp-in-string "\n\\s-*\n" "<br>\n" text)))
 
-(add-to-list 'org-export-filter-src-block-functions
-             'my/org-html-src-block-filter)
+(defun my/org-setup-src-block-filter (backend)
+  "Set `org-export-filter-src-block-functions` dynamically based on BACKEND."
+  (message "Exporting with backend: %s" backend) ;; For debugging
+  (cond
+   ((eq backend 'hugo) ;; Clear the filter for ox-hugo
+    (setq-local org-export-filter-src-block-functions nil))
+   ((eq backend 'html) ;; Apply filter for ox-html/ox-publish
+    (setq-local org-export-filter-src-block-functions
+                '(my/org-html-src-block-filter)))))
+
+(add-hook 'org-export-before-processing-functions #'my/org-setup-src-block-filter)
 
 (setq org-publish-project-alist
       '(("split-emacs"
@@ -1716,9 +1726,3 @@ Oh, it's also like the completion-preview coming to Emacs 30 but the in buffer i
 
 (global-simple-autosuggest-mode 1)
 #+end_src
-
-*** TODO autosuggest not working in org mode                       :issues:
-
-I think dabbrev--find-expansion is pulling back a nil for org-mode
-
-*** TODO possibly enabling for all buffers?                        :issues:

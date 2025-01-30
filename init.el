@@ -709,8 +709,17 @@ Dictionary [l] Check"
   (when (org-export-derived-backend-p backend 'html)
     (replace-regexp-in-string "\n\\s-*\n" "<br>\n" text)))
 
-(add-to-list 'org-export-filter-src-block-functions
-             'my/org-html-src-block-filter)
+(defun my/org-setup-src-block-filter (backend)
+  "Set `org-export-filter-src-block-functions` dynamically based on BACKEND."
+  (message "Exporting with backend: %s" backend) ;; For debugging
+  (cond
+   ((eq backend 'hugo) ;; Clear the filter for ox-hugo
+    (setq-local org-export-filter-src-block-functions nil))
+   ((eq backend 'html) ;; Apply filter for ox-html/ox-publish
+    (setq-local org-export-filter-src-block-functions
+                '(my/org-html-src-block-filter)))))
+
+(add-hook 'org-export-before-processing-functions #'my/org-setup-src-block-filter)
 
 (setq org-publish-project-alist
       '(("split-emacs"

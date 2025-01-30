@@ -10,6 +10,12 @@ This document contains the release notes for Emacs-enhanced
 
 * Versions
 
+** <2025-01-30>
+
+Improved html export backend logic
+
+- Enhanced `org-export-before-processing` to dynamically set src block filters
+
 ** <2025-01-28>
 
 Enhance mode-line and UI customization logic
