@@ -10,6 +10,15 @@ This document contains the release notes for Emacs-enhanced
 
 * Versions
 
+** <2025-02-04>
+
+Add LLM-powered interactive chat utilities and commands
+
+- Introduced `ollama-send` for streaming responses from the Ollama API.
+- Added interactive menu `llm-shell-menu` with commands for chat, code refactoring, proofreading, and more.
+- Enabled dynamic model switching and request cancellation.
+- Bound `llm-shell-menu` to `C-c g`.
+
 ** <2025-01-30>
 
 Improved html export backend logic

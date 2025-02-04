@@ -21,6 +21,15 @@ Used in concert with https://github.com/captainflasmr/Emacs-core
 
 * Whats New
 
+** <2025-02-04>
+
+Add LLM-powered interactive chat utilities and commands
+
+- Introduced `ollama-send` for streaming responses from the Ollama API.
+- Added interactive menu `llm-shell-menu` with commands for chat, code refactoring, proofreading, and more.
+- Enabled dynamic model switching and request cancellation.
+- Bound `llm-shell-menu` to `C-c g`.
+
 ** <2025-01-30>
 
 Improved html export backend logic
@@ -161,6 +170,7 @@ Here is a kanban of the features that will be (hopefully) converted to core/enha
 | open-with                    |                             |
 | dired-async-mode             |                             |
 | capf-autosuggest             |                             |
+| chatgpt-shell                |                             |
 
 * Issues
 
@@ -249,6 +259,7 @@ Side windows are ignored."
                       window-map))
         (let ((key (read-key (format "Select window [%s]: " (string-join window-keys ", ")))))
           (mapc #'delete-overlay my/quick-window-overlays)
+          (message ".")
           (setq my/quick-window-overlays nil)
           (when-let ((selected-window (cdr (assoc (char-to-string key) window-map))))
             (select-window selected-window))))))))
@@ -1726,3 +1737,106 @@ Oh, it's also like the completion-preview coming to Emacs 30 but the in buffer i
 
 (global-simple-autosuggest-mode 1)
 #+end_src
+
+** DOING chatgpt-shell
+
+In this case I am going to implement a very simple send region to ollama with a pre-configured model for now:
+
+#+begin_src elisp
+(require 'json)
+(require 'subr-x)
+
+(defvar ollama-chat-buffer "*Ollama Chat*")
+(defvar ollama-active-process nil)
+(defvar ollama-current-model "qwen-4q")
+
+(defun ollama-process-filter (proc output)
+  "Process Ollama output stream."
+  (when-let* ((json-data (ignore-errors (json-read-from-string output)))
+              (text (alist-get 'content (alist-get 'message json-data))))
+    (with-current-buffer ollama-chat-buffer
+      (goto-char (point-max))
+      (let ((inhibit-read-only t)) (insert text))
+      (redisplay))))
+
+(defun ollama-send (start end &optional system-prompt)
+  "Send region to Ollama and stream response."
+  (interactive "r")
+  (when (process-live-p ollama-active-process)
+    (kill-process ollama-active-process))
+  (let* ((prompt (buffer-substring-no-properties start end))
+         (prompt-with-system (if system-prompt 
+                                 (concat system-prompt "\n\n" prompt)
+                               prompt))
+         (json-payload (replace-regexp-in-string 
+                        "\'" "\\\\\"" 
+                        (json-encode
+                         `(("model" . ,ollama-current-model)
+                           ("messages" . [(("role" . "user")
+                                           ("content" . ,prompt-with-system))])))))
+         (buf (get-buffer-create ollama-chat-buffer)))
+    (with-current-buffer buf
+      (goto-char (point-max))
+      (insert "\n\n==================================================\n")
+      (insert (format "\n[User: PROMPT] %s" prompt-with-system))
+      (insert "\n--------------------------------------------------\n")
+      (insert (format "\n[%s: RESPONSE] \n\n" ollama-current-model))
+      (visual-line-mode 1))
+    (setq ollama-active-process
+          (start-process-shell-command
+           "ollama-chat" buf
+           (format "curl -s -X POST http://localhost:11434/api/chat -H 'Content-Type: application/json' -d '%s'"
+                   json-payload)))
+    (set-process-filter ollama-active-process #'ollama-process-filter)
+    (pop-to-buffer buf)))
+
+(defun llm-shell-menu ()
+  "Menu for ChatGPT Shell commands."
+  (interactive)
+  (let ((commands
+         '((?o (lambda()(interactive)
+                 (let ((buf (get-buffer-create ollama-chat-buffer)))
+                   (pop-to-buffer buf))) "Open chat")
+           (?l ollama-send "Chat region")
+           (?r (lambda(s e)(interactive "r")
+                 (ollama-send s e "Can you refactor the following code?"))
+               "Refactor code")
+           (?g (lambda(s e)(interactive "r")
+                 (ollama-send s e "Can you write a concise git commit message for the following?"))
+               "Git commit message")
+           (?d (lambda(s e)(interactive "r")
+                 (ollama-send s e "Can you describe the following code?"))
+               "Describe code")
+           (?p (lambda(s e)(interactive "r")
+                 (ollama-send s e "Can you proofread the following?"))
+               "Proofread text")
+           (?z (lambda(s e)(interactive "r")
+                 (ollama-send s e "Can you reduce wordiness while preserving meaning?"))
+               "Make concise")
+           (?n  (lambda()(interactive)
+                  (setq ollama-current-model
+                        (completing-read "Model: "
+                                         (thread-last
+                                           (with-temp-buffer
+                                             (call-process "curl" nil t nil "-s" "http://localhost:11434/api/tags")
+                                             (goto-char (point-min))
+                                             (json-read))
+                                           (alist-get 'models)
+                                           (mapcar (lambda (m) (alist-get 'name m))))
+                                         nil t))) "Swap model")
+           (?k  (lambda ()
+                  (interactive)
+                  (when (process-live-p ollama-active-process)
+                    (kill-process ollama-active-process)
+                    (setq ollama-active-process nil))) "Kill request")
+           (?q (lambda () (interactive) (message "Quit Ollama Shell menu.")) "Quit"))))
+    (let* ((key (read-key (propertize
+                           (mapconcat (lambda (c) (format "[%c] %s" (car c) (caddr c))) commands "\n")
+                           'face 'minibuffer-prompt)))
+           (cmd (assoc key commands)))
+      (call-interactively (cadr cmd)))))
+
+(global-set-key (kbd "C-c g") #'llm-shell-menu)
+#+end_src
+
+
