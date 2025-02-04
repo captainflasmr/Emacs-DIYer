@@ -1148,4 +1148,4 @@ process, FILENAME is the input Org file, and PUB-DIR is the publishing directory
            (cmd (assoc key commands)))
       (call-interactively (cadr cmd)))))
 
-(global-set-key (kbd "C-c g") #'llm-shell-menu)
+(global-set-key (kbd "C-c l") #'llm-shell-menu)

@@ -1836,7 +1836,7 @@ In this case I am going to implement a very simple send region to ollama with a 
            (cmd (assoc key commands)))
       (call-interactively (cadr cmd)))))
 
-(global-set-key (kbd "C-c g") #'llm-shell-menu)
+(global-set-key (kbd "C-c l") #'llm-shell-menu)
 #+end_src
 
 
