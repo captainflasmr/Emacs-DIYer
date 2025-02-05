@@ -10,6 +10,16 @@ This document contains the release notes for Emacs-enhanced
 
 * Versions
 
+** <2025-02-05>
+
+Refactor and enhance Ollama integration
+
+- Introduce `ollama-buddy` customization group
+- Improve model selection and error handling
+- Enhance chat UI with separators and intro message
+- Add helper functions for formatting menus and retrieving models
+- Refactor process handling and request execution
+
 ** <2025-02-04>
 
 Add LLM-powered interactive chat utilities and commands
