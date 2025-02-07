@@ -1063,7 +1063,7 @@ process, FILENAME is the input Org file, and PUB-DIR is the publishing directory
   :group 'applications
   :prefix "ollama-buddy-")
 
-(defcustom ollama-buddy-menu-columns 3
+(defcustom ollama-buddy-menu-columns 4
   "Number of columns to display in the Ollama Buddy menu."
   :type 'integer
   :group 'ollama-buddy)
@@ -1128,9 +1128,9 @@ process, FILENAME is the input Org file, and PUB-DIR is the publishing directory
   (concat
    "\n" ollama-buddy-separator-1 "\n"
    "         ╭──────────────────────────────────────╮\n"
-   "         │              Welcome to               │\n"
-   "         │             OLLAMA BUDDY              │\n"
-   "         │       Your Friendly AI Assistant      │\n"
+   "         │              Welcome to              │\n"
+   "         │             OLLAMA BUDDY             │\n"
+   "         │       Your Friendly AI Assistant     │\n"
    "         ╰──────────────────────────────────────╯\n\n"
    "    Hi there!\n\n"
    (if (not (ollama-buddy--ollama-running))
@@ -1175,14 +1175,35 @@ process, FILENAME is the input Org file, and PUB-DIR is the publishing directory
     (?l . ("Send region" (lambda () (ollama-buddy--send))))
     (?r . ("Refactor code" (lambda () (ollama-buddy--send "refactor the following code:"))))
     (?g . ("Git commit message" (lambda () (ollama-buddy--send "write a concise git commit message for the following:"))))
-    (?d . ("Describe code" (lambda () (ollama-buddy--send "describe the following code:"))))
+    (?c . ("Describe code" (lambda () (ollama-buddy--send "describe the following code:"))))
+    (?d . ("Dictionary Lookup" 
+           (lambda () 
+             (ollama-buddy--send
+              (concat "For the word {"
+                      (buffer-substring-no-properties (region-beginning) (region-end)) "} provide:
+1. Pronunciation (IPA)
+2. Part(s) of speech
+3. Core definition(s)
+4. Etymology
+5. Example usage in sentences
+6. Common collocations
+7. Related forms (if any)
+Please format this like a dictionary entry:")))))
+    (?n . ("Word synonym" (lambda () (ollama-buddy--send "list synonyms for word:"))))
     (?p . ("Proofread text" (lambda () (ollama-buddy--send "proofread the following:"))))
     (?z . ("Make concise" (lambda () (ollama-buddy--send "reduce wordiness while preserving meaning:"))))
-    (?c . ("Custom prompt" 
+    (?e . ("Custom prompt" 
            (lambda ()
              (when-let ((prefix (read-string "Enter prompt prefix: " nil nil nil t)))
                (unless (string-empty-p prefix)
                  (ollama-buddy--send prefix))))))
+    (?s . ("Save chat" 
+           (lambda ()
+             (with-current-buffer ollama-buddy--chat-buffer
+               (write-region (point-min) (point-max) 
+                             (read-file-name "Save conversation to: ")
+                             'append-to-file
+                             nil)))))
     (?x . ("Kill request" 
            (lambda ()
              (if (process-live-p ollama-buddy--active-process)
