@@ -849,8 +849,8 @@ The third one can be roughly accomplished by passing eshell history through =com
   (interactive)
   (insert
    (completing-read "Eshell history: "
-                   (delete-dups
-                    (ring-elements eshell-history-ring)))))
+                    (delete-dups
+                     (ring-elements eshell-history-ring)))))
 
 (setq eshell-history-size 10000)
 (setq eshell-save-history-on-exit t)
@@ -911,12 +911,12 @@ This overall setup is similar to eshell.
   (interactive)
   (let* ((history (ring-elements comint-input-ring))
          (selection (completing-read "Shell history: " 
-                                   (delete-dups history)
-                                   nil 
-                                   t)))
+                                     (delete-dups history)
+                                     nil 
+                                     t)))
     (when selection
       (delete-region (comint-line-beginning-position)
-                    (line-end-position))
+                     (line-end-position))
       (insert selection))))
 
 (define-key shell-mode-map (kbd "M-r") #'my/shell-history-complete)
@@ -940,7 +940,7 @@ Solved with the code below:
       (kill-new (substring-no-properties candidate))
       (let ((copied-text candidate))
         (run-with-timer 0 nil (lambda () 
-          (message "Copied: %s" copied-text)))
+                                (message "Copied: %s" copied-text)))
         (abort-recursive-edit)))))
 
 (global-set-key (kbd "C-c ,") 'find-file-at-point)
@@ -970,9 +970,9 @@ Mainly used for popping and popping out shells, testing the following implementa
 (defun my/popper-handle-popup (buffer)
   "Display BUFFER as a popup, setting it as the current popup."
   (pop-to-buffer buffer
-               '((display-buffer-reuse-window display-buffer-at-bottom)
-                 (inhibit-same-window . t)
-                 (window-height . 0.3)))
+                 '((display-buffer-reuse-window display-buffer-at-bottom)
+                   (inhibit-same-window . t)
+                   (window-height . 0.3)))
   (message "Displayed pop-up buffer: %s" (buffer-name buffer)))
 
 (defun my/popper-cycle-popup ()
@@ -1636,11 +1636,11 @@ Could I just call out to =async-shell-command=, something like:
 (defun my/rsync (dest)
   "Rsync copy."
   (interactive
-    (list
-      (expand-file-name (read-file-name "rsync to:"
-                          (dired-dwim-target-directory)))))
+   (list
+    (expand-file-name (read-file-name "rsync to:"
+                                      (dired-dwim-target-directory)))))
   (let ((files (dired-get-marked-files nil current-prefix-arg))
-         (command "rsync -arvz --progress --no-g "))
+        (command "rsync -arvz --progress --no-g "))
     (dolist (file files)
       (setq command (concat command (shell-quote-argument file) " ")))
     (setq command (concat command (shell-quote-argument dest)))
@@ -1727,7 +1727,7 @@ Oh, it's also like the completion-preview coming to Emacs 30 but the in buffer i
   :lighter " SAM"
   :keymap (let ((map (make-sparse-keymap)))
             (define-key map [remap move-end-of-line] #'simple-autosuggest-move-end-of-line)
-           map)
+            map)
   (if simple-autosuggest-mode
       (progn
         (setq-local simple-autosuggest--overlay (make-overlay (point) (point) nil t t))
@@ -1767,14 +1767,14 @@ In this case I am going to implement a very simple send region to ollama with a 
   :group 'ollama-buddy)
 
 (defcustom ollama-buddy-separator-1
-  "====================  n_____n  ====================
-==================== | o Y o | ===================="
+  "=========================  n_____n  =========================
+========================= | o Y o | ========================="
   "Separator used for Ollama LLM output, variant 1."
   :type 'string
   :group 'ollama-buddy)
 
 (defcustom ollama-buddy-separator-2
-  "-------------------- | @ Y @ | --------------------"
+  "------------------------- | @ Y @ | -------------------------"
   "Separator used for Ollama LLM output, variant 2."
   :type 'string
   :group 'ollama-buddy)
@@ -1792,100 +1792,70 @@ In this case I am going to implement a very simple send region to ollama with a 
 
 (defun ollama-buddy--format-menu (items columns)
   "Format menu ITEMS into COLUMNS columns."
-  (let* ((items-list (mapcar (lambda (item) 
-                               (format "[%c] %s" (car item) (cadr item)))
-                             items))
+  (let* ((items-list (mapcar (lambda (item) (format "[%c] %s" (car item) (cadr item))) items))
          (total (length items-list))
          (rows (ceiling (/ total (float columns))))
-         (padded-list (append items-list 
-                              (make-list (- (* rows columns) total) "")))
-         (columns-list (cl-loop for row from 0 below rows
-                                collect
-                                (cl-loop for col from 0 below columns
-                                         for idx = (+ (* col rows) row)
-                                         when (< idx (length padded-list))
-                                         collect (nth idx padded-list))))
-         (col-widths (cl-loop for col from 0 below columns
-                              collect
-                              (cl-loop for row from 0 below rows
-                                       for idx = (+ (* col rows) row)
-                                       when (< idx total)
-                                       maximize (length (nth idx padded-list)))))
-         (format-string (mapconcat (lambda (width)
-                                     (format "%%-%ds" (+ width 2)))
-                                   (butlast col-widths)
-                                   "")))
-    (concat
-     (if (not (ollama-buddy--ollama-running))
-         "!!WARNING!! ollama NOT RUNNING. "
-       "RUNNING ")
-     (if (not ollama-buddy-current-model)
-         "NONE"
-       (concat ollama-buddy-current-model))
-     (when (not (use-region-p))
-       " (NO REGION SELECTED)")
-     "\n"
-     "Available : "
-     (mapconcat (lambda (m) (format "%s " m)) (ollama-buddy--get-models))
-     "\n"
-     (mapconcat (lambda (row)
-                  (if format-string
-                      (apply 'format 
-                             (concat format-string "%s")
-                             row)
-                    (car row)))
-                columns-list
-                "\n"))))
+         (padded-list (append items-list (make-list (- (* rows columns) total) "")))
+         (format-string
+          (mapconcat
+           (lambda (width) (format "%%-%ds" (+ width 2)))
+           (butlast
+            (cl-loop for col below columns collect
+                     (cl-loop for row below rows
+                              for idx = (+ (* col rows) row)
+                              when (< idx total)
+                              maximize (length (nth idx padded-list)))))
+           "")))
+    (format "%s %s%s\nAvailable: %s\n%s"
+            (if (ollama-buddy--ollama-running) "RUNNING" "!!WARNING!! ollama NOT RUNNING.")
+            (or ollama-buddy-current-model "NONE")
+            (if (use-region-p) "" " (NO REGION SELECTED)")
+            (mapconcat #'identity (ollama-buddy--get-models) " ")
+            (mapconcat
+             (lambda (row)
+               (if format-string (apply 'format (concat format-string "%s") row) (car row)))
+             (cl-loop for row below rows collect
+                      (cl-loop for col below columns
+                               for idx = (+ (* col rows) row)
+                               when (< idx (length padded-list))
+                               collect (nth idx padded-list)))
+             "\n"))))
 
 (defun ollama-buddy--create-intro-message ()
-  "Create a fun introduction message for Ollama Buddy."
-  (let ((intro
-         (concat
-          "\n"
-          ollama-buddy-separator-1
-          "\n"
-          "    ╭──────────────────────────────────────╮\n"
-          "    │              Welcome to               │\n"
-          "    │             OLLAMA BUDDY              │\n"
-          "    │       Your Friendly AI Assistant      │\n"
-          "    ╰──────────────────────────────────────╯\n"
-          "\n"
-          "    Hi there!\n\n"
-          (if (not (ollama-buddy--ollama-running))
-              "    !!WARNING!! ollama server not running.\n\n"
-            (progn
-              (concat
-               "    ollama RUNNING\n\n"
-               (if (not ollama-buddy-current-model)
-                   "    No model selected"
-                 (concat "    Using Model : " ollama-buddy-current-model "\n\n"))
-               (concat "    Models available :\n\n"
-                       (mapconcat (lambda (m) (format "      %s\n" m)) (ollama-buddy--get-models)) "\n"))))
-          "    I'm here to help you with:\n\n"
-          "    - Code refactoring and analysis\n"
-          "    - Writing clear commit messages\n"
-          "    - Proofreading and text improvements\n"
-          "    - And much more!\n"
-          "\n"
-          "    Quick Start/Tips:\n\n"
-          "    - Try typing a prompt in this buffer\n"
-          "    - Select/mark all prompt text (select region)\n"
-          "    - M-x ollama-buddy-menu\n"
-          "    - Select menu item\n"
-          "    - Now wait for ollama to do its magic!\n"
-          "    - You can switch models anytime with [m]\n"
-          "    - Use [x] to cancel a running request\n"
-          "    - You can send to this chat from any buffer\n"
-          "\n"
-          ollama-buddy-separator-2
-          "\n\n")))
-    intro))
+  "Create introduction message for Ollama Buddy."
+  (concat
+   "\n" ollama-buddy-separator-1 "\n"
+   "         ╭──────────────────────────────────────╮\n"
+   "         │              Welcome to               │\n"
+   "         │             OLLAMA BUDDY              │\n"
+   "         │       Your Friendly AI Assistant      │\n"
+   "         ╰──────────────────────────────────────╯\n\n"
+   "    Hi there!\n\n"
+   (if (not (ollama-buddy--ollama-running))
+       "    !!WARNING!! ollama server not running.\n\n"
+     (format "    ollama RUNNING %s\n\n    Models available:\n\n%s\n\n"
+             (if ollama-buddy-current-model
+                 ollama-buddy-current-model
+               "No model selected")
+             (mapconcat (lambda (m) (format "      %s" m))
+                        (ollama-buddy--get-models) "\n")))
+   "    I'm here to help you with:\n\n"
+   "    - Code refactoring and analysis\n"
+   "    - Writing clear commit messages\n"
+   "    - Proofreading and text improvements\n"
+   "    - And much more!\n\n"
+   "    Quick Start/Tips:\n\n"
+   "    - Type a prompt in this buffer and select/mark it\n"
+   "    - Run M-x ollama-buddy-menu and pick an option\n"
+   "    - See ollama response in this buffer\n"
+   "    - Switch models with [m], cancel with [x]\n"
+   "    - Send selected/marked text from any buffer\n\n"
+   ollama-buddy-separator-2 "\n\n"))
 
 (defcustom ollama-buddy-menu-items
   '((?o . ("Open chat buffer" 
            (lambda ()
-             (pop-to-buffer
-              (get-buffer-create ollama-buddy--chat-buffer))
+             (pop-to-buffer (get-buffer-create ollama-buddy--chat-buffer))
              (when (= (buffer-size) 0)
                (insert (ollama-buddy--create-intro-message)))
              (goto-char (point-max)))))
@@ -1897,22 +1867,20 @@ In this case I am going to implement a very simple send region to ollama with a 
                      (completing-read "Model: " (ollama-buddy--get-models) nil t))))))
     (?h . ("Help assistant" 
            (lambda ()
-             (pop-to-buffer
-              (get-buffer-create ollama-buddy--chat-buffer))
+             (pop-to-buffer (get-buffer-create ollama-buddy--chat-buffer))
              (goto-char (point-max))
              (insert (ollama-buddy--create-intro-message)))))
-    (?l . ("Send region"
-           (lambda () (ollama-buddy--send))))
-    (?r . ("Refactor code" 
-           (lambda () (ollama-buddy--send "refactor the following code:"))))
-    (?g . ("Git commit message" 
-           (lambda () (ollama-buddy--send "write a concise git commit message for the following:"))))
-    (?d . ("Describe code" 
-           (lambda () (ollama-buddy--send "describe the following code:"))))
-    (?p . ("Proofread text" 
-           (lambda () (ollama-buddy--send "proofread the following:"))))
-    (?z . ("Make concise" 
-           (lambda () (ollama-buddy--send "reduce wordiness while preserving meaning:"))))
+    (?l . ("Send region" (lambda () (ollama-buddy--send))))
+    (?r . ("Refactor code" (lambda () (ollama-buddy--send "refactor the following code:"))))
+    (?g . ("Git commit message" (lambda () (ollama-buddy--send "write a concise git commit message for the following:"))))
+    (?d . ("Describe code" (lambda () (ollama-buddy--send "describe the following code:"))))
+    (?p . ("Proofread text" (lambda () (ollama-buddy--send "proofread the following:"))))
+    (?z . ("Make concise" (lambda () (ollama-buddy--send "reduce wordiness while preserving meaning:"))))
+    (?c . ("Custom prompt" 
+           (lambda ()
+             (when-let ((prefix (read-string "Enter prompt prefix: " nil nil nil t)))
+               (unless (string-empty-p prefix)
+                 (ollama-buddy--send prefix))))))
     (?x . ("Kill request" 
            (lambda ()
              (if (process-live-p ollama-buddy--active-process)
@@ -1921,8 +1889,7 @@ In this case I am going to implement a very simple send region to ollama with a 
                    (setq ollama-buddy--active-process nil)
                    (error "Killed"))
                (error "No process running")))))
-    (?q . ("Quit" 
-           (lambda () (message "Quit Ollama Shell menu.")))))
+    (?q . ("Quit" (lambda () (message "Quit Ollama Shell menu.")))))
   "Menu items definition for Ollama Buddy."
   :type '(alist :key-type character
                 :value-type (group (string :tag "Description")
@@ -1935,8 +1902,7 @@ In this case I am going to implement a very simple send region to ollama with a 
               (text (alist-get 'content (alist-get 'message json-data))))
     (with-current-buffer ollama-buddy--chat-buffer
       (goto-char (point-max))
-      (let ((inhibit-read-only t)) 
-        (insert text))
+      (let ((inhibit-read-only t))(insert text))
       (redisplay))))
 
 (defun ollama-buddy--ollama-running ()
@@ -1945,45 +1911,48 @@ In this case I am going to implement a very simple send region to ollama with a 
 
 (defun ollama-buddy--send (&optional system-prompt)
   "Send region to Ollama and stream response."
-  (interactive "r")
-  (when (not (ollama-buddy--ollama-running))
-    (error "Ollama server is not running. Please start it first."))
+  (interactive)
+  (unless (ollama-buddy--ollama-running)
+    (error "Ollama server is not running"))
   (unless (use-region-p)
-    (error "Please select region containing query to send to ollama."))
-  (when (not ollama-buddy-current-model)
+    (error "Please select region containing query"))
+  (unless ollama-buddy-current-model
     (setq ollama-buddy-current-model
           (completing-read "!! Select Model First !!: " (ollama-buddy--get-models) nil t)))
-  (when (use-region-p)
-    (when (process-live-p ollama-buddy--active-process)
-      (kill-process ollama-buddy--active-process))
-    (let* ((prompt (buffer-substring-no-properties
-                    (region-beginning) (region-end)))
-           (prompt-with-system (if system-prompt 
-                                   (concat system-prompt "\n\n" prompt)
-                                 prompt))
-           (json-payload (replace-regexp-in-string 
-                          "\'" "\\\\\"" 
-                          (json-encode
-                           `(("model" . ,ollama-buddy-current-model)
-                             ("messages" . [(("role" . "user")
-                                             ("content" . ,prompt-with-system))])))))
-           (buf (get-buffer-create ollama-buddy--chat-buffer)))
-      (pop-to-buffer buf)
-      (with-current-buffer buf
-        (goto-char (point-max))
-        (when (= (buffer-size) 0)
-          (insert (ollama-buddy--create-intro-message)))
-        (insert "\n\n" ollama-buddy-separator-1 "\n")
-        (insert (format "\n[User: PROMPT] %s\n" prompt-with-system))
-        (insert "\n" ollama-buddy-separator-2 "\n")
-        (insert (format "\n[%s: RESPONSE] ... \n\n" ollama-buddy-current-model))
-        (visual-line-mode 1))
-      (setq ollama-buddy--active-process
-            (start-process-shell-command
-             "ollama-buddy--chat" buf
-             (format "curl -s -X POST http://localhost:11434/api/chat -H 'Content-Type: application/json' -d '%s'"
-                     json-payload)))
-      (set-process-filter ollama-buddy--active-process #'ollama-buddy--process-filter))))
+  (when (process-live-p ollama-buddy--active-process)
+    (kill-process ollama-buddy--active-process))
+  (let* ((prompt (buffer-substring-no-properties (region-beginning) (region-end)))
+         (prompt-with-system (if system-prompt (concat system-prompt "\n\n" prompt) prompt))
+         (json-payload (replace-regexp-in-string 
+                        "\'" "\\\\\"" 
+                        (json-encode
+                         `(("model" . ,ollama-buddy-current-model)
+                           ("messages" . [(("role" . "user")
+                                           ("content" . ,prompt-with-system))])))))
+         (buf (get-buffer-create ollama-buddy--chat-buffer)))
+    (pop-to-buffer buf)
+    (with-current-buffer buf
+      (goto-char (point-max))
+      (when (= (buffer-size) 0)
+        (insert (ollama-buddy--create-intro-message)))
+      (insert "\n\n" ollama-buddy-separator-1 "\n")
+      (insert (format "\n[User: PROMPT] %s\n" prompt-with-system))
+      (insert "\n" ollama-buddy-separator-2 "\n")
+      (insert (format "\n[%s: RESPONSE] ... \n\n" ollama-buddy-current-model))
+      (visual-line-mode 1))
+    (setq ollama-buddy--active-process
+          (start-process-shell-command
+           "ollama-buddy--chat" buf
+           (format "curl -s -X POST http://localhost:11434/api/chat -H 'Content-Type: application/json' -d '%s'"
+                   json-payload)))
+    (set-process-sentinel
+     ollama-buddy--active-process
+     (lambda (proc event)
+       (when (string-match-p "finished\\|exited" event)
+         (with-current-buffer (process-buffer proc)
+           (goto-char (point-max))
+           (insert (format "\n\n[%s: FINISHED]\n\n" ollama-buddy-current-model))))))
+    (set-process-filter ollama-buddy--active-process #'ollama-buddy--process-filter)))
 
 (defun ollama-buddy--get-models ()
   "Retrieve available Ollama models. If Ollama is not running, report an error."
