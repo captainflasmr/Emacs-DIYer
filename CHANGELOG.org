@@ -10,6 +10,10 @@ This document contains the release notes for Emacs-enhanced
 
 * Versions
 
+** <2025-02-16>
+
+Add function to display Git branches in *vc-dir* header line
+
 ** <2025-02-05>
 
 Refactor and enhance Ollama integration

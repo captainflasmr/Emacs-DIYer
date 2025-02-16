@@ -120,6 +120,22 @@ Enable `recentf-mode' if it isn't already."
                    file-list))))
     (when file (find-file (expand-file-name file)))))
 
+(defun my/vc-dir-show-branches ()
+  "Show Git branches in the header line of the *vc-dir* buffer."
+  (when (and (boundp 'vc-dir-backend) (eq vc-dir-backend 'Git))
+    (let* ((default-directory (if (boundp 'vc-dir-directory) 
+                                 vc-dir-directory 
+                                 default-directory))
+           (branches (string-join
+                      (split-string
+                       (shell-command-to-string "git branch"))
+                      " ")))
+      (setq-local header-line-format 
+                  (propertize (concat "  " branches) 'face '(:inherit bold))))))
+
+;; Add the function to vc-dir-mode-hook
+(add-hook 'vc-dir-mode-hook #'my/vc-dir-show-branches)
+
 (defun my/sync-tab-bar-to-theme (&optional color)
   "Synchronize tab-bar faces with the current theme, and set
 mode-line background color interactively using `read-color`

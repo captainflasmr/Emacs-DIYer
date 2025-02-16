@@ -21,6 +21,10 @@ Used in concert with https://github.com/captainflasmr/Emacs-core
 
 * Whats New
 
+** <2025-02-16>
+
+Add function to display Git branches in *vc-dir* header line
+
 ** <2025-02-05>
 
 Refactor and enhance Ollama integration
@@ -427,6 +431,28 @@ Although still raises the following:
   ErrorHandler::Throw - warning: QFSFileEngine::open: No file name specified file:  line: 0 function: 
   To github.com:captainflasmr/Emacs-enhanced.git
   6735e12..4766e6c  main -> main
+#+end_src
+
+and for some vc-mode enhancements?
+
+lets firstly try and show the branches in =vc-dir=
+
+#+begin_src elisp
+(defun my/vc-dir-show-branches ()
+  "Show Git branches in the header line of the *vc-dir* buffer."
+  (when (and (boundp 'vc-dir-backend) (eq vc-dir-backend 'Git))
+    (let* ((default-directory (if (boundp 'vc-dir-directory) 
+                                 vc-dir-directory 
+                                 default-directory))
+           (branches (string-join
+                      (split-string
+                       (shell-command-to-string "git branch"))
+                      " ")))
+      (setq-local header-line-format 
+                  (propertize (concat "  " branches) 'face '(:inherit bold))))))
+
+;; Add the function to vc-dir-mode-hook
+(add-hook 'vc-dir-mode-hook #'my/vc-dir-show-branches)
 #+end_src
 
 ** DONE tempel
