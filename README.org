@@ -442,17 +442,50 @@ lets firstly try and show the branches in =vc-dir=
   "Show Git branches in the header line of the *vc-dir* buffer."
   (when (and (boundp 'vc-dir-backend) (eq vc-dir-backend 'Git))
     (let* ((default-directory (if (boundp 'vc-dir-directory) 
-                                 vc-dir-directory 
-                                 default-directory))
-           (branches (string-join
-                      (split-string
-                       (shell-command-to-string "git branch"))
-                      " ")))
+                                  vc-dir-directory 
+                                default-directory))
+           (branches (replace-regexp-in-string "* " "*"
+                                               (string-join
+                                                (split-string
+                                                 (shell-command-to-string "git branch") "\n" t "\\s-*")
+                                                " "))))
       (setq-local header-line-format 
                   (propertize (concat "  " branches) 'face '(:inherit bold))))))
 
 ;; Add the function to vc-dir-mode-hook
 (add-hook 'vc-dir-mode-hook #'my/vc-dir-show-branches)
+
+;; Define advice function for refreshing branches after switching
+(defun my/after-vc-switch-branch (&rest _args)
+  "Update branch display in all vc-dir buffers after switching branches."
+  (dolist (buf (buffer-list))
+    (with-current-buffer buf
+      (when (derived-mode-p 'vc-dir-mode)
+        (my/vc-dir-show-branches)))))
+
+;; Add the advice to vc-git-branch function (handles git checkout)
+(advice-add 'vc-switch-branch :after #'my/after-vc-switch-branch)
+
+;; Lets show tracked files in Git!!
+(defun my/vc-dir-show-tracked-files ()
+  "Show all tracked files in the current vc-dir buffer."
+  (interactive)
+  (when (and (derived-mode-p 'vc-dir-mode)
+             (eq vc-dir-backend 'Git))
+    (let* ((default-directory (if (boundp 'vc-dir-directory) 
+                                  vc-dir-directory 
+                                default-directory))
+           (files (split-string 
+                   (shell-command-to-string "git ls-files")
+                   "\n" t)))
+      (vc-dir-refresh)
+      (dolist (file files)
+        (let ((full-path (expand-file-name file default-directory)))
+          (vc-dir-show-fileentry file))))))
+
+;; Bind it to a key in vc-dir-mode
+(with-eval-after-load 'vc-dir
+  (define-key vc-dir-mode-map (kbd "T") 'my/vc-dir-show-tracked-files))
 #+end_src
 
 ** DONE tempel
@@ -1049,6 +1082,7 @@ Replacing the external tool Pandoc for converting Markdown (md) to Org format is
 Potentially solved with the following, probably requires more testing:
 
 #+begin_src elisp
+
 (defun my/md-to-org-convert-buffer ()
   "Convert the current buffer from Markdown to Org-mode format"
   (interactive)
@@ -1088,7 +1122,11 @@ Potentially solved with the following, probably requires more testing:
     (goto-char (point-min))
     ;; Headers: Adjust '#'
     (while (re-search-forward "^\\(#+\\) " nil t)
-      (replace-match (make-string (length (match-string 1)) ?*) nil nil nil 1))))
+      (replace-match (make-string (length (match-string 1)) ?*) nil nil nil 1))
+    (goto-char (point-min))
+    ;; any extra characters
+    (while (re-search-forward "—" nil t)
+      (replace-match ", "))))
 
 (defun my/md-to-org-convert-file (input-file output-file)
   "Convert a Markdown file INPUT-FILE to an Org-mode file OUTPUT-FILE."
@@ -1732,15 +1770,20 @@ Oh, it's also like the completion-preview coming to Emacs 30 but the in buffer i
         (move-overlay simple-autosuggest--overlay (point) (point))
         suggestion))))
 
-(defun simple-autosuggest-move-end-of-line (arg)
-  "Move to end of line, accepting suggestion first if available."
+(defun simple-autosuggest-end-of-line (arg)
+  "Move to end of line, accepting suggestion first if available.
+Works with both standard `move-end-of-line` and `org-end-of-line`."
   (interactive "^p")
   (if-let ((overlay simple-autosuggest--overlay)
            (suggestion (overlay-get overlay 'after-string)))
       (progn
         (insert (substring-no-properties suggestion))
         (overlay-put overlay 'after-string nil))
-    (move-end-of-line arg)))
+    ;; Detect whether we're in org-mode and use the appropriate function
+    (if (and (eq major-mode 'org-mode)
+             (fboundp 'org-end-of-line))
+        (org-end-of-line arg)
+      (move-end-of-line arg))))
 
 (defun simple-autosuggest-update ()
   "Update the auto-suggestion overlay."
@@ -1752,7 +1795,13 @@ Oh, it's also like the completion-preview coming to Emacs 30 but the in buffer i
   "Minor mode for showing auto-suggestions from history or dabbrev completion."
   :lighter " SAM"
   :keymap (let ((map (make-sparse-keymap)))
-            (define-key map [remap move-end-of-line] #'simple-autosuggest-move-end-of-line)
+            ;; Use a unified function for both cases
+            (define-key map [remap move-end-of-line] #'simple-autosuggest-end-of-line)
+            (when (fboundp 'org-end-of-line)
+              ;; If org-mode is loaded, also remap org-end-of-line
+              (define-key map [remap org-end-of-line] #'simple-autosuggest-end-of-line))
+            ;; Explicitly bind C-e which is commonly used
+            (define-key map (kbd "C-e") #'simple-autosuggest-end-of-line)
             map)
   (if simple-autosuggest-mode
       (progn
