@@ -169,34 +169,52 @@ Enable `recentf-mode' if it isn't already."
 (with-eval-after-load 'vc-dir
   (define-key vc-dir-mode-map (kbd "T") 'my/vc-dir-show-tracked-files))
 
-(defun my/sync-tab-bar-to-theme (&optional color)
-  "Synchronize tab-bar faces with the current theme, and set
-mode-line background color interactively using `read-color`
-if COLOR is not provided as an argument."
+(defun my/sync-ui-accent-color (&optional color)
+  "Synchronize various Emacs UI elements with a chosen accent color.
+Affects mode-line, cursor, tab-bar, and other UI elements for a coherent theme.
+If COLOR is not provided, prompts for color selection interactively.
+The function adjusts:
+- Mode-line (active and inactive states)
+- Cursor
+- Tab-bar (active and inactive tabs)
+- Window borders and dividers
+- Highlighting
+- Fringes"
   (interactive (list (when current-prefix-arg (read-color "Color: "))))
-  ;; Determine the color to use
-  (let* ((selected-color (or color (read-color "Select mode-line background color: ")))
-         (default-bg (face-background 'default))
-         (default-fg (face-foreground 'default))
-         (default-hl (face-background 'highlight))
-         (inactive-fg (face-foreground 'mode-line-inactive))
-         (is-dark (not (string-greaterp default-bg "#888888")))
-         (adjusted-bg (if is-dark
-                          (adjust-color default-bg 20)
-                        (adjust-color default-bg -5))))
-    (set-face-attribute 'mode-line nil :height 140 :underline nil :overline nil :box nil
-                        :background selected-color :foreground "#000000")
-    (set-face-attribute 'mode-line-inactive nil :height 140 :underline nil :overline nil
-                        :background adjusted-bg :foreground "#aaaaaa")
+  (let* ((accent-color (or color (read-color "Select accent color: ")))
+         (bg-color (face-background 'default))
+         (fg-color (face-foreground 'default))
+         (hl-color (face-background 'highlight))
+         (inactive-fg-color (face-foreground 'mode-line-inactive))
+         (is-dark-theme (not (string-greaterp bg-color "#888888")))
+         (adjusted-bg-color (if is-dark-theme
+                                (adjust-color bg-color 20)
+                              (adjust-color bg-color -5))))
+    ;; Mode-line configuration
+    (set-face-attribute 'mode-line nil 
+                        :height 140 
+                        :underline nil 
+                        :overline nil 
+                        :box nil
+                        :background accent-color 
+                        :foreground "#000000")
+    (set-face-attribute 'mode-line-inactive nil 
+                        :height 140 
+                        :underline nil 
+                        :overline nil
+                        :background adjusted-bg-color 
+                        :foreground "#aaaaaa")
+    ;; Other UI elements configuration
     (custom-set-faces
-     `(hl-line ((t (:background, adjusted-bg))))
-     `(vertical-border ((t (:foreground ,(adjust-color default-fg -60)))))
-     `(window-divider ((t (:foreground ,(adjust-color default-fg -60)))))
-     `(fringe ((t (:foreground ,default-bg :background ,default-bg))))
-     `(tab-bar ((t (:inherit default :background ,default-bg :foreground ,default-fg))))
-     `(tab-bar-tab ((t (:inherit 'highlight :background ,selected-color :foreground "#000000"))))
-     `(tab-bar-tab-inactive ((t (:inherit default :background ,default-bg :foreground ,inactive-fg
-                                          :box (:line-width 2 :color ,default-bg :style pressed-button))))))))
+     `(cursor ((t (:background ,accent-color))))
+     `(hl-line ((t (:background ,adjusted-bg-color))))
+     `(vertical-border ((t (:foreground ,(adjust-color fg-color -60)))))
+     `(window-divider ((t (:foreground ,(adjust-color fg-color -60)))))
+     `(fringe ((t (:foreground ,bg-color :background ,bg-color))))
+     `(tab-bar ((t (:inherit default :background ,bg-color :foreground ,fg-color))))
+     `(tab-bar-tab ((t (:inherit 'highlight :background ,accent-color :foreground "#000000"))))
+     `(tab-bar-tab-inactive ((t (:inherit default :background ,bg-color :foreground ,inactive-fg-color
+                                          :box (:line-width 2 :color ,bg-color :style pressed-button))))))))
 
 (defun my/grep (search-term &optional directory glob)
   "Run ripgrep (rg) with SEARCH-TERM and optionally DIRECTORY and GLOB.
