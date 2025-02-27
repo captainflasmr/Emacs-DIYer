@@ -120,19 +120,24 @@ Enable `recentf-mode' if it isn't already."
                    file-list))))
     (when file (find-file (expand-file-name file)))))
 
-(defun my/vc-dir-show-branches ()
-  "Show Git branches in the header line of the *vc-dir* buffer."
+(defun my/vc-dir-show-branches (&optional separator)
+  "Show Git branches in the header line of the *vc-dir* buffer, highlighting the current branch.
+If SEPARATOR is provided, it is used to separate the branches in the display."
   (when (and (boundp 'vc-dir-backend) (eq vc-dir-backend 'Git))
     (let* ((default-directory (if (boundp 'vc-dir-directory) 
                                   vc-dir-directory 
                                 default-directory))
-           (branches (replace-regexp-in-string "* " "*"
-                                               (string-join
-                                                (split-string
-                                                 (shell-command-to-string "git branch") "\n" t "\\s-*")
-                                                " "))))
-      (setq-local header-line-format 
-                  (propertize (concat "  " branches) 'face '(:inherit bold))))))
+           (branches (split-string (shell-command-to-string "git branch") "\n" t "\\s-*"))
+           (sep (or separator " | "))  ;; Default separator is " | "
+           (styled-branches (mapconcat
+                             (lambda (branch)
+                               (if (string-prefix-p "* " branch)
+                                   (propertize (concat "*" (string-trim-left branch "* "))
+                                               'face '(:weight bold))
+                                 branch))
+                             branches sep)))
+      (setq-local header-line-format
+                  (concat "  " styled-branches)))))
 
 ;; Add the function to vc-dir-mode-hook
 (add-hook 'vc-dir-mode-hook #'my/vc-dir-show-branches)

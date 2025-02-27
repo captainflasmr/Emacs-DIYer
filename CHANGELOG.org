@@ -10,6 +10,14 @@ This document contains the release notes for Emacs-enhanced
 
 * Versions
 
+** <2025-02-27>
+
+Improve vc-dir header to highlight current branch
+
+- Added an optional `separator` argument to customize branch display.
+- Current branch is now highlighted using text properties.
+- Default separator set to `" | "` for better readability.
+
 ** <2025-02-16>
 
 Add function to display Git branches in *vc-dir* header line
