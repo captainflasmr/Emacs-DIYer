@@ -123,6 +123,7 @@ Enable `recentf-mode' if it isn't already."
 (defun my/vc-dir-show-branches (&optional separator)
   "Show Git branches in the header line of the *vc-dir* buffer, highlighting the current branch.
 If SEPARATOR is provided, it is used to separate the branches in the display."
+  (interactive)
   (when (and (boundp 'vc-dir-backend) (eq vc-dir-backend 'Git))
     (let* ((default-directory (if (boundp 'vc-dir-directory) 
                                   vc-dir-directory 
@@ -172,6 +173,7 @@ If SEPARATOR is provided, it is used to separate the branches in the display."
 
 ;; Bind it to a key in vc-dir-mode
 (with-eval-after-load 'vc-dir
+  (define-key vc-dir-mode-map (kbd "B") 'my/vc-dir-show-branches)
   (define-key vc-dir-mode-map (kbd "T") 'my/vc-dir-show-tracked-files))
 
 (defun my/sync-ui-accent-color (&optional color)
