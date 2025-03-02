@@ -321,10 +321,11 @@ Solved with the code below:
       (goto-char (point-min))
       (while (re-search-forward hex-color-regex nil t)
         (let* ((color (match-string 0))
-               (overlay (make-overlay (match-beginning 0) (match-end 0))))
-          (if (string-greaterp color "#888888")
-              (overlay-put overlay 'face `(:background ,color :foreground "black"))
-            (overlay-put overlay 'face `(:background ,color :foreground "white"))))))))
+               (overlay (make-overlay (match-beginning 0) (match-end 0)))
+               (fg-color (if (string-greaterp color "#888888") "black" "white")))
+          (overlay-put overlay 'face `(:background ,color :foreground ,fg-color))))))
+  (when (derived-mode-p 'org-mode)
+    (org-set-startup-visibility)))
 
 (defun my/rainbow-mode-clear ()
   "Remove all hex color overlays in the current buffer."
@@ -478,6 +479,7 @@ If SEPARATOR is provided, it is used to separate the branches in the display."
         (my/vc-dir-show-branches)))))
 
 ;; Add the advice to vc-git-branch function (handles git checkout)
+(advice-add 'vc-create-branch :after #'my/after-vc-switch-branch)
 (advice-add 'vc-switch-branch :after #'my/after-vc-switch-branch)
 
 ;; Lets show tracked files in Git!!
