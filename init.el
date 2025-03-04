@@ -1441,4 +1441,3 @@ Works with both standard `move-end-of-line` and `org-end-of-line`."
 ;;; ollama-buddy.el ends here
 
 (global-set-key (kbd "C-c o") #'ollama-buddy-menu)
-
