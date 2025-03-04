@@ -10,6 +10,10 @@ This document contains the release notes for Emacs-enhanced
 
 * Versions
 
+** <2025-03-04>
+
+Added LLM client replacement with simple local ollama communication/package
+
 ** <2025-02-27>
 
 Improve vc-dir header to highlight current branch
