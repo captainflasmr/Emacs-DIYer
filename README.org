@@ -450,40 +450,89 @@ and for some vc-mode enhancements?
 lets firstly try and show the branches in =vc-dir=
 
 #+begin_src elisp
-(defun my/vc-dir-show-branches (&optional separator)
-  "Show Git branches in the header line of the *vc-dir* buffer, highlighting the current branch.
-If SEPARATOR is provided, it is used to separate the branches in the display."
+(defun my/vc-dir-show-branches-and-tags (&optional branch-separator tag-separator)
+  "Show Git branches and tags in the header line of the *vc-dir* buffer.
+The current branch is highlighted. If BRANCH-SEPARATOR or TAG-SEPARATOR 
+are provided, they are used to separate the branches or tags in the display."
   (interactive)
   (when (and (boundp 'vc-dir-backend) (eq vc-dir-backend 'Git))
     (let* ((default-directory (if (boundp 'vc-dir-directory) 
                                   vc-dir-directory 
                                 default-directory))
+           ;; Get branches
            (branches (split-string (shell-command-to-string "git branch") "\n" t "\\s-*"))
-           (sep (or separator " | "))  ;; Default separator is " | "
+           ;; Get tags
+           (tags (split-string (shell-command-to-string "git tag") "\n" t))
+           ;; Get current commit hash
+           (current-commit (string-trim (shell-command-to-string "git rev-parse HEAD")))
+           ;; Default separators
+           (branch-sep (or branch-separator " | "))
+           (tag-sep (or tag-separator ", "))
+           ;; Format branches
            (styled-branches (mapconcat
                              (lambda (branch)
                                (if (string-prefix-p "* " branch)
                                    (propertize (concat "*" (string-trim-left branch "* "))
                                                'face '(:weight bold))
                                  branch))
-                             branches sep)))
+                             branches branch-sep))
+           ;; Check which tags point to the current commit
+           (current-tags '())
+           (tag-part ""))
+      
+      ;; Find tags pointing to current commit
+      (dolist (tag tags)
+        (when (string-prefix-p 
+               current-commit
+               (string-trim (shell-command-to-string (format "git rev-parse %s" tag))))
+          (push tag current-tags)))
+      
+      ;; Format tag display if we have any
+      (when current-tags
+        (setq tag-part 
+              (concat " [Tags: " 
+                      (propertize 
+                       (mapconcat 'identity current-tags tag-sep)
+                       'face '(:slant italic :foreground "goldenrod"))
+                      "]")))
+      
+      ;; Set the header line
       (setq-local header-line-format
-                  (concat "  " styled-branches)))))
+                  (concat "  Branches: " styled-branches tag-part)))))
 
 ;; Add the function to vc-dir-mode-hook
-(add-hook 'vc-dir-mode-hook #'my/vc-dir-show-branches)
+(add-hook 'vc-dir-mode-hook #'my/vc-dir-show-branches-and-tags)
 
-;; Define advice function for refreshing branches after switching
+;; Define advice function for refreshing branches and tags after switching
 (defun my/after-vc-switch-branch (&rest _args)
-  "Update branch display in all vc-dir buffers after switching branches."
+  "Update branch and tag display in all vc-dir buffers after switching branches."
   (dolist (buf (buffer-list))
     (with-current-buffer buf
       (when (derived-mode-p 'vc-dir-mode)
-        (my/vc-dir-show-branches)))))
+        (my/vc-dir-show-branches-and-tags)))))
 
 ;; Add the advice to vc-git-branch function (handles git checkout)
 (advice-add 'vc-create-branch :after #'my/after-vc-switch-branch)
 (advice-add 'vc-switch-branch :after #'my/after-vc-switch-branch)
+
+;; Let's also add a command to show all tags
+(defun my/vc-dir-show-all-tags ()
+  "Display all Git tags in a separate buffer."
+  (interactive)
+  (when (and (derived-mode-p 'vc-dir-mode)
+             (eq vc-dir-backend 'Git))
+    (let* ((default-directory (if (boundp 'vc-dir-directory) 
+                                  vc-dir-directory 
+                                default-directory))
+           (buffer (get-buffer-create "*git-tags*"))
+           (tags (shell-command-to-string "git tag -n"))) ; -n shows annotations
+      (with-current-buffer buffer
+        (erase-buffer)
+        (insert "Git Tags:\n\n")
+        (insert tags)
+        (goto-char (point-min))
+        (special-mode))
+      (switch-to-buffer buffer))))
 
 ;; Lets show tracked files in Git!!
 (defun my/vc-dir-show-tracked-files ()
@@ -502,10 +551,11 @@ If SEPARATOR is provided, it is used to separate the branches in the display."
         (let ((full-path (expand-file-name file default-directory)))
           (vc-dir-show-fileentry file))))))
 
-;; Bind it to a key in vc-dir-mode
+;; Bind keys in vc-dir-mode
 (with-eval-after-load 'vc-dir
-  (define-key vc-dir-mode-map (kbd "B") 'my/vc-dir-show-branches)
-  (define-key vc-dir-mode-map (kbd "T") 'my/vc-dir-show-tracked-files))
+  (define-key vc-dir-mode-map (kbd "B") 'my/vc-dir-show-branches-and-tags)
+  (define-key vc-dir-mode-map (kbd "T") 'my/vc-dir-show-all-tags)  ; New key for showing all tags
+  (define-key vc-dir-mode-map (kbd "F") 'my/vc-dir-show-tracked-files)) ; Changed from T to F
 #+end_src
 
 ** DONE tempel
@@ -1874,7 +1924,7 @@ Works with both standard `move-end-of-line` and `org-end-of-line`."
 
 As this configuration is mainly offline then naturally running some AI would take place locally and therefore using something like ollama, so lets replace the likes of gptel, chatgpt-shell and ellama can be replace by a scaled down version of my =ollama-buddy= package:
 
-#+begin_src elisp
+#+begin_src elisp :tangle no
 ;;; ollama-buddy.el --- A mini version of ollama-buddy
 
 ;;; Commentary:
