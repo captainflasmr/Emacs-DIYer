@@ -299,53 +299,56 @@ The function adjusts:
                                (match-string 1 debug-output)))
                (raw-output (shell-command-to-string rg-command))
                (formatted-output
-                (when (not (string-empty-p raw-output))
-                  (concat
-                   (format "[s] Search:    %s\n[d] Directory: %s\n" search-term directory)
-                   (format "[o] Glob:      %s\n" glob)
-                   (if ignore-files (format "%s\n" ignore-files) "")
-                   "\n"
+                (concat
+                 (format "[S] Search:    %s\n[D] Directory: %s\n" search-term directory)
+                 (format "[o] Glob:      %s\n" glob)
+                 (if ignore-files (format "%s\n" ignore-files) "")
+                 "\n"
+                 (if (string-empty-p raw-output)
+                     "No results found.\n"
                    (replace-regexp-in-string (concat "\\(^" (regexp-quote directory) "\\)") "./" raw-output)))))
           (when (get-buffer buffer-name)
             (kill-buffer buffer-name))
           (with-current-buffer (get-buffer-create buffer-name)
             (setq default-directory directory)
             (erase-buffer)
-            (insert (or formatted-output "No results found."))
+            (insert formatted-output)
             (insert "\nripgrep finished.")
             (goto-char (point-min))
-            (when formatted-output
+            (unless (string-empty-p raw-output)
               (let ((case-fold-search t))
                 (while (search-forward search-term nil t)
                   (overlay-put (make-overlay (match-beginning 0) (match-end 0))
                                'face '(:slant italic :weight bold :underline t)))))
             (grep-mode)
+            (setq-local my/grep-search-term search-term)
+            (setq-local my/grep-directory directory)
+            (setq-local my/grep-glob glob)
+            (local-set-key (kbd "D") (lambda () 
+                                       (interactive)
+                                       (my/grep my/grep-search-term 
+                                                (read-directory-name "New search directory: ")
+                                                my/grep-glob)))
+            (local-set-key (kbd "S") (lambda () 
+                                       (interactive)
+                                       (my/grep (read-string "New search term: ")
+                                                my/grep-directory
+                                                my/grep-glob)))
+            (local-set-key (kbd "o") (lambda () 
+                                       (interactive)
+                                       (my/grep my/grep-search-term
+                                                my/grep-directory
+                                                (read-string "New glob: "))))
+            (local-set-key (kbd "g") (lambda () 
+                                       (interactive)
+                                       (my/grep my/grep-search-term my/grep-directory my/grep-glob)))
             (pop-to-buffer buffer-name)
             (goto-char (point-min))
             (message "ripgrep finished.")))
       (progn
         (setq default-directory directory)
         (message (format "%s : %s : %s" search-term glob directory))
-        (rgrep search-term  (if (string= "" glob) "*" glob) directory)))
-    (with-current-buffer "*grep*"
-      (local-set-key (kbd "d") (lambda () 
-                                 (interactive)
-                                 (my/grep search-term 
-                                          (read-directory-name "New search directory: ")
-                                          glob)))
-      (local-set-key (kbd "s") (lambda () 
-                                 (interactive)
-                                 (my/grep (read-string "New search term: ")
-                                          directory
-                                          glob)))
-      (local-set-key (kbd "o") (lambda () 
-                                 (interactive)
-                                 (my/grep search-term
-                                          directory
-                                          (read-string "New glob: "))))
-      (local-set-key (kbd "g") (lambda () 
-                                 (interactive)
-                                 (my/grep search-term directory glob))))))
+        (rgrep search-term  (if (string= "" glob) "*" glob) directory)))))
 
 (defun my-org-reveal-on-next-error ()
   "Reveal the location of search results in an Org file."
