@@ -825,21 +825,120 @@ Solution is the following configuration:
 (setq dictionary-default-dictionary "*")
 (setq dictionary-server "dict.org")
 (setq dictionary-use-single-buffer t)
+
+(defun my/flyspell-add-word-to-dict ()
+  "Add the word under point to the personal dictionary and refresh the errors list."
+  (interactive)
+  (let* ((button (button-at (point)))
+         (word (button-label button))
+         (target-buffer (button-get button 'buffer))
+         (target-pos (button-get button 'position)))
+    
+    ;; Switch to the source buffer, go to the word, and add it to dictionary
+    (with-current-buffer target-buffer
+      (save-excursion
+        (goto-char target-pos)
+        ;; Use ispell to add the word to the personal dictionary
+        (ispell-send-string (concat "*" word "\n"))
+        ;; Tell ispell we're done and the buffer hasn't changed
+        (ispell-send-string "#\n")
+        (sit-for 0.1)  ; Wait for ispell to process
+        (message "Added '%s' to the dictionary." word)))
+
+    (with-current-buffer target-buffer
+      (pop-to-buffer target-buffer)
+      (my/collect-flyspell-errors))))
+
+(defun my/collect-flyspell-errors ()
+  "Collect all flyspell errors in the current buffer and display them in a separate buffer with clickable links."
+  (interactive)
+  ;; Store the buffer name and buffer itself for later reference
+  (let* ((source-buffer (current-buffer))
+         (source-buffer-name (buffer-name))
+         (error-list nil))
+    
+    ;; Ensure the buffer is fully spell-checked
+    (flyspell-buffer)
+    
+    ;; Collect all misspelled words and their positions
+    (save-excursion
+      (goto-char (point-min))
+      (while (not (eobp))
+        (let ((overlays (overlays-at (point)))
+              (moved nil))
+          (dolist (overlay overlays)
+            (when (overlay-get overlay 'flyspell-overlay)
+              (let ((start (overlay-start overlay))
+                    (end (overlay-end overlay))
+                    (word (buffer-substring-no-properties 
+                           (overlay-start overlay) 
+                           (overlay-end overlay)))
+                    (line-num (line-number-at-pos (overlay-start overlay))))
+                ;; Store the buffer name string rather than buffer object
+                (push (list word start end line-num) error-list)
+                (goto-char end)
+                (setq moved t))))
+          (unless moved
+            (forward-char 1)))))
+    
+    ;; Sort by position in buffer
+    (setq error-list (nreverse error-list))
+    
+    ;; Create and populate the errors buffer
+    (let ((errors-buffer (get-buffer-create "*Flyspell Errors*")))
+      (with-current-buffer errors-buffer
+        (let ((inhibit-read-only t))
+          (pop-to-buffer errors-buffer)
+          (visual-line-mode 1)
+          (erase-buffer)
+          (insert (format "Flyspell Errors in %s (%d found)\n\n" 
+                          source-buffer-name
+                          (length error-list)))
+          
+          ;; Add all the errors with buttons
+          (dolist (error-info error-list)
+            (let ((word (nth 0 error-info))
+                  (start (nth 1 error-info)))
+              
+              ;; Store position as a text property for the button
+              (insert-button word
+                             'follow-link t
+                             'help-echo "Click to jump to this misspelled word"
+                             'buffer source-buffer
+                             'position start
+                             'action (lambda (button)
+                                       (switch-to-buffer (button-get button 'buffer))
+                                       (goto-char (button-get button 'position))
+                                       (recenter)))
+              (insert " ")))
+          
+          (special-mode)
+
+          ;; keybindings
+          (local-set-key (kbd "g") 
+                         (lambda () 
+                           (interactive)
+                           (let ((button (button-at (point))))
+                             (with-current-buffer (target-buffer (button-get button 'buffer))
+                               (my/collect-flyspell-errors)))))
+          (local-set-key (kbd "a") 'my/flyspell-add-word-to-dict)
+          (local-set-key (kbd "q") 'quit-window))))))
+
 (defun spelling-menu ()
   "Menu for spelling."
   (interactive)
   (let ((key (read-key
               (propertize
                "------- Spelling [q] Quit: -------
-Run        [s] Spelling
-Dictionary [l] Check"
+[s] Spelling
+[l] Summary"
                'face 'minibuffer-prompt))))
     (pcase key
       ;; Spelling
       (?s (progn
             (flyspell-buffer)
             (call-interactively 'flyspell-mode)))
-      (?l (call-interactively 'ispell-word))
+      (?l (call-interactively 'my/collect-flyspell-errors))
       ;; Quit
       (?q (message "Quit Build menu."))
       (?\C-g (message "Quit Build menu."))
