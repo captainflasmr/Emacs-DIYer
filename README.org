@@ -1,4 +1,4 @@
-#+title: Emacs Enhanced
+#+title: Emacs DIYer
 #+author: James Dyer
 #+options: toc:nil author:t title:t
 #+startup: showall
@@ -421,7 +421,7 @@ Although still raises the following:
 #+begin_src
   Running "git push"...
   ErrorHandler::Throw - warning: QFSFileEngine::open: No file name specified file:  line: 0 function: 
-  To github.com:captainflasmr/Emacs-enhanced.git
+  To github.com:captainflasmr/Emacs-DIYer.git
   6735e12..4766e6c  main -> main
 #+end_src
 
