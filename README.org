@@ -1183,7 +1183,7 @@ collect/export could be solved with a TAB showing completions buffer
 
 ** DONE popper
 
-Mainly used for popping and popping out shells, testing the following implementation:
+Mainly used for popping in popping out shells, testing the following implementation:
 
 #+begin_src elisp
 (defun my/popper-matching-buffers ()
