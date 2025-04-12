@@ -11,11 +11,11 @@
 
 * Introduction
 
-A conversion of major Emacs packages / functions, especially ones that I rely on to single defuns to try avoid the dependence of external packages.
+A conversion of major Emacs packages/functions, especially ones that I rely on, to single defuns to try to avoid the dependence on external packages.
 
 The name is obviously from "Do It Yourself," as this configuration is implementing Emacs package functionality. The bit on the end? Well, my surname is Dyer, and it also implies that you are a person who likes to go truly vanilla and do everything yourself!
 
-It is also a general comment on how I have moved to more a vanilla based Emacs setup and relying much less on external packages as I think I now have enough elisp knowledge to replace a lot of them!
+It is also a general comment on how I have moved to a more vanilla-based Emacs setup and rely much less on external packages, as I think I now have enough Elisp knowledge to replace a lot of them.
 
 Perfect for lightweight usage in VMs or basic tasks.
 
