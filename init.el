@@ -1,5 +1,100 @@
 ;; -*- lexical-binding: t; -*-
 
+(defun csv-parse-buffer (first-line-contains-keys &optional buffer coding-system)
+  "Parse a buffer containing CSV data, return data as a list of alists or lists.
+The first line in the buffer is interpreted as a header line
+if FIRST-LINE-CONTAINS-KEYS is non-nil, resulting in a list of alists.
+Otherwise, return a list of lists.
+
+If BUFFER is non-nil it gives the buffer to be parsed.  If it is
+nil the current buffer is parsed.
+
+CODING-SYSTEM gives the coding-system for reading the buffer."
+  (with-current-buffer (or buffer (current-buffer))
+    (save-excursion
+      (goto-char (point-min))
+      (let ((lines (csv-parse-lines))
+            header result)
+        (when lines
+          (if first-line-contains-keys
+              (progn
+                (setq header (car lines)
+                      lines (cdr lines))
+                (dolist (line lines)
+                  (when line
+                    (push (csv-combine-with-header header line) result))))
+            (setq result (reverse lines))))
+        result))))
+
+(defun csv-parse-lines ()
+  "Parse CSV lines in current buffer, returning a list of parsed lines.
+Each line is represented as a list of field values."
+  (let ((lines nil)
+        (begin-pos (point))
+        (in-quoted nil)
+        (current-line nil)
+        (current-field "")
+        (previous-char nil))
+    (while (not (eobp))
+      (let ((char (char-after)))
+        (cond
+         ;; Handle quoted field
+         ((and (eq char ?\") (not (and in-quoted (eq previous-char ?\"))))
+          (if in-quoted
+              (setq in-quoted nil)
+            (setq in-quoted t)))
+         
+         ;; Handle escaped quote within quoted field
+         ((and (eq char ?\") in-quoted (eq previous-char ?\"))
+          (setq current-field (concat current-field "\""))
+          (setq previous-char nil) ;; Reset to avoid triple quote issue
+          (forward-char)
+          (continue))
+         
+         ;; Handle field separator (comma)
+         ((and (eq char ?,) (not in-quoted))
+          (push current-field current-line)
+          (setq current-field "")
+          (setq begin-pos (1+ (point))))
+         
+         ;; Handle end of line
+         ((and (eq char ?\n) (not in-quoted))
+          (push current-field current-line)
+          (push (reverse current-line) lines)
+          (setq current-field "")
+          (setq current-line nil)
+          (setq begin-pos (1+ (point))))
+         
+         ;; Handle carriage return (part of CRLF)
+         ((and (eq char ?\r) (not in-quoted))
+          ;; Just skip it, we'll handle the newline next
+          nil)
+         
+         ;; Accumulate characters for the current field
+         (t
+          (when (> (point) begin-pos)
+            (setq current-field (concat current-field (buffer-substring-no-properties begin-pos (point)))))
+          (setq current-field (concat current-field (char-to-string char)))
+          (setq begin-pos (1+ (point)))))
+        
+        (setq previous-char char)
+        (forward-char)))
+    
+    ;; Handle any remaining content
+    (when (and (not (string-empty-p current-field)) (not current-line))
+      (push current-field current-line)
+      (when current-line
+        (push (reverse current-line) lines)))
+    
+    (reverse lines)))
+
+(defun csv-combine-with-header (header line)
+  "Combine HEADER and LINE into an alist."
+  (let ((result nil))
+    (dotimes (i (min (length header) (length line)))
+      (push (cons (nth i header) (nth i line)) result))
+    (reverse result)))
+
 (defun my-icomplete-exit-minibuffer-with-input ()
   "Exit the minibuffer with the current input, without forcing completion."
   (interactive)

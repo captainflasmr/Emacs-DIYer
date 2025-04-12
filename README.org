@@ -3,7 +3,7 @@
 #+options: toc:nil author:t title:t
 #+startup: showall
 #+todo: TODO DOING | DONE
-#+property: header-args :tangle ~/.emacs.d/Emacs-enhanced/init.el
+#+property: header-args :tangle ~/.emacs.d/Emacs-DIYer/init.el
 
 #+begin_src emacs-lisp :exports none
 ;; -*- lexical-binding: t; -*-
@@ -13,13 +13,19 @@
 
 A conversion of major Emacs packages / functions, especially ones that I rely on to single defuns to try avoid the dependence of external packages.
 
+The name is obviously from "Do It Yourself," as this configuration is implementing Emacs package functionality. The bit on the end? Well, my surname is Dyer, and it also implies that you are a person who likes to go truly vanilla and do everything yourself!
+
 It is also a general comment on how I have moved to more a vanilla based Emacs setup and relying much less on external packages as I think I now have enough elisp knowledge to replace a lot of them!
 
 Perfect for lightweight usage in VMs or basic tasks.
 
-Used in concert with https://github.com/captainflasmr/Emacs-core
+Used in concert with https://github.com/captainflasmr/Emacs-vanilla
 
 * Whats New
+
+** <2025-04-12>
+
+Added =csv-parse-buffer=/package csv replacement
 
 ** <2025-03-04>
 
@@ -179,23 +185,28 @@ Here is a kanban of the features that will be (hopefully) converted to core/enha
 #+RESULTS:
 | DOING                        | DONE                        |
 |------------------------------+-----------------------------|
-| consult                      | minibuffer completion       |
-| consult-imenu                | ace-window                  |
-| consult-outline              | recentf-open                |
-| consult-history for =eshell= | rainbow-mode                |
-| consult-history for =shell=  | visual-fill-column-mode     |
-| embark                       | find-name-dired             |
-| popper                       | magit                       |
-| pandoc md to org conversion  | tempel                      |
-| completion - corfu / company | image-dired                 |
-| capf for =eshell=            | selected-window-accent-mode |
-| capf for =shell=             | deadgrep                    |
-| org-kanban                   | jinx / powerthesaurus       |
-| ox-hugo                      | kurecolor                   |
-| eglot                        |                             |
-| open-with                    |                             |
-| dired-async-mode             |                             |
-| capf-autosuggest             |                             |
+| consult                      | csv parsing                 |
+| consult-imenu                | minibuffer completion       |
+| consult-outline              | ace-window                  |
+| consult-history for =eshell= | recentf-open                |
+| consult-history for =shell=  | rainbow-mode                |
+| embark                       | visual-fill-column-mode     |
+| completion - corfu / company | find-name-dired             |
+| ox-hugo                      | magit                       |
+| eglot                        | tempel                      |
+| dired-async-mode             | image-dired                 |
+|                              | selected-window-accent-mode |
+|                              | deadgrep                    |
+|                              | jinx / powerthesaurus       |
+|                              | kurecolor                   |
+|                              | popper                      |
+|                              | pandoc md to org conversion |
+|                              | capf for =eshell=           |
+|                              | capf for =shell=            |
+|                              | org-kanban                  |
+|                              | open-with                   |
+|                              | capf-autosuggest            |
+|                              | LLMs                        |
 
 * Issues
 
@@ -214,6 +225,110 @@ Here is a kanban of the features that will be (hopefully) converted to core/enha
 * Roadmap                                                           :roadmap:
 
 Here are the features that will be (hopefully) converted to core.
+
+** DONE csv parsing
+
+I have relied on the package csv for quite a while now for my csv parsing needs, what is most useful is the =csv-parse-buffer= function to convert a buffer into an alist, extracting the csv data out.
+
+Well now I have created my =bank-buddy= package I have a really good framework for testing my own replacement, and here it is (and its faster too!)
+
+#+begin_src elisp
+(defun csv-parse-buffer (first-line-contains-keys &optional buffer coding-system)
+  "Parse a buffer containing CSV data, return data as a list of alists or lists.
+The first line in the buffer is interpreted as a header line
+if FIRST-LINE-CONTAINS-KEYS is non-nil, resulting in a list of alists.
+Otherwise, return a list of lists.
+
+If BUFFER is non-nil it gives the buffer to be parsed.  If it is
+nil the current buffer is parsed.
+
+CODING-SYSTEM gives the coding-system for reading the buffer."
+  (with-current-buffer (or buffer (current-buffer))
+    (save-excursion
+      (goto-char (point-min))
+      (let ((lines (csv-parse-lines))
+            header result)
+        (when lines
+          (if first-line-contains-keys
+              (progn
+                (setq header (car lines)
+                      lines (cdr lines))
+                (dolist (line lines)
+                  (when line
+                    (push (csv-combine-with-header header line) result))))
+            (setq result (reverse lines))))
+        result))))
+
+(defun csv-parse-lines ()
+  "Parse CSV lines in current buffer, returning a list of parsed lines.
+Each line is represented as a list of field values."
+  (let ((lines nil)
+        (begin-pos (point))
+        (in-quoted nil)
+        (current-line nil)
+        (current-field "")
+        (previous-char nil))
+    (while (not (eobp))
+      (let ((char (char-after)))
+        (cond
+         ;; Handle quoted field
+         ((and (eq char ?\") (not (and in-quoted (eq previous-char ?\"))))
+          (if in-quoted
+              (setq in-quoted nil)
+            (setq in-quoted t)))
+         
+         ;; Handle escaped quote within quoted field
+         ((and (eq char ?\") in-quoted (eq previous-char ?\"))
+          (setq current-field (concat current-field "\""))
+          (setq previous-char nil) ;; Reset to avoid triple quote issue
+          (forward-char)
+          (continue))
+         
+         ;; Handle field separator (comma)
+         ((and (eq char ?,) (not in-quoted))
+          (push current-field current-line)
+          (setq current-field "")
+          (setq begin-pos (1+ (point))))
+         
+         ;; Handle end of line
+         ((and (eq char ?\n) (not in-quoted))
+          (push current-field current-line)
+          (push (reverse current-line) lines)
+          (setq current-field "")
+          (setq current-line nil)
+          (setq begin-pos (1+ (point))))
+         
+         ;; Handle carriage return (part of CRLF)
+         ((and (eq char ?\r) (not in-quoted))
+          ;; Just skip it, we'll handle the newline next
+          nil)
+         
+         ;; Accumulate characters for the current field
+         (t
+          (when (> (point) begin-pos)
+            (setq current-field (concat current-field (buffer-substring-no-properties begin-pos (point)))))
+          (setq current-field (concat current-field (char-to-string char)))
+          (setq begin-pos (1+ (point)))))
+        
+        (setq previous-char char)
+        (forward-char)))
+    
+    ;; Handle any remaining content
+    (when (and (not (string-empty-p current-field)) (not current-line))
+      (push current-field current-line)
+      (when current-line
+        (push (reverse current-line) lines)))
+    
+    (reverse lines)))
+
+(defun csv-combine-with-header (header line)
+  "Combine HEADER and LINE into an alist."
+  (let ((result nil))
+    (dotimes (i (min (length header) (length line)))
+      (push (cons (nth i header) (nth i line)) result))
+    (reverse result)))
+#+end_src
+
 
 ** DONE minibuffer completion
 
@@ -1201,7 +1316,7 @@ Solved with the code below:
   
 collect/export could be solved with a TAB showing completions buffer
 
-** DOING popper
+** DONE popper
 
 Mainly used for popping and popping out shells, testing the following implementation:
 
@@ -1272,7 +1387,7 @@ Mainly used for popping and popping out shells, testing the following implementa
 
 *** TODO push buffer to popup buffer and back                      :issues:
 
-** DOING pandoc md to org conversion
+** DONE pandoc md to org conversion
 
 Replacing the external tool Pandoc for converting Markdown (md) to Org format is especially useful when copying and pasting from AI chats.
 
@@ -1427,7 +1542,7 @@ As another option, how about a simple defun leveraging =completion-in-region= or
 
 More bonus points here for in buffer completion in shells, this includes eshell and shell
 
-*** DOING capf for =eshell=
+*** DONE capf for =eshell=
 
 #+begin_src elisp
 (defun my/eshell-history-capf ()
@@ -1451,7 +1566,7 @@ More bonus points here for in buffer completion in shells, this includes eshell 
 (add-hook 'eshell-mode-hook #'my/setup-eshell-history-completion)
 #+end_src
 
-*** DOING capf for =shell=
+*** DONE capf for =shell=
 
 #+begin_src elisp
 (defun my/shell-history-capf ()
@@ -1483,7 +1598,7 @@ More bonus points here for in buffer completion in shells, this includes eshell 
 
 *** DOING Test completion through programming modes                :issues:
 
-** DOING org-kanban
+** DONE org-kanban
 
 Creating a Kanban board for an org file: technically, I should just be able to define a =defun= that can be embedded within something like:
 
@@ -1865,7 +1980,7 @@ or maybe the more elisp based approach:
 (global-set-key (kbd "C-x p u") 'my/etags-update)
 #+end_src
 
-** DOING open-with
+** DONE open-with
 
 Opening a file, generally from dired, a solution as below:
 
@@ -1915,7 +2030,7 @@ Could I just call out to =async-shell-command=, something like:
     (revert-buffer nil t nil)))
 #+end_src
 
-** DOING capf-autosuggest
+** DONE capf-autosuggest
 
 Some elisp for some simple predictive inline completion, maybe take a look at how capf-autosuggest does it or the new completion preview in Emacs 30.
 
@@ -2022,7 +2137,7 @@ Works with both standard `move-end-of-line` and `org-end-of-line`."
 (global-simple-autosuggest-mode 1)
 #+end_src
 
-** DOING LLMs
+** DONE LLMs
 
 As this configuration is mainly offline then naturally running some AI would take place locally and therefore using something like ollama, so lets replace the likes of gptel, chatgpt-shell and ellama can be replace by a scaled down version of my =ollama-buddy= package:
 
