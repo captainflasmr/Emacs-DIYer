@@ -1,5 +1,29 @@
 ;; -*- lexical-binding: t; -*-
 
+(use-package newsticker
+  :bind
+  (:map newsticker-treeview-mode-map
+        ("n" . newsticker-treeview-next-item)
+        ("p" . newsticker-treeview-prev-item)
+        ("m" . newsticker-treeview-mark-item))
+  :custom
+  (newsticker-retrieval-interval 3600)  ; Update every hour
+  (newsticker-treeview-treeview-face-fn 'ignore)
+  (newsticker-treeview-date-format "%Y-%m-%d %H:%M")
+  (newsticker-url-list
+   '(("Emacs Dyer Dwelling"
+      "https://www.emacs.dyerdwelling.family/index.xml" nil nil nil)))
+  :config
+  (newsticker-start)
+  (defun my-newsticker-treeview-custom-filter ()
+    "Custom filter to show items from the last month."
+    (let ((one-month-ago (time-subtract (current-time) (days-to-time 30))))
+      (lambda (item)
+        (time-less-p one-month-ago (newsticker--age item)))))
+  (setq newsticker-treeview-filter-functions (list #'my-newsticker-treeview-custom-filter)))
+
+(define-key my-jump-keymap (kbd "t") #'newsticker-show-news)
+
 (defun csv-parse-buffer (first-line-contains-keys &optional buffer coding-system)
   "Parse a buffer containing CSV data, return data as a list of alists or lists.
 The first line in the buffer is interpreted as a header line

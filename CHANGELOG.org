@@ -10,6 +10,10 @@ This document contains the release notes for Emacs-enhanced
 
 * Versions
 
+** <2025-04-13>
+
+Added =elfeed= replacement with =newsticker=
+
 ** <2025-04-12>
 
 Added =csv-parse-buffer=/package csv replacement
