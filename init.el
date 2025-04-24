@@ -396,13 +396,24 @@ The function adjusts:
 
 (defun my/grep (search-term &optional directory glob)
   "Run ripgrep (rg) with SEARCH-TERM and optionally DIRECTORY and GLOB.
-  If ripgrep is unavailable, fall back to Emacs's rgrep command. Highlights SEARCH-TERM in results.
-  By default, only the SEARCH-TERM needs to be provided. If called with a
-  universal argument, DIRECTORY and GLOB are prompted for as well."
+If ripgrep is unavailable, fall back to Emacs's rgrep command. Highlights SEARCH-TERM in results.
+By default, only the SEARCH-TERM needs to be provided. If called with a
+universal argument, DIRECTORY and GLOB are prompted for as well."
   (interactive
-   (let ((univ-arg current-prefix-arg))
+   (let* ((univ-arg current-prefix-arg)
+          ;; Prefer region, then symbol-at-point, then word-at-point, then empty string
+          (default-search-term
+           (cond
+            ((use-region-p)
+             (buffer-substring-no-properties (region-beginning) (region-end)))
+            ((thing-at-point 'symbol t))
+            ((thing-at-point 'word t))
+            (t ""))))
      (list
-      (read-string "Search for: ")
+      (read-string (if (string-empty-p default-search-term)
+                       "Search for: "
+                     (format "Search for (default `%s`): " default-search-term))
+                   nil nil default-search-term)
       (when univ-arg (read-directory-name "Directory: "))
       (when univ-arg (read-string "File pattern (glob, default: ): " nil nil "")))))
   (let* ((directory (expand-file-name (or directory default-directory)))
@@ -450,7 +461,8 @@ The function adjusts:
                                                 my/grep-glob)))
             (local-set-key (kbd "S") (lambda () 
                                        (interactive)
-                                       (my/grep (read-string "New search term: ")
+                                       (my/grep (read-string "New search term: "
+                                                            nil nil my/grep-search-term)
                                                 my/grep-directory
                                                 my/grep-glob)))
             (local-set-key (kbd "o") (lambda () 
