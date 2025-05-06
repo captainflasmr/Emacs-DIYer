@@ -10,6 +10,14 @@ This document contains the release notes for Emacs-enhanced
 
 * Versions
 
+** <2025-05-06>
+
+- Added enhancements from Emacs-solo
+  - Incorporated nerdfont and dired icon replacements.
+  - Added Git gutter status overlay.
+  - Added ollama alternative directly from ansi-term
+  - Hide completion buffer when icomplete in buffer
+
 ** <2025-04-13>
 
 Added =elfeed= replacement with =newsticker=

@@ -23,6 +23,14 @@ Used in concert with https://github.com/captainflasmr/Emacs-vanilla
 
 * Whats New
 
+** <2025-05-06>
+
+- Added enhancements from Emacs-solo
+  - Incorporated nerdfont and dired icon replacements.
+  - Added Git gutter status overlay.
+  - Added ollama alternative directly from ansi-term
+  - Hide completion buffer when icomplete in buffer
+
 ** <2025-04-13>
 
 Added =elfeed= replacement with =newsticker=
@@ -228,7 +236,6 @@ Each line is represented as a list of field values."
       (push (cons (nth i header) (nth i line)) result))
     (reverse result)))
 #+end_src
-
 
 ** DONE minibuffer completion
 
@@ -571,6 +578,84 @@ are provided, they are used to separate the branches or tags in the display."
   (define-key vc-dir-mode-map (kbd "B") 'my/vc-dir-show-branches-and-tags)
   (define-key vc-dir-mode-map (kbd "T") 'my/vc-dir-show-all-tags)  ; New key for showing all tags
   (define-key vc-dir-mode-map (kbd "F") 'my/vc-dir-show-tracked-files)) ; Changed from T to F
+#+end_src
+
+For an extra bonus, lets try and put some git gutter status in dired, taken from Emacs-solo, its not really replacing anything from =magit=, but who cares!!
+
+#+begin_src elisp
+(setq emacs-solo-dired-gutter-enabled t)
+
+(defvar emacs-solo/dired-git-status-overlays nil
+  "List of active overlays in Dired for Git status.")
+
+(defun emacs-solo/dired--git-status-face (code)
+  "Return a cons cell (STATUS . FACE) for a given Git porcelain CODE."
+  (let* ((git-status-untracked "??")
+         (git-status-modified " M")
+         (git-status-modified-alt "M ")
+         (git-status-deleted "D ")
+         (git-status-added "A ")
+         (git-status-renamed "R ")
+         (git-status-copied "C ")
+         (git-status-ignored "!!")
+         (status (cond
+                  ((string-match-p "\\?\\?" code) git-status-untracked)
+                  ((string-match-p "^ M" code) git-status-modified)
+                  ((string-match-p "^M " code) git-status-modified-alt)
+                  ((string-match-p "^D" code) git-status-deleted)
+                  ((string-match-p "^A" code) git-status-added)
+                  ((string-match-p "^R" code) git-status-renamed)
+                  ((string-match-p "^C" code) git-status-copied)
+                  ((string-match-p "\\!\\!" code) git-status-ignored)
+                  (t "  ")))
+         (face (cond
+                ((string= status git-status-ignored) 'shadow)
+                ((string= status git-status-untracked) 'warning)
+                ((string= status git-status-modified) 'font-lock-function-name-face)
+                ((string= status git-status-modified-alt) 'font-lock-function-name-face)
+                ((string= status git-status-deleted) 'error)
+                ((string= status git-status-added) 'success)
+                (t 'font-lock-keyword-face))))
+    (cons status face)))
+
+(defun emacs-solo/dired-git-status-overlay ()
+  "Overlay Git status indicators on the first column in Dired."
+  (interactive)
+  (require 'vc-git)
+  (let ((git-root (ignore-errors (vc-git-root default-directory))))
+    (when (and git-root
+               (not (file-remote-p default-directory))
+               emacs-solo-dired-gutter-enabled)
+      (setq git-root (expand-file-name git-root))
+      (let* ((git-status (vc-git--run-command-string nil "status" "--porcelain" "--ignored" "--untracked-files=normal"))
+             (status-map (make-hash-table :test 'equal)))
+        (mapc #'delete-overlay emacs-solo/dired-git-status-overlays)
+        (setq emacs-solo/dired-git-status-overlays nil)
+
+        (dolist (line (split-string git-status "\n" t))
+          (when (string-match "^\\(..\\) \\(.+\\)$" line)
+            (let* ((code (match-string 1 line))
+                   (file (match-string 2 line))
+                   (fullpath (expand-file-name file git-root))
+                   (status-face (emacs-solo/dired--git-status-face code)))
+              (puthash fullpath status-face status-map))))
+
+        (save-excursion
+          (goto-char (point-min))
+          (while (not (eobp))
+            (let* ((file (ignore-errors (expand-file-name (dired-get-filename nil t)))))
+              (when file
+                (setq file (if (file-directory-p file) (concat file "/") file))
+                (let* ((status-face (gethash file status-map (cons "  " 'font-lock-keyword-face)))
+                       (status (car status-face))
+                       (face (cdr status-face))
+                       (status-str (propertize (format " %s " status) 'face face))
+                       (ov (make-overlay (line-beginning-position) (1+ (line-beginning-position)))))
+                  (overlay-put ov 'before-string status-str)
+                  (push ov emacs-solo/dired-git-status-overlays))))
+            (forward-line 1)))))))
+
+(add-hook 'dired-after-readin-hook #'emacs-solo/dired-git-status-overlay)
 #+end_src
 
 ** DONE tempel
@@ -1414,6 +1499,10 @@ Lets give it a go!, here is the general in buffer completion setup:
 (setq icomplete-scroll t)
 (setq icomplete-hide-common-prefix t)
 
+(if icomplete-in-buffer
+    (advice-add 'completion-at-point
+                :after #'minibuffer-hide-completions))
+
 #+end_src
 
 Note that the =completion-styles= variable is globally set to include =flex= because, by default, Icomplete is the completion engine that operates in the buffer. Since Fido mode, which is enabled by default, does not support /flex/ (something I have now grown accustomed to), this adjustment is necessary.
@@ -2049,6 +2138,71 @@ Works with both standard `move-end-of-line` and `org-end-of-line`."
 (global-simple-autosuggest-mode 1)
 #+end_src
 
+** DOING all-the-icons-dired
+
+I never thought about this, but isn't it nice to have =dired= shown in all its glory with a little more bling, well Emacs-solo came up with a nice solution:
+
+#+begin_src elisp
+(defvar emacs-solo/dired-icons-file-icons
+  '(("el" . "📜")      ("rb" . "💎")      ("js" . "⚙️")      ("ts" . "⚙️")
+    ("json" . "🗂️")    ("md" . "📝")      ("txt" . "📝")     ("html" . "🌐")
+    ("css" . "🎨")     ("scss" . "🎨")    ("png" . "🖼️")    ("jpg" . "🖼️")
+    ("jpeg" . "🖼️")   ("gif" . "🖼️")    ("svg" . "🖼️")    ("pdf" . "📄")
+    ("zip" . "📦")     ("tar" . "📦")     ("gz" . "📦")      ("bz2" . "📦")
+    ("7z" . "📦")      ("org" . "📝")    ("sh" . "💻")      ("c" . "🔧")
+    ("h" . "📘")       ("cpp" . "➕")     ("hpp" . "📘")     ("py" . "🐍")
+    ("java" . "☕")    ("go" . "🌍")      ("rs" . "💨")      ("php" . "🐘")
+    ("pl" . "🐍")      ("lua" . "🎮")     ("ps1" . "🔧")     ("exe" . "⚡")
+    ("dll" . "🔌")     ("bat" . "⚡")      ("yaml" . "⚙️")    ("toml" . "⚙️")
+    ("ini" . "⚙️")     ("csv" . "📊")     ("xls" . "📊")     ("xlsx" . "📊")
+    ("sql" . "🗄️")    ("log" . "📝")     ("apk" . "📱")     ("dmg" . "💻")
+    ("iso" . "💿")     ("torrent" . "⏳") ("bak" . "🗃️")    ("tmp" . "⚠️")
+    ("desktop" . "🖥️") ("md5" . "🔐")     ("sha256" . "🔐")  ("pem" . "🔐")
+    ("sqlite" . "🗄️")  ("db" . "🗄️")
+    ("mp3" . "🎶")     ("wav" . "🎶")     ("flac" . "🎶")
+    ("ogg" . "🎶")     ("m4a" . "🎶")     ("mp4" . "🎬")     ("avi" . "🎬")
+    ("mov" . "🎬")     ("mkv" . "🎬")     ("webm" . "🎬")    ("flv" . "🎬")
+    ("ico" . "🖼️")     ("ttf" . "🔠")     ("otf" . "🔠")     ("eot" . "🔠")
+    ("woff" . "🔠")    ("woff2" . "🔠")   ("epub" . "📚")    ("mobi" . "📚")
+    ("azw3" . "📚")    ("fb2" . "📚")     ("chm" . "📚")     ("tex" . "📚")
+    ("bib" . "📚")     ("apk" . "📱")     ("rar" . "📦")     ("xz" . "📦")
+    ("zst" . "📦")     ("tar.xz" . "📦")  ("tar.zst" . "📦") ("tar.gz" . "📦")
+    ("tgz" . "📦")     ("bz2" . "📦")     ("mpg" . "🎬")     ("webp" . "🖼️")
+    ("flv" . "🎬")     ("3gp" . "🎬")     ("ogv" . "🎬")     ("srt" . "🔠")
+    ("vtt" . "🔠")     ("cue" . "📀"))
+  "Icons for specific file extensions in Dired.")
+
+(defun emacs-solo/dired-icons-icon-for-file (file)
+  (if (file-directory-p file)
+      "📁"
+    (let* ((ext (file-name-extension file))
+           (icon (and ext (assoc-default (downcase ext) emacs-solo/dired-icons-file-icons))))
+      (or icon "📄"))))
+
+(defun emacs-solo/dired-icons-icons-regexp ()
+  "Return a regexp that matches any icon we use."
+  (let ((icons (mapcar #'cdr emacs-solo/dired-icons-file-icons)))
+    (concat "^\\(" (regexp-opt (cons "📁" icons)) "\\) ")))
+
+(defun emacs-solo/dired-icons-add-icons ()
+  "Add icons to filenames in Dired buffer."
+  (when (derived-mode-p 'dired-mode)
+    (let ((inhibit-read-only t)
+          (icon-regex (emacs-solo/dired-icons-icons-regexp)))
+      (save-excursion
+        (goto-char (point-min))
+        (while (not (eobp))
+          (condition-case nil
+              (when-let ((file (dired-get-filename nil t)))
+                (dired-move-to-filename)
+                (unless (looking-at-p icon-regex)
+                  (insert (concat (emacs-solo/dired-icons-icon-for-file file) " "))))
+            (error nil))  ;; gracefully skip invalid lines
+          (forward-line 1))))))
+
+(add-hook 'dired-after-readin-hook #'emacs-solo/dired-icons-add-icons)
+#+end_src
+
 ** DONE LLMs
 
 As this configuration is mainly offline then naturally running some AI would take place locally and therefore using something like ollama, so lets replace the likes of gptel, chatgpt-shell and ellama can be replace by a scaled down version of my =ollama-buddy= package:
@@ -2074,6 +2228,7 @@ As this configuration is mainly offline then naturally running some AI would tak
 (defvar ollama-buddy--current-model nil "Timer for checking Ollama connection status.")
 (defvar ollama-buddy--chat-buffer "*Ollama Buddy Chat*" "Chat interaction buffer.")
 (defvar ollama-buddy--active-process nil "Active Ollama process.")
+(defvar ollama-buddy--prompt-history nil "History of prompts used in ollama-buddy.")
 
 (defun ollama-buddy--add-to-history (role content)
   "Add message with ROLE and CONTENT to conversation history."
@@ -2154,8 +2309,8 @@ As this configuration is mainly offline then naturally running some AI would tak
   (with-current-buffer (get-buffer-create ollama-buddy--chat-buffer)
     (when (= (buffer-size) 0)
       (ollama-buddy-mode 1)
-      (insert "Commands:\n\nSend   : C-c C-c\nCancel : C-c k\nModel  : C-c m\n\n")
-      (insert "Models Available:\n\n" (mapconcat 'identity (ollama-buddy--get-models) "\n"))
+      (insert "Send   : C-c C-c\nCancel : C-c C-k\nModel  : C-c m\n\n")
+      (insert (mapconcat 'identity (ollama-buddy--get-models) "\n"))
       (ollama-buddy--show-prompt))
     (ollama-buddy--update-status "Idle"))
   (goto-char (point-max)))
@@ -2163,6 +2318,12 @@ As this configuration is mainly offline then naturally running some AI would tak
 (defun ollama-buddy--show-prompt ()
   "Show the prompt with optionally a MODEL."
   (interactive)
+  (when (not ollama-buddy-default-model)
+    ;; just get the first model
+    (let ((model (car (ollama-buddy--get-models))))
+      (setq ollama-buddy--current-model model)
+      (setq ollama-buddy-default-model model)
+      (insert (format "\n\n* NO DEFAULT MODEL : Using best guess : %s" model))))
   (let* ((model (or ollama-buddy--current-model ollama-buddy-default-model "Default:latest")))
     (insert (format "\n\n%s\n\n%s %s"
                     (propertize "------------------" 'face '(:inherit bold))
@@ -2266,7 +2427,7 @@ As this configuration is mainly offline then naturally running some AI would tak
 (defvar ollama-buddy-mode-map
   (let ((map (make-sparse-keymap)))
     (define-key map (kbd "C-c C-c") #'ollama-buddy--send-prompt)
-    (define-key map (kbd "C-c k") #'ollama-buddy--cancel-request)
+    (define-key map (kbd "C-c C-k") #'ollama-buddy--cancel-request)
     (define-key map (kbd "C-c m") #'ollama-buddy--swap-model)
     map)
   "Keymap for ollama-buddy mode.")
@@ -2278,4 +2439,37 @@ As this configuration is mainly offline then naturally running some AI would tak
 (provide 'ollama-buddy)
 
 ;;; ollama-buddy.el ends here
+#+end_src
+
+And for another bonus, which I have just discovered from Emacs Solo, this:
+
+#+begin_src elisp
+(defun emacs-solo/ollama-run-model ()
+  "Run `ollama list`, let the user choose a model, and open it in `ansi-term`.
+Asks for a prompt when run. If none is passed (RET), starts it interactive.
+If a region is selected, prompt for additional input and pass it as a query."
+  (interactive)
+  (let* ((output (shell-command-to-string "ollama list"))
+         (models (let ((lines (split-string output "\n" t)))
+                   (mapcar (lambda (line) (car (split-string line))) (cdr lines))))
+         (selected (completing-read "Select Ollama model: " models nil t))
+         (region-text (when (use-region-p)
+                        (shell-quote-argument
+                         (replace-regexp-in-string "\n" " "
+                                                   (buffer-substring-no-properties
+                                                    (region-beginning)
+                                                    (region-end))))))
+         (prompt (read-string "Ollama Prompt (leave it blank for interactive): " nil nil nil)))
+    (when (and selected (not (string-empty-p selected)))
+      (ansi-term "/bin/sh")
+      (sit-for 1)
+      (let ((args (list (format "ollama run %s"
+                                selected))))
+        (when (and prompt (not (string-empty-p prompt)))
+          (setq args (append args (list (format "\"%s\"" prompt)))))
+        (when region-text
+          (setq args (append args (list (format "\"%s\"" region-text)))))
+
+        (term-send-raw-string (string-join args " "))
+        (term-send-raw-string "\n")))))
 #+end_src

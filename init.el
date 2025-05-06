@@ -347,6 +347,80 @@ are provided, they are used to separate the branches or tags in the display."
   (define-key vc-dir-mode-map (kbd "T") 'my/vc-dir-show-all-tags)  ; New key for showing all tags
   (define-key vc-dir-mode-map (kbd "F") 'my/vc-dir-show-tracked-files)) ; Changed from T to F
 
+(setq emacs-solo-dired-gutter-enabled t)
+
+(defvar emacs-solo/dired-git-status-overlays nil
+  "List of active overlays in Dired for Git status.")
+
+(defun emacs-solo/dired--git-status-face (code)
+  "Return a cons cell (STATUS . FACE) for a given Git porcelain CODE."
+  (let* ((git-status-untracked "??")
+         (git-status-modified " M")
+         (git-status-modified-alt "M ")
+         (git-status-deleted "D ")
+         (git-status-added "A ")
+         (git-status-renamed "R ")
+         (git-status-copied "C ")
+         (git-status-ignored "!!")
+         (status (cond
+                  ((string-match-p "\\?\\?" code) git-status-untracked)
+                  ((string-match-p "^ M" code) git-status-modified)
+                  ((string-match-p "^M " code) git-status-modified-alt)
+                  ((string-match-p "^D" code) git-status-deleted)
+                  ((string-match-p "^A" code) git-status-added)
+                  ((string-match-p "^R" code) git-status-renamed)
+                  ((string-match-p "^C" code) git-status-copied)
+                  ((string-match-p "\\!\\!" code) git-status-ignored)
+                  (t "  ")))
+         (face (cond
+                ((string= status git-status-ignored) 'shadow)
+                ((string= status git-status-untracked) 'warning)
+                ((string= status git-status-modified) 'font-lock-function-name-face)
+                ((string= status git-status-modified-alt) 'font-lock-function-name-face)
+                ((string= status git-status-deleted) 'error)
+                ((string= status git-status-added) 'success)
+                (t 'font-lock-keyword-face))))
+    (cons status face)))
+
+(defun emacs-solo/dired-git-status-overlay ()
+  "Overlay Git status indicators on the first column in Dired."
+  (interactive)
+  (require 'vc-git)
+  (let ((git-root (ignore-errors (vc-git-root default-directory))))
+    (when (and git-root
+               (not (file-remote-p default-directory))
+               emacs-solo-dired-gutter-enabled)
+      (setq git-root (expand-file-name git-root))
+      (let* ((git-status (vc-git--run-command-string nil "status" "--porcelain" "--ignored" "--untracked-files=normal"))
+             (status-map (make-hash-table :test 'equal)))
+        (mapc #'delete-overlay emacs-solo/dired-git-status-overlays)
+        (setq emacs-solo/dired-git-status-overlays nil)
+
+        (dolist (line (split-string git-status "\n" t))
+          (when (string-match "^\\(..\\) \\(.+\\)$" line)
+            (let* ((code (match-string 1 line))
+                   (file (match-string 2 line))
+                   (fullpath (expand-file-name file git-root))
+                   (status-face (emacs-solo/dired--git-status-face code)))
+              (puthash fullpath status-face status-map))))
+
+        (save-excursion
+          (goto-char (point-min))
+          (while (not (eobp))
+            (let* ((file (ignore-errors (expand-file-name (dired-get-filename nil t)))))
+              (when file
+                (setq file (if (file-directory-p file) (concat file "/") file))
+                (let* ((status-face (gethash file status-map (cons "  " 'font-lock-keyword-face)))
+                       (status (car status-face))
+                       (face (cdr status-face))
+                       (status-str (propertize (format " %s " status) 'face face))
+                       (ov (make-overlay (line-beginning-position) (1+ (line-beginning-position)))))
+                  (overlay-put ov 'before-string status-str)
+                  (push ov emacs-solo/dired-git-status-overlays))))
+            (forward-line 1)))))))
+
+(add-hook 'dired-after-readin-hook #'emacs-solo/dired-git-status-overlay)
+
 (defun my/sync-ui-accent-color (&optional color)
   "Synchronize various Emacs UI elements with a chosen accent color.
 Affects mode-line, cursor, tab-bar, and other UI elements for a coherent theme.
@@ -396,9 +470,9 @@ The function adjusts:
 
 (defun my/grep (search-term &optional directory glob)
   "Run ripgrep (rg) with SEARCH-TERM and optionally DIRECTORY and GLOB.
-If ripgrep is unavailable, fall back to Emacs's rgrep command. Highlights SEARCH-TERM in results.
-By default, only the SEARCH-TERM needs to be provided. If called with a
-universal argument, DIRECTORY and GLOB are prompted for as well."
+  If ripgrep is unavailable, fall back to Emacs's rgrep command. Highlights SEARCH-TERM in results.
+  By default, only the SEARCH-TERM needs to be provided. If called with a
+  universal argument, DIRECTORY and GLOB are prompted for as well."
   (interactive
    (let* ((univ-arg current-prefix-arg)
           ;; Prefer region, then symbol-at-point, then word-at-point, then empty string
@@ -959,6 +1033,10 @@ universal argument, DIRECTORY and GLOB are prompted for as well."
 (setq icomplete-scroll t)
 (setq icomplete-hide-common-prefix t)
 
+(if icomplete-in-buffer
+    (advice-add 'completion-at-point
+                :after #'minibuffer-hide-completions))
+
 (defun my/simple-completion-at-point ()
   "Use completing-read-in-buffer for completion at point."
   (interactive)
@@ -1433,3 +1511,91 @@ Works with both standard `move-end-of-line` and `org-end-of-line`."
       (simple-autosuggest-mode 1))))
 
 (global-simple-autosuggest-mode 1)
+
+(defvar emacs-solo/dired-icons-file-icons
+  '(("el" . "📜")      ("rb" . "💎")      ("js" . "⚙️")      ("ts" . "⚙️")
+    ("json" . "🗂️")    ("md" . "📝")      ("txt" . "📝")     ("html" . "🌐")
+    ("css" . "🎨")     ("scss" . "🎨")    ("png" . "🖼️")    ("jpg" . "🖼️")
+    ("jpeg" . "🖼️")   ("gif" . "🖼️")    ("svg" . "🖼️")    ("pdf" . "📄")
+    ("zip" . "📦")     ("tar" . "📦")     ("gz" . "📦")      ("bz2" . "📦")
+    ("7z" . "📦")      ("org" . "📝")    ("sh" . "💻")      ("c" . "🔧")
+    ("h" . "📘")       ("cpp" . "➕")     ("hpp" . "📘")     ("py" . "🐍")
+    ("java" . "☕")    ("go" . "🌍")      ("rs" . "💨")      ("php" . "🐘")
+    ("pl" . "🐍")      ("lua" . "🎮")     ("ps1" . "🔧")     ("exe" . "⚡")
+    ("dll" . "🔌")     ("bat" . "⚡")      ("yaml" . "⚙️")    ("toml" . "⚙️")
+    ("ini" . "⚙️")     ("csv" . "📊")     ("xls" . "📊")     ("xlsx" . "📊")
+    ("sql" . "🗄️")    ("log" . "📝")     ("apk" . "📱")     ("dmg" . "💻")
+    ("iso" . "💿")     ("torrent" . "⏳") ("bak" . "🗃️")    ("tmp" . "⚠️")
+    ("desktop" . "🖥️") ("md5" . "🔐")     ("sha256" . "🔐")  ("pem" . "🔐")
+    ("sqlite" . "🗄️")  ("db" . "🗄️")
+    ("mp3" . "🎶")     ("wav" . "🎶")     ("flac" . "🎶")
+    ("ogg" . "🎶")     ("m4a" . "🎶")     ("mp4" . "🎬")     ("avi" . "🎬")
+    ("mov" . "🎬")     ("mkv" . "🎬")     ("webm" . "🎬")    ("flv" . "🎬")
+    ("ico" . "🖼️")     ("ttf" . "🔠")     ("otf" . "🔠")     ("eot" . "🔠")
+    ("woff" . "🔠")    ("woff2" . "🔠")   ("epub" . "📚")    ("mobi" . "📚")
+    ("azw3" . "📚")    ("fb2" . "📚")     ("chm" . "📚")     ("tex" . "📚")
+    ("bib" . "📚")     ("apk" . "📱")     ("rar" . "📦")     ("xz" . "📦")
+    ("zst" . "📦")     ("tar.xz" . "📦")  ("tar.zst" . "📦") ("tar.gz" . "📦")
+    ("tgz" . "📦")     ("bz2" . "📦")     ("mpg" . "🎬")     ("webp" . "🖼️")
+    ("flv" . "🎬")     ("3gp" . "🎬")     ("ogv" . "🎬")     ("srt" . "🔠")
+    ("vtt" . "🔠")     ("cue" . "📀"))
+  "Icons for specific file extensions in Dired.")
+
+(defun emacs-solo/dired-icons-icon-for-file (file)
+  (if (file-directory-p file)
+      "📁"
+    (let* ((ext (file-name-extension file))
+           (icon (and ext (assoc-default (downcase ext) emacs-solo/dired-icons-file-icons))))
+      (or icon "📄"))))
+
+(defun emacs-solo/dired-icons-icons-regexp ()
+  "Return a regexp that matches any icon we use."
+  (let ((icons (mapcar #'cdr emacs-solo/dired-icons-file-icons)))
+    (concat "^\\(" (regexp-opt (cons "📁" icons)) "\\) ")))
+
+(defun emacs-solo/dired-icons-add-icons ()
+  "Add icons to filenames in Dired buffer."
+  (when (derived-mode-p 'dired-mode)
+    (let ((inhibit-read-only t)
+          (icon-regex (emacs-solo/dired-icons-icons-regexp)))
+      (save-excursion
+        (goto-char (point-min))
+        (while (not (eobp))
+          (condition-case nil
+              (when-let ((file (dired-get-filename nil t)))
+                (dired-move-to-filename)
+                (unless (looking-at-p icon-regex)
+                  (insert (concat (emacs-solo/dired-icons-icon-for-file file) " "))))
+            (error nil))  ;; gracefully skip invalid lines
+          (forward-line 1))))))
+
+(add-hook 'dired-after-readin-hook #'emacs-solo/dired-icons-add-icons)
+
+(defun emacs-solo/ollama-run-model ()
+  "Run `ollama list`, let the user choose a model, and open it in `ansi-term`.
+Asks for a prompt when run. If none is passed (RET), starts it interactive.
+If a region is selected, prompt for additional input and pass it as a query."
+  (interactive)
+  (let* ((output (shell-command-to-string "ollama list"))
+         (models (let ((lines (split-string output "\n" t)))
+                   (mapcar (lambda (line) (car (split-string line))) (cdr lines))))
+         (selected (completing-read "Select Ollama model: " models nil t))
+         (region-text (when (use-region-p)
+                        (shell-quote-argument
+                         (replace-regexp-in-string "\n" " "
+                                                   (buffer-substring-no-properties
+                                                    (region-beginning)
+                                                    (region-end))))))
+         (prompt (read-string "Ollama Prompt (leave it blank for interactive): " nil nil nil)))
+    (when (and selected (not (string-empty-p selected)))
+      (ansi-term "/bin/sh")
+      (sit-for 1)
+      (let ((args (list (format "ollama run %s"
+                                selected))))
+        (when (and prompt (not (string-empty-p prompt)))
+          (setq args (append args (list (format "\"%s\"" prompt)))))
+        (when region-text
+          (setq args (append args (list (format "\"%s\"" region-text)))))
+
+        (term-send-raw-string (string-join args " "))
+        (term-send-raw-string "\n")))))
