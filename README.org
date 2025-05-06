@@ -62,16 +62,17 @@ Here is a kanban of the features that will be (hopefully) converted to core/enha
 #+RESULTS:
 | DOING                        | DONE                        |
 |------------------------------+-----------------------------|
-| consult                      | csv parsing                 |
-| consult-imenu                | minibuffer completion       |
-| consult-outline              | ace-window                  |
-| consult-history for =eshell= | recentf-open                |
-| consult-history for =shell=  | rainbow-mode                |
-| embark                       | visual-fill-column-mode     |
-| completion - corfu / company | find-name-dired             |
-| ox-hugo                      | magit                       |
-| eglot                        | tempel                      |
-| dired-async-mode             | image-dired                 |
+| consult                      | elfeed                      |
+| consult-imenu                | csv parsing                 |
+| consult-outline              | minibuffer completion       |
+| consult-history for =eshell= | ace-window                  |
+| consult-history for =shell=  | recentf-open                |
+| embark                       | rainbow-mode                |
+| completion - corfu / company | visual-fill-column-mode     |
+| ox-hugo                      | find-name-dired             |
+| eglot                        | magit                       |
+| dired-async-mode             | tempel                      |
+|                              | image-dired                 |
 |                              | selected-window-accent-mode |
 |                              | deadgrep                    |
 |                              | jinx / powerthesaurus       |
@@ -83,6 +84,7 @@ Here is a kanban of the features that will be (hopefully) converted to core/enha
 |                              | org-kanban                  |
 |                              | open-with                   |
 |                              | capf-autosuggest            |
+|                              | all-the-icons-dired         |
 |                              | LLMs                        |
 
 * Issues
@@ -2138,7 +2140,7 @@ Works with both standard `move-end-of-line` and `org-end-of-line`."
 (global-simple-autosuggest-mode 1)
 #+end_src
 
-** DOING all-the-icons-dired
+** DONE all-the-icons-dired
 
 I never thought about this, but isn't it nice to have =dired= shown in all its glory with a little more bling, well Emacs-solo came up with a nice solution:
 
