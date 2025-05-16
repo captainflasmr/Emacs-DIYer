@@ -23,9 +23,13 @@ Used in concert with https://github.com/captainflasmr/Emacs-vanilla
 
 * Whats New
 
+** <2025-05-16>
+
+Added attempt at a native =orderless= implementation in the minibuffer!
+
 ** <2025-05-06>
 
-- Added enhancements from Emacs-solo
+Added enhancements from Emacs-solo
   - Incorporated nerdfont and dired icon replacements.
   - Added Git gutter status overlay.
   - Added ollama alternative directly from ansi-term
@@ -71,8 +75,8 @@ Here is a kanban of the features that will be (hopefully) converted to core/enha
 | completion - corfu / company | visual-fill-column-mode     |
 | ox-hugo                      | find-name-dired             |
 | eglot                        | magit                       |
-| dired-async-mode             | tempel                      |
-|                              | image-dired                 |
+| orderless                    | tempel                      |
+| dired-async-mode             | image-dired                 |
 |                              | selected-window-accent-mode |
 |                              | deadgrep                    |
 |                              | jinx / powerthesaurus       |
@@ -1982,6 +1986,49 @@ or maybe the more elisp based approach:
 (global-set-key (kbd "C-x p l") 'my/etags-load)
 (global-set-key (kbd "C-x p u") 'my/etags-update)
 #+end_src
+
+** DOING orderless
+
+A bit of a bonus this one, I was watching one of System Crafters videos and there was talk around using built-in functionality and how it would be nice if there was an =orderless= implementation to allow minibuffer completion on an any word basis.
+
+Well I thought I would take up the challenge and came up with this:
+
+#+begin_src elisp
+(defun simple-orderless-completion (string table pred point)
+  "Enhanced orderless completion with better partial matching."
+  (let* ((words (split-string string "[-, ]+"))
+         (patterns (mapcar (lambda (word)
+                             (concat "\\b.*" (regexp-quote word) ".*"))
+                           words))
+         (full-regexp (mapconcat 'identity patterns "")))
+    (if (string-empty-p string)
+        (all-completions "" table pred)
+      (cl-remove-if-not
+       (lambda (candidate)
+         (let ((case-fold-search completion-ignore-case))
+           (and (cl-every (lambda (word)
+                            (string-match-p
+                             (concat "\\b.*" (regexp-quote word))
+                             candidate))
+                          words)
+                t)))
+       (all-completions "" table pred)))))
+
+;; Register the completion style
+(add-to-list 'completion-styles-alist
+             '(simple-orderless simple-orderless-completion
+                                simple-orderless-completion))
+
+;; Set different completion styles for minibuffer vs other contexts
+(defun setup-minibuffer-completion-styles ()
+  "Use orderless completion in minibuffer, regular completion elsewhere."
+  ;; For minibuffer: use orderless first, then fallback to flex and basic
+  (setq-local completion-styles '(simple-orderless flex basic substring)))
+
+;; Hook into minibuffer setup
+(add-hook 'minibuffer-setup-hook #'setup-minibuffer-completion-styles)
+#+end_src
+
 
 ** DONE open-with
 

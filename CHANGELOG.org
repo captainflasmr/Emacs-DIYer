@@ -10,6 +10,10 @@ This document contains the release notes for Emacs-enhanced
 
 * Versions
 
+** <2025-05-16>
+
+Added attempt at a native =orderless= implementation in the minibuffer!
+
 ** <2025-05-06>
 
 - Added enhancements from Emacs-solo

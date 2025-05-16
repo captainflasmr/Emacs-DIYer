@@ -470,9 +470,9 @@ The function adjusts:
 
 (defun my/grep (search-term &optional directory glob)
   "Run ripgrep (rg) with SEARCH-TERM and optionally DIRECTORY and GLOB.
-  If ripgrep is unavailable, fall back to Emacs's rgrep command. Highlights SEARCH-TERM in results.
-  By default, only the SEARCH-TERM needs to be provided. If called with a
-  universal argument, DIRECTORY and GLOB are prompted for as well."
+If ripgrep is unavailable, fall back to Emacs's rgrep command. Highlights SEARCH-TERM in results.
+By default, only the SEARCH-TERM needs to be provided. If called with a
+universal argument, DIRECTORY and GLOB are prompted for as well."
   (interactive
    (let* ((univ-arg current-prefix-arg)
           ;; Prefer region, then symbol-at-point, then word-at-point, then empty string
@@ -1390,6 +1390,40 @@ process, FILENAME is the input Org file, and PUB-DIR is the publishing directory
       (shell-command (format "etags --append \%s -o %s" file tags-file-path)))))
 (global-set-key (kbd "C-x p l") 'my/etags-load)
 (global-set-key (kbd "C-x p u") 'my/etags-update)
+
+(defun simple-orderless-completion (string table pred point)
+  "Enhanced orderless completion with better partial matching."
+  (let* ((words (split-string string "[-, ]+"))
+         (patterns (mapcar (lambda (word)
+                             (concat "\\b.*" (regexp-quote word) ".*"))
+                           words))
+         (full-regexp (mapconcat 'identity patterns "")))
+    (if (string-empty-p string)
+        (all-completions "" table pred)
+      (cl-remove-if-not
+       (lambda (candidate)
+         (let ((case-fold-search completion-ignore-case))
+           (and (cl-every (lambda (word)
+                            (string-match-p
+                             (concat "\\b.*" (regexp-quote word))
+                             candidate))
+                          words)
+                t)))
+       (all-completions "" table pred)))))
+
+;; Register the completion style
+(add-to-list 'completion-styles-alist
+             '(simple-orderless simple-orderless-completion
+                                simple-orderless-completion))
+
+;; Set different completion styles for minibuffer vs other contexts
+(defun setup-minibuffer-completion-styles ()
+  "Use orderless completion in minibuffer, regular completion elsewhere."
+  ;; For minibuffer: use orderless first, then fallback to flex and basic
+  (setq-local completion-styles '(simple-orderless flex basic substring)))
+
+;; Hook into minibuffer setup
+(add-hook 'minibuffer-setup-hook #'setup-minibuffer-completion-styles)
 
 (with-eval-after-load 'dired
   (define-key dired-mode-map (kbd "W") 'dired-do-async-shell-command)
