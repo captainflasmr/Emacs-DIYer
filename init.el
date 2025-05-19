@@ -395,15 +395,15 @@ are provided, they are used to separate the branches or tags in the display."
              (status-map (make-hash-table :test 'equal)))
         (mapc #'delete-overlay emacs-solo/dired-git-status-overlays)
         (setq emacs-solo/dired-git-status-overlays nil)
-
-        (dolist (line (split-string git-status "\n" t))
-          (when (string-match "^\\(..\\) \\(.+\\)$" line)
-            (let* ((code (match-string 1 line))
-                   (file (match-string 2 line))
-                   (fullpath (expand-file-name file git-root))
-                   (status-face (emacs-solo/dired--git-status-face code)))
-              (puthash fullpath status-face status-map))))
-
+        ;; Add this check to prevent the error
+        (when git-status  ; Only process if git-status is not nil
+          (dolist (line (split-string git-status "\n" t))
+            (when (string-match "^\\(..\\) \\(.+\\)$" line)
+              (let* ((code (match-string 1 line))
+                     (file (match-string 2 line))
+                     (fullpath (expand-file-name file git-root))
+                     (status-face (emacs-solo/dired--git-status-face code)))
+                (puthash fullpath status-face status-map)))))
         (save-excursion
           (goto-char (point-min))
           (while (not (eobp))
@@ -536,7 +536,7 @@ universal argument, DIRECTORY and GLOB are prompted for as well."
             (local-set-key (kbd "S") (lambda () 
                                        (interactive)
                                        (my/grep (read-string "New search term: "
-                                                            nil nil my/grep-search-term)
+                                                             nil nil my/grep-search-term)
                                                 my/grep-directory
                                                 my/grep-glob)))
             (local-set-key (kbd "o") (lambda () 
