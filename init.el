@@ -218,12 +218,12 @@ Enable `recentf-mode' if it isn't already."
   "Find file from current directory in many different ways."
   (interactive)
   (let* ((find-options (delq nil
-                             (list (when (executable-find "find")
+                             (list (when (executable-find "rg")
+                                     '("rg --follow --files --null" . :string))
+                                   (when (executable-find "find")
                                      '("find -type f -printf \"$PWD/%p\\0\"" . :string))
                                    (when (executable-find "fd")
                                      '("fd --absolute-path --type f -0" . :string))
-                                   (when (executable-find "rg")
-                                     '("rg --follow --files --null" . :string))
                                    (when (fboundp 'find-name-dired)
                                      '("find-name-dired" . :command)))))
          (selection (completing-read "Select: " find-options))
