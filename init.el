@@ -1029,7 +1029,7 @@ universal argument, DIRECTORY and GLOB are prompted for as well."
                 (minibuffer-complete))))
 (setq completion-show-help nil)
 (setq icomplete-with-completion-tables t)
-(setq icomplete-prospects-height 3)
+(setq icomplete-prospects-height 1)
 (setq icomplete-scroll t)
 (setq icomplete-hide-common-prefix t)
 
@@ -1420,7 +1420,7 @@ process, FILENAME is the input Org file, and PUB-DIR is the publishing directory
 (defun setup-minibuffer-completion-styles ()
   "Use orderless completion in minibuffer, regular completion elsewhere."
   ;; For minibuffer: use orderless first, then fallback to flex and basic
-  (setq-local completion-styles '(simple-orderless flex basic substring)))
+  (setq-local completion-styles '(basic simple-orderless flex substring)))
 
 ;; Hook into minibuffer setup
 (add-hook 'minibuffer-setup-hook #'setup-minibuffer-completion-styles)
