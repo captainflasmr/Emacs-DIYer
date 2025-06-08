@@ -1029,7 +1029,7 @@ universal argument, DIRECTORY and GLOB are prompted for as well."
                 (minibuffer-complete))))
 (setq completion-show-help nil)
 (setq icomplete-with-completion-tables t)
-(setq icomplete-prospects-height 1)
+(setq icomplete-prospects-height 2)
 (setq icomplete-scroll t)
 (setq icomplete-hide-common-prefix t)
 
