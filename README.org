@@ -2110,7 +2110,7 @@ Oh, it's also like the completion-preview coming to Emacs 30 but the in buffer i
          (input (or input (and bounds (buffer-substring-no-properties (car bounds) (cdr bounds)))))
          (min-length (cond ((derived-mode-p 'comint-mode) 0)
                            ((derived-mode-p 'eshell-mode) 0)
-                           (t 3)))
+                           (t 2)))
          (suggestion (and input (>= (length input) min-length)
                           (memq last-command '(org-self-insert-command self-insert-command yank))
                           (cond ((derived-mode-p 'comint-mode)

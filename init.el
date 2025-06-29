@@ -1470,7 +1470,7 @@ process, FILENAME is the input Org file, and PUB-DIR is the publishing directory
          (input (or input (and bounds (buffer-substring-no-properties (car bounds) (cdr bounds)))))
          (min-length (cond ((derived-mode-p 'comint-mode) 0)
                            ((derived-mode-p 'eshell-mode) 0)
-                           (t 3)))
+                           (t 2)))
          (suggestion (and input (>= (length input) min-length)
                           (memq last-command '(org-self-insert-command self-insert-command yank))
                           (cond ((derived-mode-p 'comint-mode)
