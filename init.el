@@ -1605,3 +1605,12 @@ If a region is selected, prompt for additional input and pass it as a query."
 
         (term-send-raw-string (string-join args " "))
         (term-send-raw-string "\n")))))
+
+(defun tiny-diminish (mode &optional replacement)
+  "Hide or replace modeline display of minor MODE with REPLACEMENT."
+  (when-let ((entry (assq mode minor-mode-alist)))
+    (setcdr entry (list (or replacement "")))))
+
+(tiny-diminish 'abbrev-mode)
+(tiny-diminish 'visual-line-mode)
+(tiny-diminish 'org-indent-mode)

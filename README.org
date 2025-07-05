@@ -23,6 +23,10 @@ Used in concert with https://github.com/captainflasmr/Emacs-vanilla
 
 * Whats New
 
+** <2025-07-05>
+
+Added diminish replacement
+
 ** <2025-05-16>
 
 Added attempt at a native =orderless= implementation in the minibuffer!
@@ -2494,3 +2498,20 @@ If a region is selected, prompt for additional input and pass it as a query."
         (term-send-raw-string (string-join args " "))
         (term-send-raw-string "\n")))))
 #+end_src
+
+** DONE diminish
+
+Just poodling around with some extreme yak shaving and I thought, why not shave down the mode-line, I now sometimes have many modes displayed for a file so lets cut back on them, turns out this is a very small defun replacement!
+
+#+begin_src elisp
+(defun tiny-diminish (mode &optional replacement)
+  "Hide or replace modeline display of minor MODE with REPLACEMENT."
+  (when-let ((entry (assq mode minor-mode-alist)))
+    (setcdr entry (list (or replacement "")))))
+
+(tiny-diminish 'abbrev-mode)
+(tiny-diminish 'visual-line-mode)
+(tiny-diminish 'org-indent-mode)
+
+#+end_src
+
