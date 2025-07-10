@@ -1388,6 +1388,7 @@ Mainly used for popping in popping out shells, testing the following implementat
 ;; Toggle the currently selected popup.
 (global-set-key (kbd "M-J") #'my/popper-toggle-current)
 (global-set-key (kbd "C-`") #'my/popper-toggle-current)
+(global-set-key (kbd "C-x j") #'my/popper-toggle-current)
 
 ;; Cycle through popups or show the next popup.
 (global-set-key (kbd "M-L") #'my/popper-cycle-popup)
