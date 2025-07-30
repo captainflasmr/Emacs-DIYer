@@ -465,8 +465,8 @@ The function adjusts:
      `(fringe ((t (:foreground ,bg-color :background ,bg-color))))
      `(tab-bar ((t (:inherit default :background ,bg-color :foreground ,fg-color))))
      `(tab-bar-tab ((t (:inherit 'highlight :background ,accent-color :foreground "#000000"))))
-     `(tab-bar-tab-inactive ((t (:inherit default :background ,bg-color :foreground ,inactive-fg-color
-                                          :box (:line-width 2 :color ,bg-color :style pressed-button))))))))
+     `(tab-bar-tab-inactive ((t (:inherit default :background ,bg-color :foreground ,fg-color
+                                          :box (:line-width 1 :color ,bg-color :style flat-button))))))))
 
 (defun my/grep (search-term &optional directory glob)
   "Run ripgrep (rg) with SEARCH-TERM and optionally DIRECTORY and GLOB.
