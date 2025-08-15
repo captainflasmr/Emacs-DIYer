@@ -23,6 +23,10 @@ Used in concert with https://github.com/captainflasmr/Emacs-vanilla
 
 * Whats New
 
+** <2025-08-15>
+
+Added evil-mode replacement with some tweaks to the built-in view-mode
+
 ** <2025-07-24>
 
 Added Emacs Everywhere replacement, although this will be for Wayland
@@ -2583,3 +2587,55 @@ Taken directly from [[https://thanosapollo.org/posts/use-emacs-everywhere/][Emac
 (server-start)
 #+end_src
 
+** DONE evil-mode
+
+I've recently explored [[https://www.gnu.org/software/emacs/manual/html_node/emacs/View-Mode.html][Emacs view-mode]] and found that, with a little customization, it serves as an excellent lightweight modal editing solution, potentially replacing Evil mode for many users.
+
+*Highlights:*
+- Single-key navigation (Vim or Emacs style, no modifiers)
+- Easily toggled on/off (=C-<escape>=, =C-<tab>=)
+- Cursor style changes for clear state indication
+- Optional: enable read-only by default for “baby-proofing”
+- Vanilla, extensible, and package-free
+
+#+begin_src elisp :tangle no
+(add-hook 'find-file-hook 
+          (lambda ()
+            (view-mode 1)))
+
+(setq view-read-only t)
+(with-eval-after-load 'view
+  (define-key view-mode-map (kbd "j") 'next-line)
+  (define-key view-mode-map (kbd "k") 'previous-line)
+  (define-key view-mode-map (kbd "h") 'backward-char)
+  (define-key view-mode-map (kbd "l") 'forward-char)
+  (define-key view-mode-map (kbd "i") 'View-exit)
+
+  ;; Beginning/end of line (Vim style)
+  (define-key view-mode-map (kbd "0") 'beginning-of-line)
+  (define-key view-mode-map (kbd "$") 'end-of-line)
+
+  ;; Beginning/end of buffers
+  (define-key view-mode-map (kbd "g") 'beginning-of-buffer)
+  (define-key view-mode-map (kbd "G") 'end-of-buffer)
+
+  ;; Page movement
+  (define-key view-mode-map (kbd "u") '(lambda()
+                                         (interactive)
+                                         (View-scroll-page-backward 3)))
+  (define-key view-mode-map (kbd "d") '(lambda()
+                                         (interactive)
+                                         (View-scroll-page-forward 3))))
+
+;; Optional: return to view-mode after saving
+(add-hook 'after-save-hook 
+          (lambda ()
+            (when (and buffer-file-name (not view-mode))
+              (view-mode 1))))
+
+(add-hook 'view-mode-hook
+          (defun view-mode-hookee+ ()
+            (setq cursor-type (if view-mode 'box 'bar))))
+
+(global-set-key (kbd "C-<escape>") 'view-mode)
+#+end_src
