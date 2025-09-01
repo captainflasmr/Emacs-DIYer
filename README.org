@@ -676,6 +676,21 @@ For an extra bonus, lets try and put some git gutter status in dired, taken from
             (forward-line 1)))))))
 
 (add-hook 'dired-after-readin-hook #'emacs-solo/dired-git-status-overlay)
+
+(defun my-git-diff-stash (stash-ref)
+  "Diff working directory against specified stash"
+  (interactive "sStash reference: ")
+  (let ((buffer (get-buffer-create "*git-stash-diff*")))
+    (with-current-buffer buffer
+      (erase-buffer)
+      (call-process "git" nil buffer t "diff" (format "stash@{%s}" stash-ref))
+      (diff-mode)
+      (goto-char (point-min)))
+    (switch-to-buffer buffer)))
+
+;; Bind to C-x v S (capital S for stash diff)
+(define-key vc-prefix-map (kbd "S") 'my-git-diff-stash)
+
 #+end_src
 
 ** DONE tempel
@@ -1503,7 +1518,7 @@ Can these in buffer completion systems be replaced by a simple in-built =icomple
 
 Lets give it a go!, here is the general in buffer completion setup:
 
-#+begin_src elisp
+#+begin_src elisp :tangle no
 (define-key icomplete-minibuffer-map (kbd "C-n") #'icomplete-forward-completions)
 (define-key icomplete-minibuffer-map (kbd "C-p") #'icomplete-backward-completions)
 (define-key icomplete-minibuffer-map (kbd "RET") #'icomplete-force-complete-and-exit)
