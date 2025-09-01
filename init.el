@@ -421,6 +421,20 @@ are provided, they are used to separate the branches or tags in the display."
 
 (add-hook 'dired-after-readin-hook #'emacs-solo/dired-git-status-overlay)
 
+(defun my-git-diff-stash (stash-ref)
+  "Diff working directory against specified stash"
+  (interactive "sStash reference: ")
+  (let ((buffer (get-buffer-create "*git-stash-diff*")))
+    (with-current-buffer buffer
+      (erase-buffer)
+      (call-process "git" nil buffer t "diff" (format "stash@{%s}" stash-ref))
+      (diff-mode)
+      (goto-char (point-min)))
+    (switch-to-buffer buffer)))
+
+;; Bind to C-x v S (capital S for stash diff)
+(define-key vc-prefix-map (kbd "S") 'my-git-diff-stash)
+
 (defun my/sync-ui-accent-color (&optional color)
   "Synchronize various Emacs UI elements with a chosen accent color.
 Affects mode-line, cursor, tab-bar, and other UI elements for a coherent theme.
@@ -1019,38 +1033,6 @@ universal argument, DIRECTORY and GLOB are prompted for as well."
   (org-map-entries
    (lambda () 
      (dotimes (_ arg) (org-promote)))))
-
-(define-key icomplete-minibuffer-map (kbd "C-n") #'icomplete-forward-completions)
-(define-key icomplete-minibuffer-map (kbd "C-p") #'icomplete-backward-completions)
-(define-key icomplete-minibuffer-map (kbd "RET") #'icomplete-force-complete-and-exit)
-(add-hook 'after-init-hook (lambda () (fido-mode 1)))
-(setq completion-styles '(flex basic substring))
-(setq tab-always-indent 'complete)
-(setq icomplete-delay-completions-threshold 0)
-(setq icomplete-max-delay-chars 0)
-(setq icomplete-compute-delay 0)
-(setq icomplete-show-matches-on-no-input t)
-(setq icomplete-separator " | ")
-(add-hook 'buffer-list-update-hook
-          (lambda ()
-            (unless (minibufferp)
-              (setq-local icomplete-separator "\n"))))
-(setq icomplete-in-buffer t)
-(setq completion-auto-help t)
-(define-key minibuffer-local-completion-map (kbd "TAB")
-            (lambda ()
-              (interactive)
-              (let ((completion-auto-help t))
-                (minibuffer-complete))))
-(setq completion-show-help nil)
-(setq icomplete-with-completion-tables t)
-(setq icomplete-prospects-height 2)
-(setq icomplete-scroll t)
-(setq icomplete-hide-common-prefix t)
-
-(if icomplete-in-buffer
-    (advice-add 'completion-at-point
-                :after #'minibuffer-hide-completions))
 
 (defun my/simple-completion-at-point ()
   "Use completing-read-in-buffer for completion at point."
