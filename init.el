@@ -457,16 +457,29 @@ The function adjusts:
                         :background adjusted-bg-color 
                         :foreground "#aaaaaa")
     ;; Other UI elements configuration
-    (custom-set-faces
-     `(cursor ((t (:background ,accent-color))))
-     `(hl-line ((t (:background ,adjusted-bg-color))))
-     `(vertical-border ((t (:foreground ,(adjust-color fg-color -60)))))
-     `(window-divider ((t (:foreground ,(adjust-color fg-color -60)))))
-     `(fringe ((t (:foreground ,bg-color :background ,bg-color))))
-     `(tab-bar ((t (:inherit default :background ,bg-color :foreground ,fg-color))))
-     `(tab-bar-tab ((t (:inherit 'highlight :background ,accent-color :foreground "#000000"))))
-     `(tab-bar-tab-inactive ((t (:inherit default :background ,bg-color :foreground ,fg-color
-                                          :box (:line-width 1 :color ,bg-color :style flat-button))))))))
+    (if is-dark-theme
+        (custom-set-faces
+         `(cursor ((t (:background ,accent-color))))
+         `(hl-line ((t (:background ,adjusted-bg-color))))
+         `(vertical-border ((t (:foreground ,(adjust-color fg-color -60)))))
+         `(window-divider ((t (:foreground ,(adjust-color fg-color -60)))))
+         `(fringe ((t (:foreground ,bg-color :background ,bg-color))))
+         `(tab-bar ((t (:inherit default :background ,bg-color :foreground ,fg-color))))
+         `(tab-bar-tab ((t (:inherit 'highlight :background ,accent-color :foreground "#000000"))))
+         `(tab-bar-tab-inactive ((t (:inherit default :background ,bg-color :foreground ,fg-color
+                                              :box (:line-width 1 :color ,bg-color :style flat-button))))))
+      (custom-set-faces
+       `(cursor ((t (:background ,accent-color))))
+       `(hl-line ((t (:background ,adjusted-bg-color))))
+       `(vertical-border ((t (:foreground ,(adjust-color fg-color -60)))))
+       `(window-divider ((t (:foreground ,(adjust-color fg-color -60)))))
+       `(fringe ((t (:foreground ,bg-color :background ,bg-color))))
+       `(tab-bar ((t (:inherit default :background "#000000" :foreground ,bg-color))))
+       ;; `(tab-bar-tab ((t (:inherit 'highlight :box (:line-width 6 :color ,accent-color :style flat-button)))))
+       `(tab-bar-tab ((t (:inherit 'highlight :background ,accent-color))))
+       `(tab-bar-tab-inactive ((t (:inherit default :background ,bg-color :foreground ,fg-color
+                                            :box (:line-width 1 :color ,bg-color :style flat-button)))))))
+    ))
 
 (defun my/grep (search-term &optional directory glob)
   "Run ripgrep (rg) with SEARCH-TERM and optionally DIRECTORY and GLOB.
