@@ -173,16 +173,6 @@ Side windows are ignored."
           (when-let ((selected-window (cdr (assoc (char-to-string key) window-map))))
             (select-window selected-window))))))))
 
-(defun my/recentf-open (file)
-  "Prompt for FILE in `recentf-list' and visit it.
-Enable `recentf-mode' if it isn't already."
-  (interactive
-   (list
-    (progn (unless recentf-mode (recentf-mode 1))
-           (completing-read "Open recent file: " recentf-list nil t))))
-  (when file
-    (funcall recentf-menu-action file)))
-
 (defun my/rainbow-mode ()
   "Overlay colors represented as hex values in the current buffer."
   (interactive)
@@ -956,8 +946,6 @@ universal argument, DIRECTORY and GLOB are prompted for as well."
         (message "No pop-up buffers to display!")))))
 
 ;; Toggle the currently selected popup.
-(global-set-key (kbd "M-J") #'my/popper-toggle-current)
-(global-set-key (kbd "C-`") #'my/popper-toggle-current)
 (global-set-key (kbd "C-x j") #'my/popper-toggle-current)
 
 ;; Cycle through popups or show the next popup.
@@ -1101,51 +1089,6 @@ universal argument, DIRECTORY and GLOB are prompted for as well."
 (with-eval-after-load 'shell
   (add-to-list 'completion-category-overrides
                '(shell-history (styles basic substring initials))))
-
-(defun my/kanban-to-table (&optional match exclude-tag)
-  "Format Org headings into a Kanban-style Org table, filtering by MATCH and excluding EXCLUDE-TAG."
-  (interactive)
-  (let ((todo-states org-todo-keywords-1)
-        (kanban-table (list))
-        (column-data (make-hash-table :test 'equal)))
-    (dolist (state todo-states)
-      (puthash state '() column-data))
-    (save-excursion
-      (goto-char (point-min))
-      (org-map-entries
-       (lambda ()
-         (let* ((todo (org-get-todo-state))
-                (heading (org-get-heading t t t t))
-                (tags (org-get-tags))) ;; Get tags for current heading.
-           (when (and todo (not (string-empty-p todo))
-                      (not (member exclude-tag tags))) ;; Exclude headings with the `exclude-tag`.
-             (puthash todo
-                      (append (gethash todo column-data) (list heading))
-                      column-data))))
-       match 'file))
-    ;; Filter out empty columns
-    (setq todo-states (seq-filter (lambda (state)
-                                    (not (null (gethash state column-data))))
-                                  todo-states))
-    ;; Build the rows for the Kanban Org table.
-    (let ((max-rows 0))
-      (dolist (state todo-states)
-        (let ((headings (gethash state column-data)))
-          (setq max-rows (max max-rows (length headings)))
-          (push (list state headings) kanban-table)))
-      ;; Construct the table rows.
-      (let ((rows '()))
-        ;; Fill rows by extracting each heading under TODO states.
-        (dotimes (i max-rows)
-          (let ((row '()))
-            (dolist (state todo-states)
-              (let ((headings (gethash state column-data)))
-                (push (or (nth i headings) "") row))) ;; Add the heading or an empty string.
-            (push (reverse row) rows)))
-        (setq rows (nreverse rows))
-        (push 'hline rows)
-        ;; Insert TODO column headers at the top.
-        (push todo-states rows)))))
 
 (require 'ox-publish)
 
@@ -1428,7 +1371,7 @@ process, FILENAME is the input Org file, and PUB-DIR is the publishing directory
         '(("\\.\\(jpg\\|jpeg\\|png\\|gif\\|bmp\\)$" "gthumb")
           ("\\.\\(mp4\\|mkv\\|avi\\|mov\\|wmv\\|flv\\|mpg\\)$" "mpv")
           ("\\.\\(mp3\\|wav\\|ogg\\|\\)$" "mpv")
-          ("\\.\\(kra\\)$" "org.kde.krita")
+          ("\\.\\(kra\\)$" "krita")
           ("\\.\\(xcf\\)$" "gimp")
           ("\\.\\(odt\\|ods\\|doc\\|docx\\)$" "libreoffice")
           ("\\.\\(html\\|htm\\)$" "firefox")

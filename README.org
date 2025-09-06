@@ -332,25 +332,6 @@ Side windows are ignored."
             (select-window selected-window))))))))
 #+end_src
 
-** DONE recentf-open
-CLOSED: [2024-12-09 Mon 09:22]
-
-Given recentf-open was introduced in 29.1, just copied what has been put into recentf.el for that version!
-
-Solved with the code below:
-
-#+begin_src elisp
-(defun my/recentf-open (file)
-  "Prompt for FILE in `recentf-list' and visit it.
-Enable `recentf-mode' if it isn't already."
-  (interactive
-   (list
-    (progn (unless recentf-mode (recentf-mode 1))
-           (completing-read "Open recent file: " recentf-list nil t))))
-  (when file
-    (funcall recentf-menu-action file)))
-#+end_src
-
 ** DONE rainbow-mode
 CLOSED: [2024-12-09 Mon 10:50]
 
@@ -1422,8 +1403,6 @@ Mainly used for popping in popping out shells, testing the following implementat
         (message "No pop-up buffers to display!")))))
 
 ;; Toggle the currently selected popup.
-(global-set-key (kbd "M-J") #'my/popper-toggle-current)
-(global-set-key (kbd "C-`") #'my/popper-toggle-current)
 (global-set-key (kbd "C-x j") #'my/popper-toggle-current)
 
 ;; Cycle through popups or show the next popup.
@@ -1646,63 +1625,6 @@ More bonus points here for in buffer completion in shells, this includes eshell 
 #+end_src
 
 *** DOING Test completion through programming modes                :issues:
-
-** DONE org-kanban
-
-Creating a Kanban board for an org file: technically, I should just be able to define a =defun= that can be embedded within something like:
-
-#+begin_src emacs-lisp :results table :exports results :tangle no
-(my/kanban-to-table "roadmap")
-#+end_src
-
-Here is the current code, undergoing testing:
-
-#+begin_src elisp
-(defun my/kanban-to-table (&optional match exclude-tag)
-  "Format Org headings into a Kanban-style Org table, filtering by MATCH and excluding EXCLUDE-TAG."
-  (interactive)
-  (let ((todo-states org-todo-keywords-1)
-        (kanban-table (list))
-        (column-data (make-hash-table :test 'equal)))
-    (dolist (state todo-states)
-      (puthash state '() column-data))
-    (save-excursion
-      (goto-char (point-min))
-      (org-map-entries
-       (lambda ()
-         (let* ((todo (org-get-todo-state))
-                (heading (org-get-heading t t t t))
-                (tags (org-get-tags))) ;; Get tags for current heading.
-           (when (and todo (not (string-empty-p todo))
-                      (not (member exclude-tag tags))) ;; Exclude headings with the `exclude-tag`.
-             (puthash todo
-                      (append (gethash todo column-data) (list heading))
-                      column-data))))
-       match 'file))
-    ;; Filter out empty columns
-    (setq todo-states (seq-filter (lambda (state)
-                                    (not (null (gethash state column-data))))
-                                  todo-states))
-    ;; Build the rows for the Kanban Org table.
-    (let ((max-rows 0))
-      (dolist (state todo-states)
-        (let ((headings (gethash state column-data)))
-          (setq max-rows (max max-rows (length headings)))
-          (push (list state headings) kanban-table)))
-      ;; Construct the table rows.
-      (let ((rows '()))
-        ;; Fill rows by extracting each heading under TODO states.
-        (dotimes (i max-rows)
-          (let ((row '()))
-            (dolist (state todo-states)
-              (let ((headings (gethash state column-data)))
-                (push (or (nth i headings) "") row))) ;; Add the heading or an empty string.
-            (push (reverse row) rows)))
-        (setq rows (nreverse rows))
-        (push 'hline rows)
-        ;; Insert TODO column headers at the top.
-        (push todo-states rows)))))
-#+end_src
 
 ** DOING ox-hugo
 
@@ -2071,7 +1993,6 @@ Well I thought I would take up the challenge and came up with this:
 (add-hook 'minibuffer-setup-hook #'setup-minibuffer-completion-styles)
 #+end_src
 
-
 ** DONE open-with
 
 Opening a file, generally from dired, a solution as below:
@@ -2083,7 +2004,7 @@ Opening a file, generally from dired, a solution as below:
         '(("\\.\\(jpg\\|jpeg\\|png\\|gif\\|bmp\\)$" "gthumb")
           ("\\.\\(mp4\\|mkv\\|avi\\|mov\\|wmv\\|flv\\|mpg\\)$" "mpv")
           ("\\.\\(mp3\\|wav\\|ogg\\|\\)$" "mpv")
-          ("\\.\\(kra\\)$" "org.kde.krita")
+          ("\\.\\(kra\\)$" "krita")
           ("\\.\\(xcf\\)$" "gimp")
           ("\\.\\(odt\\|ods\\|doc\\|docx\\)$" "libreoffice")
           ("\\.\\(html\\|htm\\)$" "firefox")
