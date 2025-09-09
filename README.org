@@ -128,20 +128,22 @@ Here are the features that will be (hopefully) converted to core.
 Well this is a bit of a turn up!, wandering around the general Emacs feeds and someone mentions newsticker as an =elfeed= replacement, and guess what!, it is built-in.  Well lets see how this goes, as it turns out the syntax is pretty similar:
 
 #+begin_src elisp
-(use-package newsticker
-  :bind
-  (:map newsticker-treeview-mode-map
-        ("n" . newsticker-treeview-next-item)
-        ("p" . newsticker-treeview-prev-item)
-        ("m" . newsticker-treeview-mark-item))
-  :custom
-  (newsticker-retrieval-interval 3600)  ; Update every hour
-  (newsticker-treeview-treeview-face-fn 'ignore)
-  (newsticker-treeview-date-format "%Y-%m-%d %H:%M")
-  (newsticker-url-list
-   '(("Emacs Dyer Dwelling"
-      "https://www.emacs.dyerdwelling.family/index.xml" nil nil nil)))
-  :config
+;; Set custom variables
+(setq newsticker-retrieval-interval 3600)  ; Update every hour
+(setq newsticker-treeview-treeview-face-fn 'ignore)
+(setq newsticker-treeview-date-format "%Y-%m-%d %H:%M")
+(setq newsticker-url-list
+      '(("Emacs Dyer Dwelling"
+         "https://www.emacs.dyerdwelling.family/index.xml" nil nil nil)))
+
+;; Key bindings
+(with-eval-after-load 'newsticker
+  (define-key newsticker-treeview-mode-map (kbd "n") 'newsticker-treeview-next-item)
+  (define-key newsticker-treeview-mode-map (kbd "p") 'newsticker-treeview-prev-item)
+  (define-key newsticker-treeview-mode-map (kbd "m") 'newsticker-treeview-mark-item))
+
+;; Configuration that runs after newsticker is loaded
+(with-eval-after-load 'newsticker
   (newsticker-start)
   (defun my-newsticker-treeview-custom-filter ()
     "Custom filter to show items from the last month."
