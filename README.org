@@ -1999,7 +1999,7 @@ Opening a file, generally from dired, a solution as below:
 Does dired actions asynchronously, originally I thought this was built-in but I think you require the following for activation:
 
 #+begin_src elisp :tangle no
-(use-package async)
+(require async)
 (require 'dired-async)
 (dired-async-mode 1)
 #+end_src
