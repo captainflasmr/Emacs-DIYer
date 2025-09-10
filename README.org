@@ -259,25 +259,6 @@ Each line is represented as a list of field values."
     (reverse result)))
 #+end_src
 
-** DONE minibuffer completion
-
-fido-mode enabled replacing:
-
-- vertico
-- marginalia
-- orderless
-
-but also require the following for exiting a forced completion:
-
-#+begin_src elisp
-(defun my-icomplete-exit-minibuffer-with-input ()
-  "Exit the minibuffer with the current input, without forcing completion."
-  (interactive)
-  (exit-minibuffer))
-#+end_src
-
-Note that orderless isn't really replaced, I can enable flex but I don't feel I really need the orderless functionality anyway.
-
 ** DONE ace-window
 CLOSED: [2024-12-08 Sun 13:53]
 
