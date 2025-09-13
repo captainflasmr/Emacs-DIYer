@@ -257,6 +257,14 @@ Each line is represented as a list of field values."
     (dotimes (i (min (length header) (length line)))
       (push (cons (nth i header) (nth i line)) result))
     (reverse result)))
+
+(defun my-icomplete-exit-minibuffer-with-input ()
+  "Exit the minibuffer with the current input, without forcing completion."
+  (interactive)
+  (exit-minibuffer))
+
+(define-key icomplete-minibuffer-map (kbd "M-RET") 'my-icomplete-exit-minibuffer-with-input)
+
 #+end_src
 
 ** DONE ace-window

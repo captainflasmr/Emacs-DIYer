@@ -121,6 +121,13 @@ Each line is represented as a list of field values."
       (push (cons (nth i header) (nth i line)) result))
     (reverse result)))
 
+(defun my-icomplete-exit-minibuffer-with-input ()
+  "Exit the minibuffer with the current input, without forcing completion."
+  (interactive)
+  (exit-minibuffer))
+
+(define-key icomplete-minibuffer-map (kbd "M-RET") 'my-icomplete-exit-minibuffer-with-input)
+
 (defun my/quick-window-jump ()
   "Jump to a window by typing its assigned character label.
 If there is only a single window, split it horizontally.
