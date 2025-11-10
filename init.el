@@ -703,8 +703,8 @@ universal argument, DIRECTORY and GLOB are prompted for as well."
             (call-interactively 'flyspell-mode)))
       (?l (call-interactively 'my/collect-flyspell-errors))
       ;; Quit
-      (?q (message "Quit Build menu."))
-      (?\C-g (message "Quit Build menu."))
+      (?q (message "Quit menu."))
+      (?\C-g (message "Quit menu."))
       ;; Default Invalid Key
       (_ (message "Invalid key: %c" key)))))
 
