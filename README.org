@@ -1412,49 +1412,96 @@ Potentially solved with the following, probably requires more testing:
 #+begin_src elisp
 
 (defun my/md-to-org-convert-buffer ()
-  "Convert the current buffer from Markdown to Org-mode format"
+  "Convert the current buffer from Markdown to Org-mode format."
   (interactive)
   (save-excursion
-    ;; Lists: Translate `-`, `*`, or `+` lists to Org-mode lists
-    (goto-char (point-min))
-    (while (re-search-forward "^\\([ \t]*\\)[*-+] \\(.*\\)$" nil t)
-      (replace-match (concat (match-string 1) "- \\2")))
-    ;; Bold: `**bold**` -> `*bold*` only if directly adjacent
-    (goto-char (point-min))
-    (while (re-search-forward "\\*\\*\\([^ ]\\(.*?\\)[^ ]\\)\\*\\*" nil t)
-      (replace-match "*\\1*"))
-    ;; Italics: `_italic_` -> `/italic/`
-    (goto-char (point-min))
-    (while (re-search-forward "\\([ \n]\\)_\\([^ ].*?[^ ]\\)_\\([ \n]\\)" nil t)
-      (replace-match "\\1/\\2/\\3"))
-    ;; Links: `[text](url)` -> `[[url][text]]`
-    (goto-char (point-min))
-    (while (re-search-forward "\\[\\(.*?\\)\\](\\(.*?\\))" nil t)
-      (replace-match "[[\\2][\\1]]"))
-    ;; Code blocks: Markdown ```lang ... ``` to Org #+begin_src ... #+end_src
-    (goto-char (point-min))
-    (while (re-search-forward "```\\(.*?\\)\\(?:\n\\|\\s-\\)\\(\\(?:.\\|\n\\)*?\\)```" nil t)
-      (replace-match "#+begin_src \\1\n\\2#+end_src"))
-    ;; Inline code: `code` -> =code=
-    (goto-char (point-min))
-    (while (re-search-forward "`\\(.*?\\)`" nil t)
-      (replace-match "=\\1="))
-    ;; Horizontal rules: `---` or `***` -> `-----`
-    (goto-char (point-min))
-    (while (re-search-forward "^\\(-{3,}\\|\\*{3,}\\)$" nil t)
-      (replace-match "-----"))
-    ;; Images: `![alt text](url)` -> `[[url]]`
-    (goto-char (point-min))
-    (while (re-search-forward "!\\[.*?\\](\\(.*?\\))" nil t)
-      (replace-match "[[\\1]]"))
-    (goto-char (point-min))
-    ;; Headers: Adjust '#'
-    (while (re-search-forward "^\\(#+\\) " nil t)
-      (replace-match (make-string (length (match-string 1)) ?*) nil nil nil 1))
-    (goto-char (point-min))
-    ;; any extra characters
-    (while (re-search-forward "—" nil t)
-      (replace-match ", "))))
+    ;; First, protect code blocks by replacing them with placeholders
+    (let ((code-blocks '())
+          (counter 0))
+      ;; Collect and replace code blocks with placeholders
+      (goto-char (point-min))
+      (while (re-search-forward "^\\([ \t]*\\)```\\([^\n]*\\)\n\\(\\(?:.*\n\\)*?\\)\\1```" nil t)
+        (let ((indent (match-string 1))
+              (lang (match-string 2))
+              (code (match-string 3)))
+          (push (list counter indent lang code) code-blocks)
+          (replace-match (format "<<<CODE-BLOCK-%d>>>" counter))
+          (setq counter (1+ counter))))
+
+      ;; Also protect inline code
+      (let ((inline-codes '())
+            (inline-counter 0))
+        (goto-char (point-min))
+        (while (re-search-forward "`\\([^`\n]+\\)`" nil t)
+          (push (cons inline-counter (match-string 1)) inline-codes)
+          (replace-match (format "<<<INLINE-CODE-%d>>>" inline-counter))
+          (setq inline-counter (1+ inline-counter)))
+
+        ;; Now do all the conversions safely
+
+        ;; Headers: # -> * (must come before list conversion)
+        (goto-char (point-min))
+        (while (re-search-forward "^\\(#+\\) " nil t)
+          (replace-match (concat (make-string (length (match-string 1)) ?*) " ")))
+
+        ;; Lists: -, *, + -> -
+        (goto-char (point-min))
+        (while (re-search-forward "^\\([ \t]*\\)[*+-] " nil t)
+          (replace-match "\\1- "))
+
+        ;; Bold: **text** -> *text*
+        (goto-char (point-min))
+        (while (re-search-forward "\\*\\*\\(.+?\\)\\*\\*" nil t)
+          (replace-match "*\\1*"))
+
+        ;; Italics: _text_ or *text* (single) -> /text/
+        ;; Only match _text_ to avoid conflicting with bold
+        (goto-char (point-min))
+        (while (re-search-forward "\\_<_\\([^_]+\\)_\\_>" nil t)
+          (replace-match "/\\1/"))
+
+        ;; Images: ![alt](url) -> [[url]] (must come before links)
+        (goto-char (point-min))
+        (while (re-search-forward "!\\[\\(?:[^]]*\\)\\](\\([^)]+\\))" nil t)
+          (replace-match "[[\\1]]"))
+
+        ;; Links: [text](url) -> [[url][text]]
+        (goto-char (point-min))
+        (while (re-search-forward "\\[\\([^]]+\\)\\](\\([^)]+\\))" nil t)
+          (replace-match "[[\\2][\\1]]"))
+
+        ;; Horizontal rules
+        (goto-char (point-min))
+        (while (re-search-forward "^[ \t]*\\(-\\{3,\\}\\|\\*\\{3,\\}\\|_\\{3,\\}\\)[ \t]*$" nil t)
+          (replace-match "-----"))
+
+        ;; Blockquotes: > text -> : text (simple version)
+        (goto-char (point-min))
+        (while (re-search-forward "^> \\(.*\\)$" nil t)
+          (replace-match ": \\1"))
+
+        ;; Fix encoding issues
+        (goto-char (point-min))
+        (while (re-search-forward "â€" nil t)
+          (replace-match "—"))
+
+        ;; Restore inline code as =code=
+        (dolist (item inline-codes)
+          (goto-char (point-min))
+          (when (search-forward (format "<<<INLINE-CODE-%d>>>" (car item)) nil t)
+            (replace-match (format "=%s=" (cdr item)) t t))))
+
+      ;; Restore code blocks as #+begin_src ... #+end_src
+      (dolist (item code-blocks)
+        (let ((n (nth 0 item))
+              (indent (nth 1 item))
+              (lang (nth 2 item))
+              (code (nth 3 item)))
+          (goto-char (point-min))
+          (when (search-forward (format "<<<CODE-BLOCK-%d>>>" n) nil t)
+            (replace-match (format "%s#+begin_src %s\n%s%s#+end_src"
+                                   indent lang code indent)
+                           t t)))))))
 
 (defun my/md-to-org-convert-file (input-file output-file)
   "Convert a Markdown file INPUT-FILE to an Org-mode file OUTPUT-FILE."
