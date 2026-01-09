@@ -496,7 +496,6 @@ By default, only the SEARCH-TERM needs to be provided. If called with a
 universal argument, DIRECTORY and GLOB are prompted for as well."
   (interactive
    (let* ((univ-arg current-prefix-arg)
-          ;; Prefer region, then symbol-at-point, then word-at-point, then empty string
           (default-search-term
            (cond
             ((use-region-p)
@@ -515,66 +514,115 @@ universal argument, DIRECTORY and GLOB are prompted for as well."
          (glob (or glob ""))
          (buffer-name "*grep*"))
     (if (executable-find "rg")
-        (let* ((rg-command (format "rg --color=never --max-columns=500 --column --line-number --no-heading --smart-case -e %s --glob %s %s"
-                                   (shell-quote-argument search-term)
-                                   (shell-quote-argument glob)
-                                   directory))
-               (debug-output (shell-command-to-string (format "rg --debug --files %s" directory)))
-               (ignore-files (when (string-match "ignore file: \\(.*?\\.ignore\\)" debug-output)
-                               (match-string 1 debug-output)))
-               (raw-output (shell-command-to-string rg-command))
-               (formatted-output
-                (concat
-                 (format "[S] Search:    %s\n[D] Directory: %s\n" search-term directory)
-                 (format "[o] Glob:      %s\n" glob)
-                 (if ignore-files (format "%s\n" ignore-files) "")
-                 "\n"
-                 (if (string-empty-p raw-output)
-                     "No results found.\n"
-                   (replace-regexp-in-string (concat "\\(^" (regexp-quote directory) "\\)") "./" raw-output)))))
-          (when (get-buffer buffer-name)
-            (kill-buffer buffer-name))
-          (with-current-buffer (get-buffer-create buffer-name)
+        (let ((buffer (get-buffer-create buffer-name)))
+          (with-current-buffer buffer
             (setq default-directory directory)
-            (erase-buffer)
-            (insert formatted-output)
-            (insert "\nripgrep finished.")
-            (goto-char (point-min))
-            (unless (string-empty-p raw-output)
-              (let ((case-fold-search t))
-                (while (search-forward search-term nil t)
-                  (overlay-put (make-overlay (match-beginning 0) (match-end 0))
-                               'face '(:slant italic :weight bold :underline t)))))
+            (let ((inhibit-read-only t))
+              (erase-buffer)
+              (insert (format "-*- mode: grep; default-directory: \"%s\" -*-\n\n" directory))
+              (if (not (string= "" glob))
+                  (insert (format "[o] Glob: %s\n\n" glob)))
+              (insert "Searching...\n\n"))
             (grep-mode)
             (setq-local my/grep-search-term search-term)
             (setq-local my/grep-directory directory)
-            (setq-local my/grep-glob glob)
-            (local-set-key (kbd "D") (lambda () 
-                                       (interactive)
-                                       (my/grep my/grep-search-term 
-                                                (read-directory-name "New search directory: ")
-                                                my/grep-glob)))
-            (local-set-key (kbd "S") (lambda () 
-                                       (interactive)
-                                       (my/grep (read-string "New search term: "
-                                                             nil nil my/grep-search-term)
-                                                my/grep-directory
-                                                my/grep-glob)))
-            (local-set-key (kbd "o") (lambda () 
-                                       (interactive)
-                                       (my/grep my/grep-search-term
-                                                my/grep-directory
-                                                (read-string "New glob: "))))
-            (local-set-key (kbd "g") (lambda () 
-                                       (interactive)
-                                       (my/grep my/grep-search-term my/grep-directory my/grep-glob)))
-            (pop-to-buffer buffer-name)
-            (goto-char (point-min))
-            (message "ripgrep finished.")))
+            (setq-local my/grep-glob glob))
+          
+          (pop-to-buffer buffer)
+          (goto-char (point-min))
+          
+          (make-process
+           :name "ripgrep"
+           :buffer buffer
+           :command `("rg" "--color=never" "--max-columns=500" 
+                      "--column" "--line-number" "--no-heading" 
+                      "--smart-case" "-e" ,search-term
+                      "--glob" ,glob ,directory)
+           :filter (lambda (proc string)
+                     (when (buffer-live-p (process-buffer proc))
+                       (with-current-buffer (process-buffer proc)
+                         (let ((inhibit-read-only t)
+                               (moving (= (point) (process-mark proc))))
+                           (setq string (replace-regexp-in-string "[\r\0\x01-\x08\x0B-\x0C\x0E-\x1F]" "" string))
+                           ;; Replace full directory path with ./ in the incoming output
+                           (setq string (replace-regexp-in-string 
+                                         (concat "^" (regexp-quote directory))
+                                         "./"
+                                         string))
+                           (save-excursion
+                             (goto-char (process-mark proc))
+                             (insert string)
+                             (set-marker (process-mark proc) (point)))
+                           (if moving (goto-char (process-mark proc)))))))
+           :sentinel
+           (lambda (proc _event)
+             (when (memq (process-status proc) '(exit signal))
+               (with-current-buffer (process-buffer proc)
+                 (let ((inhibit-read-only t))
+                   ;; Remove "Searching..." line
+                   (goto-char (point-min))
+                   (while (re-search-forward "Searching\\.\\.\\.\n\n" nil t)
+                     (replace-match "" nil t))
+
+                   ;; Clean up the output - replace full paths with ./
+                   (goto-char (point-min))
+                   (forward-line 3)
+                   (let ((start-pos (point)))
+                     (while (re-search-forward (concat "^" (regexp-quote directory)) nil t)
+                       (replace-match "./" t t))
+                     
+                     ;; Check if any results were found
+                     (goto-char start-pos)
+                     (when (= (point) (point-max))
+                       (insert "No results found.\n")))
+                   
+                   (goto-char (point-max))
+                   (insert "\nRipgrep finished\n")
+
+                   ;; Highlight search terms using grep's match face
+                   (goto-char (point-min))
+                   (forward-line 3)
+                   (save-excursion
+                     (while (re-search-forward (regexp-quote search-term) nil t)
+                       (put-text-property (match-beginning 0) (match-end 0)
+                                          'face 'match)
+                       (put-text-property (match-beginning 0) (match-end 0)
+                                          'font-lock-face 'match))))
+                 
+                 ;; Set up keybindings
+                 (local-set-key (kbd "D") 
+                                (lambda () 
+                                  (interactive)
+                                  (my/grep my/grep-search-term 
+                                           (read-directory-name "New search directory: ")
+                                           my/grep-glob)))
+                 (local-set-key (kbd "S") 
+                                (lambda () 
+                                  (interactive)
+                                  (my/grep (read-string "New search term: "
+                                                        nil nil my/grep-search-term)
+                                           my/grep-directory
+                                           my/grep-glob)))
+                 (local-set-key (kbd "o") 
+                                (lambda () 
+                                  (interactive)
+                                  (my/grep my/grep-search-term
+                                           my/grep-directory
+                                           (read-string "New glob: "))))
+                 (local-set-key (kbd "g") 
+                                (lambda () 
+                                  (interactive)
+                                  (my/grep my/grep-search-term my/grep-directory my/grep-glob)))
+                 
+                 (goto-char (point-min))
+                 (message "ripgrep finished."))))
+           )
+          (message "ripgrep started..."))
+      ;; Fallback to rgrep
       (progn
         (setq default-directory directory)
         (message (format "%s : %s : %s" search-term glob directory))
-        (rgrep search-term  (if (string= "" glob) "*" glob) directory)))))
+        (rgrep search-term (if (string= "" glob) "*" glob) directory)))))
 
 (defun my-org-reveal-on-next-error ()
   "Reveal the location of search results in an Org file."
