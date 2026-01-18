@@ -23,6 +23,10 @@ Used in concert with https://github.com/captainflasmr/Emacs-vanilla
 
 * Whats New
 
+** <2026-01-18>
+
+Added RSVP speed reading implementation to replace spray and speedread packages
+
 ** <2025-08-15>
 
 Added evil-mode replacement with some tweaks to the built-in view-mode
@@ -66,44 +70,6 @@ Improve vc-dir header to highlight current branch
 - Added an optional `separator` argument to customize branch display.
 - Current branch is now highlighted using text properties.
 - Default separator set to `" | "` for better readability.
-
-* Kanban
-
-Here is a kanban of the features that will be (hopefully) converted to core/enhanced Emacs features and visually demonstrating their current status via a kanban board
-
-#+begin_src emacs-lisp :results table :exports results :tangle no
-(my/kanban-to-table "roadmap" "issues")
-#+end_src
-
-#+RESULTS:
-| DOING                        | DONE                        |
-|------------------------------+-----------------------------|
-| consult                      | elfeed                      |
-| consult-imenu                | csv parsing                 |
-| consult-outline              | minibuffer completion       |
-| consult-history for =eshell= | ace-window                  |
-| consult-history for =shell=  | recentf-open                |
-| embark                       | rainbow-mode                |
-| completion - corfu / company | visual-fill-column-mode     |
-| ox-hugo                      | find-name-dired             |
-| eglot                        | magit                       |
-| orderless                    | tempel                      |
-| dired-async-mode             | image-dired                 |
-|                              | selected-window-accent-mode |
-|                              | deadgrep                    |
-|                              | jinx / powerthesaurus       |
-|                              | kurecolor                   |
-|                              | popper                      |
-|                              | pandoc md to org conversion |
-|                              | capf for =eshell=           |
-|                              | capf for =shell=            |
-|                              | org-kanban                  |
-|                              | open-with                   |
-|                              | capf-autosuggest            |
-|                              | all-the-icons-dired         |
-|                              | LLMs                        |
-|                              | diminish                    |
-|                              | emacs-everywhere            |
 
 * Issues
 
@@ -2672,4 +2638,69 @@ I've recently explored [[https://www.gnu.org/software/emacs/manual/html_node/ema
             (setq cursor-type (if view-mode 'box 'bar))))
 
 (global-set-key (kbd "C-<escape>") 'view-mode)
+#+end_src
+
+** DONE spray/speedread
+
+Replaced spray and speedread packages with a simple RSVP (Rapid Serial Visual Presentation) implementation for speed reading.
+
+The implementation displays words one at a time in a fixed position with the Optimal Recognition Point (ORP) highlighted, eliminating eye movement overhead and enabling reading speeds of 300-600+ WPM.
+
+Features:
+
+- ORP (one-third into word) highlighted and aligned
+- Adaptive timing based on word length and punctuation
+- Interactive controls: f/s for speed, [/] for font size, b/n to skip, SPC to pause, q to quit
+- Position tracking in original buffer
+- Works on region or from point to end of buffer
+
+#+begin_src elisp
+(defun rsvp-minibuffer ()
+  "Display words from point (or mark to point) in minibuffer using RSVP.
+Use f/s for speed, [/] for size, b/n to skip, SPC to pause, q to quit."
+  (interactive)
+  (let* ((start (if (region-active-p) (region-beginning) (point)))
+         (end (if (region-active-p) (region-end) (point-max)))
+         (text (buffer-substring-no-properties start end))
+         (wpm 350) (font-size 200) (orp-column 20)
+         (word-positions '()) (pos 0) (i 0)
+         (message-log-max nil))  ; Disable message logging
+    ;; Build word positions list
+    (dolist (word (split-string text))
+      (unless (string-blank-p word)
+        (when-let ((word-start (string-match (regexp-quote word) text pos)))
+          (push (cons word (+ start word-start)) word-positions)
+          (setq pos (+ word-start (length word))))))
+    (setq word-positions (nreverse word-positions))
+    ;; Display loop
+    (while (< i (length word-positions))
+      (let* ((word (car (nth i word-positions)))
+             (word-pos (cdr (nth i word-positions)))
+             (word-len (length word))
+             (delay (* (/ 60.0 wpm)
+                      (cond ((< word-len 3) 0.8) ((> word-len 8) 1.3) (t 1.0))
+                      (if (string-match-p "[.!?]$" word) 1.5 1.0)))
+             (orp-pos (/ word-len 3))
+             (face-mono `(:height ,font-size :family "monospace"))
+             (face-orp `(:foreground "red" :weight normal ,@face-mono))
+             (padded-word (concat 
+                          (propertize (make-string (max 0 (- orp-column orp-pos)) ?\s) 'face face-mono)
+                          (propertize (substring word 0 orp-pos) 'face face-mono)
+                          (propertize (substring word orp-pos (1+ orp-pos)) 'face face-orp)
+                          (propertize (substring word (1+ orp-pos)) 'face face-mono))))
+        (goto-char (+ word-pos word-len))
+        (message "%s" padded-word)
+        (pcase (read-event nil nil delay)
+          (?f (setq wpm (min 1000 (+ wpm 50))))
+          (?s (setq wpm (max 50 (- wpm 50))))
+          (?\[ (setq font-size (max 100 (- font-size 20))))
+          (?\] (setq font-size (min 400 (+ font-size 20))))
+          (?b (setq i (max 0 (- i 10))))
+          (?n (setq i (min (1- (length word-positions)) (+ i 10))))
+          (?\s (read-event (format "%s [PAUSED - WPM: %d]" padded-word wpm)))
+          (?q (setq i (length word-positions)))
+          (_ (setq i (1+ i))))))))
+
+;; Optional: bind to a key
+;; (global-set-key (kbd "C-c r") 'rsvp-minibuffer)
 #+end_src

@@ -10,6 +10,22 @@ This document contains the release notes for Emacs-enhanced
 
 * Versions
 
+** <2026-01-18>
+
+Added RSVP speed reading implementation to replace spray and speedread packages
+
+** <2025-08-15>
+
+Added evil-mode replacement with some tweaks to the built-in view-mode
+
+** <2025-07-24>
+
+Added Emacs Everywhere replacement, although this will be for Wayland
+
+** <2025-07-05>
+
+Added diminish replacement
+
 ** <2025-05-16>
 
 Added attempt at a native =orderless= implementation in the minibuffer!
