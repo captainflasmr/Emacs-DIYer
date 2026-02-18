@@ -1002,7 +1002,7 @@ universal argument, DIRECTORY and GLOB are prompted for as well."
 (global-set-key (kbd "C-'") #'my/popper-toggle-current)
 
 ;; Cycle through popups or show the next popup.
-(global-set-key (kbd "M-L") #'my/popper-cycle-popup)
+(global-set-key (kbd "C-M-<return>") #'my/popper-cycle-popup)
 
 (defun my/md-to-org-convert-buffer ()
   "Convert the current buffer from Markdown to Org-mode format."

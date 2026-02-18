@@ -1412,7 +1412,7 @@ Mainly used for popping in popping out shells, testing the following implementat
 (global-set-key (kbd "C-'") #'my/popper-toggle-current)
 
 ;; Cycle through popups or show the next popup.
-(global-set-key (kbd "M-L") #'my/popper-cycle-popup)
+(global-set-key (kbd "C-M-<return>") #'my/popper-cycle-popup)
 #+end_src
 
 *** TODO push buffer to popup buffer and back                      :issues:
