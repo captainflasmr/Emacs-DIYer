@@ -1759,3 +1759,59 @@ Use f/s for speed, [/] for size, b/n to skip, SPC to pause, q to quit."
 
 ;; Optional: bind to a key
 ;; (global-set-key (kbd "C-c r") 'rsvp-minibuffer)
+
+;; Part 1: free annotations for commands, variables, faces (Emacs 28+)
+(when (boundp 'completions-detailed)
+  (setq completions-detailed t))
+
+;; Part 2: annotations for buffer, file and bookmark categories
+
+(defun tiny-marginalia--ann (str)
+  "Format STR as a right-padded completion annotation."
+  (propertize (concat "    " str) 'face 'completions-annotations))
+
+(defun tiny-marginalia-annotate-buffer (candidate)
+  "Annotate buffer CANDIDATE with its major mode and file path."
+  (when-let ((buf (get-buffer candidate)))
+    (tiny-marginalia--ann
+     (format "%-25s %s"
+             (with-current-buffer buf (symbol-name major-mode))
+             (abbreviate-file-name (or (buffer-file-name buf) ""))))))
+
+(defun tiny-marginalia-annotate-file (candidate)
+  "Annotate file CANDIDATE with its size and modification date."
+  (let* ((path (expand-file-name candidate default-directory))
+         (attrs (ignore-errors (file-attributes path))))
+    (when attrs
+      (tiny-marginalia--ann
+       (format "%6s  %s"
+               (file-size-human-readable (file-attribute-size attrs))
+               (format-time-string "%Y-%m-%d"
+                                   (file-attribute-modification-time attrs)))))))
+
+(defun tiny-marginalia-annotate-bookmark (candidate)
+  "Annotate bookmark CANDIDATE with its target file."
+  (require 'bookmark)
+  (when-let* ((rec (assoc candidate bookmark-alist))
+              (file (bookmark-prop-get rec 'filename)))
+    (tiny-marginalia--ann (abbreviate-file-name file))))
+
+(defun tiny-marginalia--setup ()
+  "Inject an annotation function based on the current completion category."
+  (unless (plist-get completion-extra-properties :annotation-function)
+    (let* ((metadata (completion-metadata
+                      (buffer-substring-no-properties
+                       (minibuffer-prompt-end) (point-max))
+                      minibuffer-completion-table
+                      minibuffer-completion-predicate))
+           (category (completion-metadata-get metadata 'category))
+           (fn (pcase category
+                 ('buffer   #'tiny-marginalia-annotate-buffer)
+                 ('file     #'tiny-marginalia-annotate-file)
+                 ('bookmark #'tiny-marginalia-annotate-bookmark))))
+      (when fn
+        (setq-local completion-extra-properties
+                    (plist-put (copy-sequence completion-extra-properties)
+                               :annotation-function fn))))))
+
+(add-hook 'minibuffer-setup-hook #'tiny-marginalia--setup)
