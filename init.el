@@ -1522,7 +1522,9 @@ process, FILENAME is the input Org file, and PUB-DIR is the publishing directory
                                    (seq-find (lambda (h) (string-prefix-p input h t))
                                              (ring-elements ring))))
                                 (t (let ((dabbrev-case-fold-search t)
-                                         (dabbrev-case-replace nil))
+                                         (dabbrev-case-replace nil)
+                                         (inhibit-message t)
+                                         (message-log-max nil))
                                      (ignore-errors
                                        (dabbrev--reset-global-variables)
                                        (dabbrev--find-expansion input 0 t))))))))
