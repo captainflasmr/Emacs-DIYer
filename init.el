@@ -379,39 +379,49 @@ are provided, they are used to separate the branches or tags in the display."
 (defun emacs-solo/dired-git-status-overlay ()
   "Overlay Git status indicators on the first column in Dired."
   (interactive)
-  (require 'vc-git)
-  (let ((git-root (ignore-errors (vc-git-root default-directory))))
-    (when (and git-root
-               (not (file-remote-p default-directory))
-               emacs-solo-dired-gutter-enabled)
-      (setq git-root (expand-file-name git-root))
-      (let* ((git-status (vc-git--run-command-string nil "status" "--porcelain" "--ignored" "--untracked-files=normal"))
-             (status-map (make-hash-table :test 'equal)))
-        (mapc #'delete-overlay emacs-solo/dired-git-status-overlays)
-        (setq emacs-solo/dired-git-status-overlays nil)
-        ;; Add this check to prevent the error
-        (when git-status  ; Only process if git-status is not nil
-          (dolist (line (split-string git-status "\n" t))
-            (when (string-match "^\\(..\\) \\(.+\\)$" line)
-              (let* ((code (match-string 1 line))
-                     (file (match-string 2 line))
-                     (fullpath (expand-file-name file git-root))
-                     (status-face (emacs-solo/dired--git-status-face code)))
-                (puthash fullpath status-face status-map)))))
-        (save-excursion
-          (goto-char (point-min))
-          (while (not (eobp))
-            (let* ((file (ignore-errors (expand-file-name (dired-get-filename nil t)))))
-              (when file
-                (setq file (if (file-directory-p file) (concat file "/") file))
-                (let* ((status-face (gethash file status-map (cons "  " 'font-lock-keyword-face)))
-                       (status (car status-face))
-                       (face (cdr status-face))
-                       (status-str (propertize (format " %s " status) 'face face))
-                       (ov (make-overlay (line-beginning-position) (1+ (line-beginning-position)))))
-                  (overlay-put ov 'before-string status-str)
-                  (push ov emacs-solo/dired-git-status-overlays))))
-            (forward-line 1)))))))
+  (when (and emacs-solo-dired-gutter-enabled
+             (not (file-remote-p default-directory))
+             (executable-find "git"))
+    (condition-case nil
+        (progn
+          (require 'vc-git)
+          (let ((git-root (ignore-errors (vc-git-root default-directory))))
+            (when git-root
+              (setq git-root (expand-file-name git-root))
+              (let* ((git-status (vc-git--run-command-string
+                                  nil "status" "--porcelain"
+                                  "--ignored" "--untracked-files=normal"))
+                     (status-map (make-hash-table :test 'equal)))
+                (mapc #'delete-overlay emacs-solo/dired-git-status-overlays)
+                (setq emacs-solo/dired-git-status-overlays nil)
+                (when git-status
+                  (dolist (line (split-string git-status "\n" t))
+                    (when (string-match "^\\(..\\) \\(.+\\)$" line)
+                      (let* ((code (match-string 1 line))
+                             (file (match-string 2 line))
+                             (fullpath (expand-file-name file git-root))
+                             (status-face (emacs-solo/dired--git-status-face code)))
+                        (puthash fullpath status-face status-map)))))
+                (save-excursion
+                  (goto-char (point-min))
+                  (while (not (eobp))
+                    (let* ((file (ignore-errors
+                                   (expand-file-name (dired-get-filename nil t)))))
+                      (when file
+                        (setq file (if (file-directory-p file)
+                                       (concat file "/") file))
+                        (let* ((status-face (gethash file status-map
+                                                     (cons "  " 'font-lock-keyword-face)))
+                               (status (car status-face))
+                               (face (cdr status-face))
+                               (status-str (propertize (format " %s " status)
+                                                       'face face))
+                               (ov (make-overlay (line-beginning-position)
+                                                 (1+ (line-beginning-position)))))
+                          (overlay-put ov 'before-string status-str)
+                          (push ov emacs-solo/dired-git-status-overlays))))
+                    (forward-line 1)))))))
+      (error nil))))
 
 (add-hook 'dired-after-readin-hook #'emacs-solo/dired-git-status-overlay)
 
