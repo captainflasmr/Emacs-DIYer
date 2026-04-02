@@ -1104,7 +1104,7 @@ Solution is the following configuration:
       (_ (message "Invalid key: %c" key)))))
 
 (global-set-key (kbd "C-c s") #'spelling-menu)
-(global-set-key (kbd "C-0") #'ispell-word)
+(global-set-key (kbd "M-4") #'ispell-word)
 #+end_src
 
 Note that at the moment, I don't really care about spell-checking efficiency (which Jinx was very good at). I am quite happy to wait a few seconds for the =flyspell-buffer= to run, and in a narrowed region, it won't take that long anyway.

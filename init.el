@@ -767,7 +767,7 @@ universal argument, DIRECTORY and GLOB are prompted for as well."
       (_ (message "Invalid key: %c" key)))))
 
 (global-set-key (kbd "C-c s") #'spelling-menu)
-(global-set-key (kbd "C-0") #'ispell-word)
+(global-set-key (kbd "M-4") #'ispell-word)
 
 (require 'cl-lib)
 (require 'color)
