@@ -649,7 +649,9 @@ universal argument, DIRECTORY and GLOB are prompted for as well."
 
 (setq ispell-local-dictionary "en_GB")
 (setq ispell-program-name "hunspell")
-(setq ispell-alternate-dictionary "/home/jdyer/.emacs.d/en_GB-words.txt")
+(setq ispell-alternate-dictionary
+      (expand-file-name "en_GB-words.txt"
+                        (file-name-directory (or load-file-name buffer-file-name))))
 (setq dictionary-default-dictionary "*")
 (setq dictionary-server "dict.org")
 (setq dictionary-use-single-buffer t)
