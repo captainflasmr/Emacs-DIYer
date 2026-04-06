@@ -8,14 +8,11 @@
       '(("Emacs Dyer Dwelling"
          "https://www.emacs.dyerdwelling.family/index.xml" nil nil nil)))
 
-;; Key bindings
+;; Key bindings and configuration
 (with-eval-after-load 'newsticker
   (define-key newsticker-treeview-mode-map (kbd "n") 'newsticker-treeview-next-item)
   (define-key newsticker-treeview-mode-map (kbd "p") 'newsticker-treeview-prev-item)
-  (define-key newsticker-treeview-mode-map (kbd "m") 'newsticker-treeview-mark-item))
-
-;; Configuration that runs after newsticker is loaded
-(with-eval-after-load 'newsticker
+  (define-key newsticker-treeview-mode-map (kbd "m") 'newsticker-treeview-mark-item)
   (newsticker-start)
   (defun my-newsticker-treeview-custom-filter ()
     "Custom filter to show items from the last month."
@@ -56,10 +53,9 @@ CODING-SYSTEM gives the coding-system for reading the buffer."
   "Parse CSV lines in current buffer, returning a list of parsed lines.
 Each line is represented as a list of field values."
   (let ((lines nil)
-        (begin-pos (point))
         (in-quoted nil)
         (current-line nil)
-        (current-field "")
+        (field-chars nil)
         (previous-char nil))
     (while (not (eobp))
       (let ((char (char-after)))
@@ -69,48 +65,41 @@ Each line is represented as a list of field values."
           (if in-quoted
               (setq in-quoted nil)
             (setq in-quoted t)))
-         
+
          ;; Handle escaped quote within quoted field
          ((and (eq char ?\") in-quoted (eq previous-char ?\"))
-          (setq current-field (concat current-field "\""))
+          (push ?\" field-chars)
           (setq previous-char nil))
-         
+
          ;; Handle field separator (comma)
          ((and (eq char ?,) (not in-quoted))
-          (push current-field current-line)
-          (setq current-field "")
-          (setq begin-pos (1+ (point))))
-         
+          (push (apply #'string (nreverse field-chars)) current-line)
+          (setq field-chars nil))
+
          ;; Handle end of line
          ((and (eq char ?\n) (not in-quoted))
-          (push current-field current-line)
-          (push (reverse current-line) lines)
-          (setq current-field "")
-          (setq current-line nil)
-          (setq begin-pos (1+ (point))))
-         
+          (push (apply #'string (nreverse field-chars)) current-line)
+          (push (nreverse current-line) lines)
+          (setq field-chars nil)
+          (setq current-line nil))
+
          ;; Handle carriage return (part of CRLF)
          ((and (eq char ?\r) (not in-quoted))
-          ;; Just skip it, we'll handle the newline next
           nil)
-         
-         ;; Accumulate characters for the current field
+
+         ;; Accumulate character
          (t
-          (when (> (point) begin-pos)
-            (setq current-field (concat current-field (buffer-substring-no-properties begin-pos (point)))))
-          (setq current-field (concat current-field (char-to-string char)))
-          (setq begin-pos (1+ (point)))))
-        
+          (push char field-chars)))
+
         (setq previous-char char)
         (forward-char)))
-    
+
     ;; Handle any remaining content
-    (when (and (not (string-empty-p current-field)) (not current-line))
-      (push current-field current-line)
-      (when current-line
-        (push (reverse current-line) lines)))
-    
-    (reverse lines)))
+    (when (or field-chars current-line)
+      (push (apply #'string (nreverse field-chars)) current-line)
+      (push (nreverse current-line) lines))
+
+    (nreverse lines)))
 
 (defun csv-combine-with-header (header line)
   "Combine HEADER and LINE into an alist."
@@ -667,25 +656,26 @@ universal argument, DIRECTORY and GLOB are prompted for as well."
 (defun my/flyspell-add-word-to-dict ()
   "Add the word under point to the personal dictionary and refresh the errors list."
   (interactive)
-  (let* ((button (button-at (point)))
-         (word (button-label button))
-         (target-buffer (button-get button 'buffer))
-         (target-pos (button-get button 'position)))
-    
-    ;; Switch to the source buffer, go to the word, and add it to dictionary
-    (with-current-buffer target-buffer
-      (save-excursion
-        (goto-char target-pos)
-        ;; Use ispell to add the word to the personal dictionary
-        (ispell-send-string (concat "*" word "\n"))
-        ;; Tell ispell we're done and the buffer hasn't changed
-        (ispell-send-string "#\n")
-        (sit-for 0.1)  ; Wait for ispell to process
-        (message "Added '%s' to the dictionary." word)))
+  (when-let ((button (button-at (point))))
+    (let* ((word (button-label button))
+           (target-buffer (button-get button 'buffer))
+           (target-pos (button-get button 'position)))
 
-    (with-current-buffer target-buffer
-      (pop-to-buffer target-buffer)
-      (my/collect-flyspell-errors))))
+      ;; Switch to the source buffer, go to the word, and add it to dictionary
+      (with-current-buffer target-buffer
+        (save-excursion
+          (goto-char target-pos)
+          ;; Use ispell to add the word to the personal dictionary
+          (ispell-send-string (concat "*" word "\n"))
+          ;; Tell ispell we're done and the buffer hasn't changed
+          (ispell-send-string "#\n")
+          (when-let ((proc (get-process "ispell")))
+            (accept-process-output proc 0.5))
+          (message "Added '%s' to the dictionary." word)))
+
+      (with-current-buffer target-buffer
+        (pop-to-buffer target-buffer)
+        (my/collect-flyspell-errors)))))
 
 (defun my/collect-flyspell-errors ()
   "Collect all flyspell errors in the current buffer and display them in a separate buffer with clickable links."
@@ -1154,8 +1144,6 @@ universal argument, DIRECTORY and GLOB are prompted for as well."
   (org-map-entries
    (lambda () 
      (dotimes (_ arg) (org-promote)))))
-
-(require 'cl-lib)
 
 (defvar my/popup-max 8
   "Maximum visible candidates in popup.")
@@ -1725,7 +1713,7 @@ process, FILENAME is the input Org file, and PUB-DIR is the publishing directory
   (let ((all-files
          (append
           (directory-files-recursively default-directory "\\(?:\\.cpp$\\|\\.c$\\|\\.h$\\)" nil 'predicate-exclusion-p)
-          (directory-files-recursively default-directory "\\(?:\\.cs$\\|\\.cs$\\)" nil 'predicate-exclusion-p)
+          (directory-files-recursively default-directory "\\.cs$" nil 'predicate-exclusion-p)
           (directory-files-recursively default-directory "\\(?:\\.ads$\\|\\.adb$\\)" nil 'predicate-exclusion-p)))
         (tags-file-path (expand-file-name (concat default-directory "TAGS"))))
     (unless (file-directory-p default-directory)
@@ -1733,7 +1721,7 @@ process, FILENAME is the input Org file, and PUB-DIR is the publishing directory
     ;; Generate TAGS file
     (dolist (file all-files)
       (message file)
-      (shell-command (format "etags --append \%s -o %s" file tags-file-path)))))
+      (shell-command (format "etags --append %s -o %s" file tags-file-path)))))
 (global-set-key (kbd "C-x p l") 'my/etags-load)
 (global-set-key (kbd "C-x p u") 'my/etags-update)
 
@@ -1894,35 +1882,41 @@ Works with both standard `move-end-of-line` and `org-end-of-line`."
 
 (global-simple-autosuggest-mode 1)
 
-(defvar dired-icons-map
-  '(("el" . "λ") ("rb" . "◆") ("js" . "○") ("ts" . "●") ("json" . "◎") ("md" . "■") 
-    ("txt" . "□") ("html" . "▲") ("css" . "▼") ("png" . "◉") ("jpg" . "◉") 
-    ("pdf" . "▣") ("zip" . "▢") ("py" . "∆") ("c" . "◇") ("sql" . "▦") 
+(defvar my/dired-icons-map
+  '(("el" . "λ") ("rb" . "◆") ("js" . "○") ("ts" . "●") ("json" . "◎") ("md" . "■")
+    ("txt" . "□") ("html" . "▲") ("css" . "▼") ("png" . "◉") ("jpg" . "◉")
+    ("pdf" . "▣") ("zip" . "▢") ("py" . "∆") ("c" . "◇") ("sql" . "▦")
     ("mp3" . "♪") ("mp4" . "▶") ("exe" . "▪")))
 
-(defun dired-add-icons ()
-  (when (derived-mode-p 'dired-mode)
-    (let ((inhibit-read-only t))
-      (save-excursion
-        (goto-char (point-min))
-        (while (and (not (eobp)) (< (line-number-at-pos) 200))
-          (condition-case nil
-              (let ((line (buffer-substring-no-properties (line-beginning-position) (line-end-position))))
-                (when (and (> (length line) 10)
-                           (string-match "\\([rwxd-]\\{10\\}\\)" line)
-                           (dired-move-to-filename t)
-                           (not (looking-at "[▶◦λ◆○●◎■□▲▼◉▣▢◇∆▦♪▪] ")))
-                  (let* ((is-dir (eq (aref line (match-beginning 1)) ?d))
-                         (filename (and (string-match "\\([^ ]+\\)$" line) (match-string 1 line)))
-                         (icon (cond (is-dir "▶")
-                                    ((and filename (string-match "\\.\\([^.]+\\)$" filename))
-                                     (or (cdr (assoc (downcase (match-string 1 filename)) dired-icons-map)) "◦"))
-                                    (t "◦"))))
-                    (insert icon " "))))
-            (error nil))
-          (forward-line))))))
+(defvar-local my/dired-icon-overlays nil
+  "List of icon overlays in current dired buffer.")
 
-(add-hook 'dired-after-readin-hook 'dired-add-icons)
+(defun my/dired-add-icons ()
+  "Add file type icon overlays in dired."
+  (when (derived-mode-p 'dired-mode)
+    (mapc #'delete-overlay my/dired-icon-overlays)
+    (setq my/dired-icon-overlays nil)
+    (save-excursion
+      (goto-char (point-min))
+      (while (not (eobp))
+        (condition-case nil
+            (when-let ((filename (dired-get-filename 'no-dir t)))
+              (when (dired-move-to-filename t)
+                (let* ((is-dir (file-directory-p (dired-get-filename nil t)))
+                       (icon (cond (is-dir "▶")
+                                   ((string-match "\\.\\([^.]+\\)$" filename)
+                                    (or (cdr (assoc (downcase (match-string 1 filename))
+                                                    my/dired-icons-map))
+                                        "◦"))
+                                   (t "◦")))
+                       (ov (make-overlay (point) (point))))
+                  (overlay-put ov 'before-string (concat icon " "))
+                  (overlay-put ov 'my/dired-icon t)
+                  (push ov my/dired-icon-overlays))))
+          (error nil))
+        (forward-line)))))
+
+(add-hook 'dired-after-readin-hook #'my/dired-add-icons)
 
 (defun emacs-solo/ollama-run-model ()
   "Run `ollama list`, let the user choose a model, and open it in `ansi-term`.
@@ -2042,10 +2036,10 @@ Use f/s for speed, [/] for size, b/n to skip, SPC to pause, q to quit."
              (delay (* (/ 60.0 wpm)
                       (cond ((< word-len 3) 0.8) ((> word-len 8) 1.3) (t 1.0))
                       (if (string-match-p "[.!?]$" word) 1.5 1.0)))
-             (orp-pos (/ word-len 3))
+             (orp-pos (min (/ word-len 3) (1- word-len)))
              (face-mono `(:height ,font-size :family "monospace"))
              (face-orp `(:foreground "red" :weight normal ,@face-mono))
-             (padded-word (concat 
+             (padded-word (concat
                           (propertize (make-string (max 0 (- orp-column orp-pos)) ?\s) 'face face-mono)
                           (propertize (substring word 0 orp-pos) 'face face-mono)
                           (propertize (substring word orp-pos (1+ orp-pos)) 'face face-orp)
