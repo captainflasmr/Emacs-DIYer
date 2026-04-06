@@ -649,6 +649,7 @@ universal argument, DIRECTORY and GLOB are prompted for as well."
 
 (setq ispell-local-dictionary "en_GB")
 (setq ispell-program-name "hunspell")
+(setq ispell-alternate-dictionary "/home/jdyer/.emacs.d/en_GB-words.txt")
 (setq dictionary-default-dictionary "*")
 (setq dictionary-server "dict.org")
 (setq dictionary-use-single-buffer t)
@@ -1173,6 +1174,7 @@ universal argument, DIRECTORY and GLOB are prompted for as well."
 (defvar-local my/popup--pred nil "Completion predicate.")
 (defvar-local my/popup--plist nil "Capf extra properties.")
 (defvar-local my/popup--scroll 0 "Scroll offset.")
+(defvar-local my/popup--source "" "Name of the capf that provided candidates.")
 
 (defvar my/popup-active-map
   (let ((map (make-sparse-keymap)))
@@ -1199,6 +1201,12 @@ universal argument, DIRECTORY and GLOB are prompted for as well."
     (when (consp all)
       (when (numberp (cdr (last all)))
         (setcdr (last all) nil))
+      (setq all (cl-remove-if
+                 (lambda (s)
+                   (or (not (stringp s))
+                       (zerop (string-width
+                               (string-trim (substring-no-properties s))))))
+                 all))
       (funcall sort-fn all))))
 
 (defun my/popup--ann-fn ()
@@ -1242,18 +1250,25 @@ universal argument, DIRECTORY and GLOB are prompted for as well."
              for face = (if sel
                             'my/popup-current-face
                           'my/popup-face)
-             for ann = (if ann-fn
-                           (or (funcall ann-fn c) "")
-                         "")
-             for raw = (concat " " c " " ann)
-             for text = (truncate-string-to-width
-                         raw w 0 ?\s)
+             for ann = (replace-regexp-in-string
+                        "[\n\r]" ""
+                        (if ann-fn (or (funcall ann-fn c) "") ""))
+             for tag = (if (string= my/popup--source "") ""
+                         (concat "(" my/popup--source ")"))
+             for left = (concat " "
+                         (substring-no-properties c)
+                         " " ann)
+             for left-trunc = (truncate-string-to-width
+                               left (- w (1+ (length tag))) 0 ?\s)
+             for raw = (concat left-trunc " " tag)
+             for text = (truncate-string-to-width raw w 0 ?\s)
              collect (propertize text 'face face)))
            (counter-line
-            (when (> n my/popup-max)
-              (propertize
-               (format " [%d/%d]" (1+ my/popup--idx) n)
-               'face 'my/popup-face)))
+            (propertize
+             (truncate-string-to-width
+              (format " [%d/%d %s]" (1+ my/popup--idx) n my/popup--source)
+              w 0 ?\s)
+             'face 'my/popup-face))
            (all-lines (if counter-line
                           (append popup-lines
                                   (list counter-line))
@@ -1266,14 +1281,16 @@ universal argument, DIRECTORY and GLOB are prompted for as well."
                      (zerop (forward-line 1)))
                 (let* ((bol (line-beginning-position))
                        (eol (line-end-position))
+                       (end (min (1+ eol) (point-max)))
                        (orig (buffer-substring
                               bol eol))
                        (prefix
                         (truncate-string-to-width
                          orig col 0 ?\s))
-                       (ov (make-overlay bol eol)))
+                       (ov (make-overlay bol end)))
                   (overlay-put ov 'display
-                               (concat prefix pline))
+                               (concat prefix pline
+                                       (if (< eol (point-max)) "\n" "")))
                   (overlay-put ov 'priority 1000)
                   (push ov my/popup--ovs))
               (setq past-end t)
@@ -1340,7 +1357,8 @@ universal argument, DIRECTORY and GLOB are prompted for as well."
         my/popup--pred nil
         my/popup--plist nil
         my/popup--ovs nil
-        my/popup--scroll 0))
+        my/popup--scroll 0
+        my/popup--source ""))
 
 (defun my/popup--start (beg cands table pred plist)
   "Start popup with BEG, CANDS, TABLE, PRED, and PLIST."
@@ -1368,6 +1386,7 @@ Picks up extra capf properties via `completion-extra-properties'."
          (plist (bound-and-true-p completion-extra-properties))
          (cands (my/popup--get-candidates prefix table pred)))
     (when cands
+      (setq my/popup--source "completion")
       (my/popup--start beg cands table pred plist))))
 
 (defun my/popup--refresh ()
@@ -1399,24 +1418,46 @@ Picks up extra capf properties via `completion-extra-properties'."
               my/popup-insert my/popup-abort
               my/popup-complete completion-at-point))
       nil)
-     ((memq this-command
-            '(self-insert-command
-              delete-backward-char
-              backward-delete-char-untabify
-              c-electric-backspace))
-      (if (and my/popup--beg (>= (point) my/popup--beg))
-          (my/popup--refresh)
-        (my/popup-abort)))
+     ((and my/popup--beg (>= (point) my/popup--beg)
+           (or (eq this-command 'self-insert-command)
+               (get this-command 'delete-selection)
+               (memq this-command
+                     '(delete-backward-char
+                       backward-delete-char-untabify
+                       c-electric-backspace
+                       org-self-insert-command))))
+      (my/popup--refresh))
      (t (my/popup-abort)))))
 
 (add-hook 'post-command-hook #'my/popup--post-command)
+
+(defun my/popup--capf-name (fn)
+  "Return a short display name for capf function FN."
+  (let ((name (symbol-name fn)))
+    (cond
+     ((string-match-p "dabbrev" name) "dabbrev")
+     ((string-match-p "eglot" name) "eglot")
+     ((string-match-p "elisp" name) "elisp")
+     ((string-match-p "eshell" name) "eshell")
+     ((string-match-p "shell" name) "shell")
+     ((string-match-p "ispell" name) "ispell")
+     ((string-match-p "tag" name) "tags")
+     ((string-match-p "file" name) "file")
+     (t (replace-regexp-in-string
+         "\\(?:-capf\\|-completion-at-point\\)" "" name)))))
 
 (defun my/popup-complete ()
   "Trigger popup completion at point by querying capf directly."
   (interactive)
   (my/popup-abort)
-  (let ((data (run-hook-with-args-until-success
-               'completion-at-point-functions)))
+  (let ((data nil)
+        (source ""))
+    (cl-loop for fn in completion-at-point-functions
+             when (and (functionp fn)
+                       (setq data (funcall fn)))
+             do (progn
+                  (setq source (my/popup--capf-name fn))
+                  (cl-return)))
     (if (and data (>= (length data) 3))
         (let* ((beg (nth 0 data))
                (end (nth 1 data))
@@ -1427,15 +1468,39 @@ Picks up extra capf properties via `completion-extra-properties'."
                (cands (my/popup--get-candidates
                        prefix table pred)))
           (if cands
-              (my/popup--start beg cands table pred plist)
+              (progn
+                (setq my/popup--source source)
+                (my/popup--start beg cands table pred plist))
             (message "No completions for '%s'" prefix)))
       (message "No completion backend at point"))))
+
+(defun my/dabbrev-capf ()
+  "Completion-at-point function using dabbrev as a fallback."
+  (let ((bounds (bounds-of-thing-at-point 'symbol)))
+    (when bounds
+      (let* ((beg (car bounds))
+             (end (cdr bounds))
+             (prefix (buffer-substring-no-properties beg end))
+             (inhibit-message t)
+             (message-log-max nil))
+        (ignore-errors
+          (dabbrev--reset-global-variables)
+          (let ((completions (dabbrev--find-all-expansions prefix nil)))
+            (when completions
+              (list beg end completions
+                    :exclusive 'no
+                    :annotation-function
+                    (lambda (_) " (dabbrev)")))))))))
+
+(add-hook 'completion-at-point-functions #'my/dabbrev-capf 100)
 
 (setq tab-always-indent 'complete)
 (setq completion-in-region-function #'my/popup-completion-in-region)
 (global-set-key (kbd "C-c TAB") #'my/popup-complete)
 (global-set-key (kbd "C-c <tab>") #'my/popup-complete)
 (global-set-key (kbd "C-M-i") #'my/popup-complete)
+(with-eval-after-load 'flyspell
+  (define-key flyspell-mode-map (kbd "C-M-i") nil))
 
 (defun my/eshell-history-capf ()
   "Completion-at-point function for eshell history."
