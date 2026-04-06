@@ -184,9 +184,7 @@ Each line is represented as a list of field values."
          ;; Handle escaped quote within quoted field
          ((and (eq char ?\") in-quoted (eq previous-char ?\"))
           (setq current-field (concat current-field "\""))
-          (setq previous-char nil) ;; Reset to avoid triple quote issue
-          (forward-char)
-          (continue))
+          (setq previous-char nil))
          
          ;; Handle field separator (comma)
          ((and (eq char ?,) (not in-quoted))
@@ -306,7 +304,7 @@ Solved with the code below:
 (defun my/rainbow-mode ()
   "Overlay colors represented as hex values in the current buffer."
   (interactive)
-  (remove-overlays (point-min) (point-max))
+  (remove-overlays (point-min) (point-max) 'my/rainbow t)
   (let ((hex-color-regex "#[0-9a-fA-F]\\{3,6\\}"))
     (save-excursion
       (goto-char (point-min))
@@ -314,6 +312,7 @@ Solved with the code below:
         (let* ((color (match-string 0))
                (overlay (make-overlay (match-beginning 0) (match-end 0)))
                (fg-color (if (string-greaterp color "#888888") "black" "white")))
+          (overlay-put overlay 'my/rainbow t)
           (overlay-put overlay 'face `(:background ,color :foreground ,fg-color))))))
   (when (derived-mode-p 'org-mode)
     (org-set-startup-visibility)))
@@ -321,7 +320,7 @@ Solved with the code below:
 (defun my/rainbow-mode-clear ()
   "Remove all hex color overlays in the current buffer."
   (interactive)
-  (remove-overlays (point-min) (point-max)))
+  (remove-overlays (point-min) (point-max) 'my/rainbow t))
 #+end_src
 
 ** DONE visual-fill-column-mode
@@ -460,7 +459,7 @@ are provided, they are used to separate the branches or tags in the display."
            (styled-branches (mapconcat
                              (lambda (branch)
                                (if (string-prefix-p "* " branch)
-                                   (propertize (concat "*" (string-trim-left branch "* "))
+                                   (propertize (concat "*" (string-trim-left branch "\\* "))
                                                'face '(:weight bold))
                                  branch))
                              branches branch-sep))
@@ -535,9 +534,16 @@ are provided, they are used to separate the branches or tags in the display."
                    (shell-command-to-string "git ls-files")
                    "\n" t)))
       (vc-dir-refresh)
-      (dolist (file files)
-        (let ((full-path (expand-file-name file default-directory)))
-          (vc-dir-show-fileentry file))))))
+      (let ((buf (get-buffer-create "*vc-tracked-files*")))
+        (with-current-buffer buf
+          (let ((inhibit-read-only t))
+            (erase-buffer)
+            (insert (format "Tracked files in %s:\n\n" default-directory))
+            (dolist (file files)
+              (insert (format "  %s\n" file)))
+            (goto-char (point-min))
+            (special-mode)))
+        (pop-to-buffer buf)))))
 
 ;; Bind keys in vc-dir-mode
 (with-eval-after-load 'vc-dir
@@ -786,8 +792,8 @@ The function adjusts:
          (inactive-fg-color (face-foreground 'mode-line-inactive))
          (is-dark-theme (not (string-greaterp bg-color "#888888")))
          (adjusted-bg-color (if is-dark-theme
-                                (adjust-color bg-color 20)
-                              (adjust-color bg-color -5))))
+                                (color-lighten-name bg-color 20)
+                              (color-darken-name bg-color 5))))
     ;; Mode-line configuration
     (set-face-attribute 'mode-line nil 
                         :height 140 
@@ -807,8 +813,8 @@ The function adjusts:
         (custom-set-faces
          `(cursor ((t (:background ,accent-color))))
          `(hl-line ((t (:background ,adjusted-bg-color))))
-         `(vertical-border ((t (:foreground ,(adjust-color fg-color -60)))))
-         `(window-divider ((t (:foreground ,(adjust-color fg-color -60)))))
+         `(vertical-border ((t (:foreground ,(color-darken-name fg-color 60)))))
+         `(window-divider ((t (:foreground ,(color-darken-name fg-color 60)))))
          `(fringe ((t (:foreground ,bg-color :background ,bg-color))))
          `(tab-bar ((t (:inherit default :background ,bg-color :foreground ,fg-color))))
          `(tab-bar-tab ((t (:inherit 'highlight :background ,accent-color :foreground "#000000"))))
@@ -817,8 +823,8 @@ The function adjusts:
       (custom-set-faces
        `(cursor ((t (:background ,accent-color))))
        `(hl-line ((t (:background ,adjusted-bg-color))))
-       `(vertical-border ((t (:foreground ,(adjust-color fg-color -60)))))
-       `(window-divider ((t (:foreground ,(adjust-color fg-color -60)))))
+       `(vertical-border ((t (:foreground ,(color-darken-name fg-color 60)))))
+       `(window-divider ((t (:foreground ,(color-darken-name fg-color 60)))))
        `(fringe ((t (:foreground ,bg-color :background ,bg-color))))
        `(tab-bar ((t (:inherit default :background "#000000" :foreground ,bg-color))))
        ;; `(tab-bar-tab ((t (:inherit 'highlight :box (:line-width 6 :color ,accent-color :style flat-button)))))
@@ -1092,7 +1098,7 @@ Solution is the following configuration:
                          (lambda () 
                            (interactive)
                            (let ((button (button-at (point))))
-                             (with-current-buffer (target-buffer (button-get button 'buffer))
+                             (with-current-buffer (button-get button 'buffer)
                                (my/collect-flyspell-errors)))))
           (local-set-key (kbd "a") 'my/flyspell-add-word-to-dict)
           (local-set-key (kbd "q") 'quit-window))))))
@@ -1251,7 +1257,7 @@ The second one I think I can replace by using =org-goto= with a couple of tweaks
 
 #+begin_src emacs-lisp
 (global-set-key (kbd "M-g o") #'org-goto)
-(setq org-goto-interface 'outline-path-completionp)
+(setq org-goto-interface 'outline-path-completion)
 (setq org-outline-path-complete-in-steps nil)
 #+end_src
 
@@ -1262,12 +1268,18 @@ This transforms the awkward =org-goto= interface into a better, easier, completi
 The third one can be roughly accomplished by passing eshell history through =completing-read=
 
 #+begin_src elisp
-(let ((bash-history-file "~/.bash_history")
-      (eshell-history-file (expand-file-name "eshell/history" user-emacs-directory)))
-  (when (file-exists-p bash-history-file)
-    (with-temp-buffer
-      (insert-file-contents bash-history-file)
-      (append-to-file (buffer-string) nil eshell-history-file))))
+(defun my/import-bash-history-to-eshell ()
+  "Import bash history into eshell history file, once per session."
+  (unless (bound-and-true-p my/bash-history-imported)
+    (let ((bash-history-file "~/.bash_history")
+          (eshell-history-file (expand-file-name "eshell/history" user-emacs-directory)))
+      (when (file-exists-p bash-history-file)
+        (with-temp-buffer
+          (insert-file-contents bash-history-file)
+          (append-to-file (buffer-string) nil eshell-history-file))))
+    (setq my/bash-history-imported t)))
+
+(add-hook 'eshell-mode-hook #'my/import-bash-history-to-eshell)
 
 (defun my/eshell-history-completing-read ()
   "Search eshell history using completing-read"
@@ -1550,7 +1562,7 @@ Potentially solved with the following, probably requires more testing:
   "Convert a Markdown file INPUT-FILE to an Org-mode file OUTPUT-FILE."
   (with-temp-buffer
     (insert-file-contents input-file)
-    (md-to-org-convert-buffer)
+    (my/md-to-org-convert-buffer)
     (write-file output-file)))
 
 (defun my/convert-markdown-clipboard-to-org ()
@@ -1940,7 +1952,8 @@ More bonus points here for in buffer completion in shells, this includes eshell 
 Lets try and see how far we can get going through the =org-publish= mechanism for publishing a web-site!
 
 #+begin_src elisp
-(require 'ox-publish)
+(with-eval-after-load 'org
+  (require 'ox-publish))
 
 (defun my/org-html-src-block-filter (text backend info)
   (when (org-export-derived-backend-p backend 'html)
@@ -2051,7 +2064,7 @@ process, FILENAME is the input Org file, and PUB-DIR is the publishing directory
           (mapconcat
            (lambda (entry)
              (format "- %s\n" (car entry)))
-           list)
+           list "")
           "\n"))
 #+end_src
 
