@@ -1424,6 +1424,7 @@ Picks up extra capf properties via `completion-extra-properties'."
 (setq completion-in-region-function #'my/popup-completion-in-region)
 (global-set-key (kbd "C-c TAB") #'my/popup-complete)
 (global-set-key (kbd "C-c <tab>") #'my/popup-complete)
+(global-set-key (kbd "C-M-i") #'my/popup-complete)
 
 (defun my/eshell-history-capf ()
   "Completion-at-point function for eshell history."
