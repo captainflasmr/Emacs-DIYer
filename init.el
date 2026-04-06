@@ -425,6 +425,17 @@ are provided, they are used to separate the branches or tags in the display."
 
 (add-hook 'dired-after-readin-hook #'emacs-solo/dired-git-status-overlay)
 
+(defun my/dired-revert-and-refresh (&rest _)
+  "Revert dired buffer to refresh git status overlays."
+  (when (derived-mode-p 'dired-mode)
+    (revert-buffer)))
+
+(with-eval-after-load 'dired
+  (advice-add 'dired-do-delete :after #'my/dired-revert-and-refresh)
+  (advice-add 'dired-do-rename :after #'my/dired-revert-and-refresh)
+  (advice-add 'dired-do-copy :after #'my/dired-revert-and-refresh)
+  (advice-add 'dired-do-flagged-delete :after #'my/dired-revert-and-refresh))
+
 (defun my-git-diff-stash (stash-ref)
   "Diff working directory against specified stash"
   (interactive "sStash reference: ")
