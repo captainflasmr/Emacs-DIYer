@@ -1132,27 +1132,293 @@ universal argument, DIRECTORY and GLOB are prompted for as well."
    (lambda () 
      (dotimes (_ arg) (org-promote)))))
 
-(defun my/simple-completion-at-point ()
-  "Use completing-read-in-buffer for completion at point."
-  (interactive)
-  (let* ((completion-data (run-hook-with-args-until-success 
-                           'completion-at-point-functions))
-         (beg (nth 0 completion-data))
-         (end (nth 1 completion-data))
-         (table (nth 2 completion-data))
-         (pred (plist-get (nthcdr 3 completion-data) :predicate))
-         (prefix (buffer-substring-no-properties beg end))
-         (completion (completing-read-default
-                      "Complete: "
-                      table
-                      pred
-                      nil  ; no require-match
-                      prefix)))
-    (when completion
-      (delete-region beg end)
-      (insert completion))))
+(require 'cl-lib)
 
-(global-set-key (kbd "C-c TAB") #'my/simple-completion-at-point)
+(defvar my/popup-max 8
+  "Maximum visible candidates in popup.")
+
+(defvar my/popup-width 70
+  "Maximum width of popup candidates in characters.")
+
+(defface my/popup-face
+  '((((background dark))
+     :background "#1e1e2e" :foreground "#bac2de" :extend t)
+    (t
+     :background "#eff1f5" :foreground "#4c4f69" :extend t))
+  "Face for popup completion candidates.")
+
+(defface my/popup-current-face
+  '((((background dark))
+     :background "#45475a" :foreground "#cdd6f4" :extend t)
+    (t
+     :background "#ccd0da" :foreground "#4c4f69" :extend t))
+  "Face for selected popup candidate.")
+
+(defvar-local my/popup--ovs nil "List of popup overlays.")
+(defvar-local my/popup--cands nil "Completion candidates.")
+(defvar-local my/popup--idx 0 "Selected index.")
+(defvar-local my/popup--beg nil "Start of completion prefix.")
+(defvar-local my/popup--table nil "Completion table.")
+(defvar-local my/popup--pred nil "Completion predicate.")
+(defvar-local my/popup--plist nil "Capf extra properties.")
+(defvar-local my/popup--scroll 0 "Scroll offset.")
+
+(defvar my/popup-active-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map (kbd "C-n") #'my/popup-next)
+    (define-key map (kbd "C-p") #'my/popup-prev)
+    (define-key map (kbd "RET") #'my/popup-insert)
+    (define-key map (kbd "TAB") #'my/popup-insert)
+    (define-key map (kbd "C-g") #'my/popup-abort)
+    map)
+  "Keymap for active popup.")
+
+(define-minor-mode my/popup-active-mode
+  "Transient minor mode active while popup is showing."
+  :keymap my/popup-active-map)
+
+(defun my/popup--get-candidates (prefix table pred)
+  "Get sorted candidates matching PREFIX from TABLE with PRED."
+  (let* ((md (completion-metadata prefix table pred))
+         (all (completion-all-completions
+               prefix table pred (length prefix) md))
+         (sort-fn (or (completion-metadata-get
+                       md 'display-sort-function)
+                      #'identity)))
+    (when (consp all)
+      (when (numberp (cdr (last all)))
+        (setcdr (last all) nil))
+      (funcall sort-fn all))))
+
+(defun my/popup--ann-fn ()
+  "Get annotation function from metadata or capf plist."
+  (or (completion-metadata-get
+       (completion-metadata
+        (buffer-substring-no-properties my/popup--beg (point))
+        my/popup--table my/popup--pred)
+       'annotation-function)
+      (plist-get my/popup--plist :annotation-function)))
+
+(defun my/popup--render ()
+  "Display popup by overlaying existing lines below point."
+  (my/popup--hide)
+  (when my/popup--cands
+    (let* ((col (save-excursion
+                  (goto-char my/popup--beg)
+                  (current-column)))
+           (n (length my/popup--cands))
+           (_ (cond
+               ((>= my/popup--idx
+                    (+ my/popup--scroll my/popup-max))
+                (setq my/popup--scroll
+                      (1+ (- my/popup--idx my/popup-max))))
+               ((< my/popup--idx my/popup--scroll)
+                (setq my/popup--scroll my/popup--idx))))
+           (end-idx (min n (+ my/popup--scroll my/popup-max)))
+           (visible (seq-subseq my/popup--cands
+                                my/popup--scroll end-idx))
+           (ann-fn (my/popup--ann-fn))
+           (widest (if visible
+                       (apply #'max
+                              (mapcar #'string-width visible))
+                     10))
+           (w my/popup-width)
+           (popup-lines
+            (cl-loop
+             for c in visible
+             for i from my/popup--scroll
+             for sel = (= i my/popup--idx)
+             for face = (if sel
+                            'my/popup-current-face
+                          'my/popup-face)
+             for ann = (if ann-fn
+                           (or (funcall ann-fn c) "")
+                         "")
+             for raw = (concat " " c " " ann)
+             for text = (truncate-string-to-width
+                         raw w 0 ?\s)
+             collect (propertize text 'face face)))
+           (counter-line
+            (when (> n my/popup-max)
+              (propertize
+               (format " [%d/%d]" (1+ my/popup--idx) n)
+               'face 'my/popup-face)))
+           (all-lines (if counter-line
+                          (append popup-lines
+                                  (list counter-line))
+                        popup-lines)))
+      (save-excursion
+        (let ((past-end nil))
+          (dolist (pline all-lines)
+            (if (and (not past-end)
+                     (zerop (forward-line 1)))
+                (let* ((bol (line-beginning-position))
+                       (eol (line-end-position))
+                       (orig (buffer-substring
+                              bol eol))
+                       (prefix
+                        (truncate-string-to-width
+                         orig col 0 ?\s))
+                       (ov (make-overlay bol eol)))
+                  (overlay-put ov 'display
+                               (concat prefix pline))
+                  (overlay-put ov 'priority 1000)
+                  (push ov my/popup--ovs))
+              (setq past-end t)
+              (let* ((pad (make-string col ?\s))
+                     (ov (make-overlay (point-max)
+                                       (point-max))))
+                (overlay-put
+                 ov 'after-string
+                 (concat "\n" pad pline))
+                (overlay-put ov 'priority 1000)
+                (push ov my/popup--ovs))))))
+      (my/popup-active-mode 1))))
+
+(defun my/popup--hide ()
+  "Remove all popup overlays."
+  (dolist (ov my/popup--ovs)
+    (when (overlayp ov) (delete-overlay ov)))
+  (setq my/popup--ovs nil))
+
+(defun my/popup-next ()
+  "Select next candidate."
+  (interactive)
+  (when my/popup--cands
+    (setq my/popup--idx
+          (mod (1+ my/popup--idx)
+               (length my/popup--cands)))
+    (my/popup--render)))
+
+(defun my/popup-prev ()
+  "Select previous candidate."
+  (interactive)
+  (when my/popup--cands
+    (setq my/popup--idx
+          (mod (1- my/popup--idx)
+               (length my/popup--cands)))
+    (my/popup--render)))
+
+(defun my/popup-insert ()
+  "Insert selected candidate, run exit-function, and close."
+  (interactive)
+  (when (and my/popup--cands my/popup--beg)
+    (let ((chosen (nth my/popup--idx my/popup--cands))
+          (exit-fn (plist-get my/popup--plist :exit-function)))
+      (when chosen
+        (delete-region my/popup--beg (point))
+        (insert chosen)
+        (when exit-fn
+          (funcall exit-fn chosen 'finished)))))
+  (my/popup-abort))
+
+(defun my/popup-abort ()
+  "Dismiss the popup."
+  (interactive)
+  (my/popup--hide)
+  (my/popup-active-mode -1)
+  (setq my/popup--cands nil
+        my/popup--idx 0
+        my/popup--beg nil
+        my/popup--table nil
+        my/popup--pred nil
+        my/popup--plist nil
+        my/popup--ovs nil
+        my/popup--scroll 0))
+
+(defun my/popup--start (beg cands table pred plist)
+  "Start popup with BEG, CANDS, TABLE, PRED, and PLIST."
+  (setq my/popup--beg beg
+        my/popup--cands cands
+        my/popup--table table
+        my/popup--pred pred
+        my/popup--plist plist
+        my/popup--idx 0
+        my/popup--scroll 0)
+  (if (= (length cands) 1)
+      (progn
+        (delete-region beg (point))
+        (insert (car cands))
+        (let ((exit-fn (plist-get plist :exit-function)))
+          (when exit-fn
+            (funcall exit-fn (car cands) 'finished))))
+    (my/popup--render)))
+
+(defun my/popup-completion-in-region (beg end table &optional pred)
+  "Show popup for region BEG..END using TABLE and PRED.
+Picks up extra capf properties via `completion-extra-properties'."
+  (my/popup-abort)
+  (let* ((prefix (buffer-substring-no-properties beg end))
+         (plist (bound-and-true-p completion-extra-properties))
+         (cands (my/popup--get-candidates prefix table pred)))
+    (when cands
+      (my/popup--start beg cands table pred plist))))
+
+(defun my/popup--refresh ()
+  "Re-query candidates after prefix changed."
+  (when (and my/popup--beg my/popup--table
+             (>= (point) my/popup--beg))
+    (let* ((prefix (buffer-substring-no-properties
+                    my/popup--beg (point)))
+           (cands (my/popup--get-candidates
+                   prefix my/popup--table my/popup--pred)))
+      (if cands
+          (progn
+            (setq my/popup--cands cands
+                  my/popup--idx
+                  (min my/popup--idx (1- (length cands)))
+                  my/popup--scroll
+                  (min my/popup--scroll
+                       (max 0 (- (length cands)
+                                 my/popup-max))))
+            (my/popup--render))
+        (my/popup-abort)))))
+
+(defun my/popup--post-command ()
+  "Handle live filtering and popup dismissal."
+  (when my/popup-active-mode
+    (cond
+     ((memq this-command
+            '(my/popup-next my/popup-prev
+              my/popup-insert my/popup-abort
+              my/popup-complete completion-at-point))
+      nil)
+     ((memq this-command
+            '(self-insert-command
+              delete-backward-char
+              backward-delete-char-untabify
+              c-electric-backspace))
+      (if (and my/popup--beg (>= (point) my/popup--beg))
+          (my/popup--refresh)
+        (my/popup-abort)))
+     (t (my/popup-abort)))))
+
+(add-hook 'post-command-hook #'my/popup--post-command)
+
+(defun my/popup-complete ()
+  "Trigger popup completion at point by querying capf directly."
+  (interactive)
+  (my/popup-abort)
+  (let ((data (run-hook-with-args-until-success
+               'completion-at-point-functions)))
+    (if (and data (>= (length data) 3))
+        (let* ((beg (nth 0 data))
+               (end (nth 1 data))
+               (table (nth 2 data))
+               (plist (nthcdr 3 data))
+               (pred (plist-get plist :predicate))
+               (prefix (buffer-substring-no-properties beg end))
+               (cands (my/popup--get-candidates
+                       prefix table pred)))
+          (if cands
+              (my/popup--start beg cands table pred plist)
+            (message "No completions for '%s'" prefix)))
+      (message "No completion backend at point"))))
+
+(setq tab-always-indent 'complete)
+(setq completion-in-region-function #'my/popup-completion-in-region)
+(global-set-key (kbd "C-c TAB") #'my/popup-complete)
+(global-set-key (kbd "C-c <tab>") #'my/popup-complete)
 
 (defun my/eshell-history-capf ()
   "Completion-at-point function for eshell history."

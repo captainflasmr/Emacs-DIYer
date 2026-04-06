@@ -10,6 +10,14 @@ This document contains the release notes for Emacs-enhanced
 
 * Versions
 
+** <2026-04-06>
+
+Added overlay-based in-buffer popup completion to replace corfu/company, using only built-in Emacs features. Supports live filtering, scrolling, annotations, and eglot integration with exit-function handling.
+
+** <2026-02-20>
+
+Added some marginalia-ish details
+
 ** <2026-01-18>
 
 Added RSVP speed reading implementation to replace spray and speedread packages
