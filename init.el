@@ -1248,7 +1248,8 @@ universal argument, DIRECTORY and GLOB are prompted for as well."
                                   (list counter-line))
                         popup-lines)))
       (save-excursion
-        (let ((past-end nil))
+        (let ((past-end nil)
+              (extra-lines nil))
           (dolist (pline all-lines)
             (if (and (not past-end)
                      (zerop (forward-line 1)))
@@ -1265,14 +1266,18 @@ universal argument, DIRECTORY and GLOB are prompted for as well."
                   (overlay-put ov 'priority 1000)
                   (push ov my/popup--ovs))
               (setq past-end t)
-              (let* ((pad (make-string col ?\s))
-                     (ov (make-overlay (point-max)
-                                       (point-max))))
-                (overlay-put
-                 ov 'after-string
-                 (concat "\n" pad pline))
-                (overlay-put ov 'priority 1000)
-                (push ov my/popup--ovs))))))
+              (push pline extra-lines)))
+          (when extra-lines
+            (let* ((pad (make-string col ?\s))
+                   (str (mapconcat
+                         (lambda (l) (concat pad l))
+                         (nreverse extra-lines) "\n"))
+                   (ov (make-overlay (point-max)
+                                     (point-max))))
+              (overlay-put ov 'after-string
+                           (concat "\n" str))
+              (overlay-put ov 'priority 1000)
+              (push ov my/popup--ovs)))))
       (my/popup-active-mode 1))))
 
 (defun my/popup--hide ()
