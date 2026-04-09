@@ -1026,6 +1026,7 @@ universal argument, DIRECTORY and GLOB are prompted for as well."
 ;; Toggle the currently selected popup.
 (global-set-key (kbd "C-x j") #'my/popper-toggle-current)
 (global-set-key (kbd "C-'") #'my/popper-toggle-current)
+(global-set-key (kbd "C-`") #'my/popper-toggle-current)
 
 ;; Cycle through popups or show the next popup.
 (global-set-key (kbd "C-M-<return>") #'my/popper-cycle-popup)
