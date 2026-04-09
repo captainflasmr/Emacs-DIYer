@@ -1986,6 +1986,69 @@ Works with both standard `move-end-of-line` and `org-end-of-line`."
 
 (add-hook 'dired-after-readin-hook #'my/dired-add-icons)
 
+(defun my/dired-collapse--deepest (dir)
+  "Return the deepest single-child descendant directory of DIR.
+Walks the directory chain as long as each directory contains exactly
+one entry which is itself an accessible directory.  Stops after 100
+iterations to guard against symlink cycles."
+  (let ((current dir)
+        (depth 0))
+    (catch 'done
+      (while (< depth 100)
+        (let ((entries (condition-case nil
+                           (directory-files current t
+                                            directory-files-no-dot-files-regexp
+                                            t)
+                         (error nil))))
+          (if (and entries
+                   (null (cdr entries))
+                   (file-directory-p (car entries))
+                   (file-accessible-directory-p (car entries)))
+              (setq current (car entries)
+                    depth (1+ depth))
+            (throw 'done current)))))
+    current))
+
+(defun my/dired-collapse ()
+  "Collapse single-child directory chains in the current dired buffer.
+A DIY replacement for `dired-collapse-mode' from the dired-hacks
+package.  Rewrites the filename portion of each line in place and
+reapplies the `dired-filename' text property so that standard dired
+navigation still resolves to the deepest directory."
+  (when (derived-mode-p 'dired-mode)
+    (let ((inhibit-read-only t))
+      (save-excursion
+        (goto-char (point-min))
+        (while (not (eobp))
+          (condition-case nil
+              (let ((file (dired-get-filename nil t)))
+                (when (and file
+                           (file-directory-p file)
+                           (not (member (file-name-nondirectory
+                                         (directory-file-name file))
+                                        '("." "..")))
+                           (file-accessible-directory-p file))
+                  (let ((deepest (my/dired-collapse--deepest file)))
+                    (unless (string= deepest file)
+                      (when (dired-move-to-filename)
+                        (let* ((start (point))
+                               (end (dired-move-to-end-of-filename t))
+                               (displayed (buffer-substring-no-properties
+                                           start end))
+                               (suffix (substring deepest
+                                                  (1+ (length file))))
+                               (new (concat displayed "/" suffix)))
+                          (delete-region start end)
+                          (goto-char start)
+                          (insert (propertize new
+                                              'face 'dired-directory
+                                              'mouse-face 'highlight
+                                              'dired-filename t))))))))
+            (error nil))
+          (forward-line))))))
+
+(add-hook 'dired-after-readin-hook #'my/dired-collapse -50)
+
 (defun emacs-solo/ollama-run-model ()
   "Run `ollama list`, let the user choose a model, and open it in `ansi-term`.
 Asks for a prompt when run. If none is passed (RET), starts it interactive.
