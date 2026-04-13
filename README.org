@@ -2643,6 +2643,74 @@ navigation still resolves to the deepest directory."
 (add-hook 'dired-after-readin-hook #'my/dired-collapse -50)
 #+end_src
 
+Collapsed lines confuse =dired-jump=: because =dired-get-filename= on a collapsed line returns the deepest path, =dired-jump= on a file under that path sees the deep directory as "missing" from =dired-subdir-alist= and splices in a duplicate listing via =dired-maybe-insert-subdir=.  The around-advice below short-circuits that case — if an existing dired buffer already has a collapsed line whose deepest target is an ancestor of the jump target, reuse that buffer and place point on the collapsed line instead of letting dired insert a second subdir.
+
+#+begin_src elisp
+(defun my/dired-collapse--find-hit (target-dir)
+  "Return (BUFFER . POS) of a dired buffer with a collapsed line covering TARGET-DIR.
+TARGET-DIR is an absolute directory name (trailing slash added if
+missing).  A collapsed line \"covers\" TARGET-DIR when the line's
+deepest path lies anywhere along the chain between the buffer's
+`default-directory' (strict ancestor) and TARGET-DIR — in particular
+when the collapsed chain's deepest path is equal to TARGET-DIR or a
+descendant of it."
+  (let ((target (file-name-as-directory (expand-file-name target-dir)))
+        hit)
+    (dolist (buf (buffer-list))
+      (unless hit
+        (with-current-buffer buf
+          (when (and (derived-mode-p 'dired-mode)
+                     (stringp default-directory))
+            (let ((buf-dir (file-name-as-directory
+                            (expand-file-name default-directory))))
+              (when (and (string-prefix-p buf-dir target)
+                         (not (string= buf-dir target)))
+                (save-excursion
+                  (goto-char (point-min))
+                  (catch 'found
+                    (while (not (eobp))
+                      (let ((line-file (ignore-errors
+                                         (dired-get-filename nil t))))
+                        (when (and line-file
+                                   (file-directory-p line-file))
+                          (let ((line-dir (file-name-as-directory
+                                           (expand-file-name line-file))))
+                            (when (string-prefix-p target line-dir)
+                              (setq hit (cons buf (point)))
+                              (throw 'found nil)))))
+                      (forward-line))))))))))
+    hit))
+
+(defun my/dired-collapse--jump-advice (orig-fn &optional other-window file-name)
+  "Around-advice for `dired-jump' that respects collapsed dired lines.
+When an existing dired buffer already shows the jump target inside a
+collapsed line, switch to that buffer and place point on the collapsed
+line instead of letting dired splice in a duplicate subdir.  Covers
+both the file-buffer jump and the in-dired \"pop up a level\" path."
+  (let* ((target
+          (cond
+           (file-name
+            (let ((f (expand-file-name file-name)))
+              (if (file-directory-p f) f (file-name-directory f))))
+           ((derived-mode-p 'dired-mode)
+            (and (fboundp 'dired-current-directory)
+                 (dired-current-directory)))
+           (buffer-file-name
+            (file-name-directory (expand-file-name buffer-file-name)))))
+         (hit (and target (my/dired-collapse--find-hit target))))
+    (if hit
+        (let ((buf (car hit))
+              (pos (cdr hit)))
+          (if other-window
+              (switch-to-buffer-other-window buf)
+            (pop-to-buffer-same-window buf))
+          (goto-char pos)
+          (dired-move-to-filename))
+      (funcall orig-fn other-window file-name))))
+
+(advice-add 'dired-jump :around #'my/dired-collapse--jump-advice)
+#+end_src
+
 ** DONE LLMs
 
 As this configuration is mainly offline then naturally running some AI would take place locally and therefore using something like ollama, so lets replace the likes of gptel, chatgpt-shell and ellama can be replace by a scaled down version of my =ollama-buddy= package:
