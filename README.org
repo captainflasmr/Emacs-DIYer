@@ -2640,10 +2640,10 @@ navigation still resolves to the deepest directory."
             (error nil))
           (forward-line))))))
 
-(add-hook 'dired-after-readin-hook #'my/dired-collapse -50)
+(add-hook 'dired-after-readin-hook #'my/dired-collapse)
 #+end_src
 
-Collapsed lines confuse =dired-jump=: because =dired-get-filename= on a collapsed line returns the deepest path, =dired-jump= on a file under that path sees the deep directory as "missing" from =dired-subdir-alist= and splices in a duplicate listing via =dired-maybe-insert-subdir=.  The around-advice below short-circuits that case — if an existing dired buffer already has a collapsed line whose deepest target is an ancestor of the jump target, reuse that buffer and place point on the collapsed line instead of letting dired insert a second subdir.
+A companion advice on =dired-up-directory= restores the collapsed round-trip when navigating upwards: if you RET into a collapsed chain and then press the "up" key, the literal parent is usually not what you want — you'd rather land back on the collapsed line in whichever buffer you came from.  The advice only kicks in when the literal parent isn't already open as a dired buffer, so normal upward navigation is unchanged.
 
 #+begin_src elisp
 (defun my/dired-collapse--find-hit (target-dir)
@@ -2681,23 +2681,19 @@ descendant of it."
                       (forward-line))))))))))
     hit))
 
-(defun my/dired-collapse--jump-advice (orig-fn &optional other-window file-name)
-  "Around-advice for `dired-jump' that respects collapsed dired lines.
-When an existing dired buffer already shows the jump target inside a
-collapsed line, switch to that buffer and place point on the collapsed
-line instead of letting dired splice in a duplicate subdir.  Covers
-both the file-buffer jump and the in-dired \"pop up a level\" path."
-  (let* ((target
-          (cond
-           (file-name
-            (let ((f (expand-file-name file-name)))
-              (if (file-directory-p f) f (file-name-directory f))))
-           ((derived-mode-p 'dired-mode)
-            (and (fboundp 'dired-current-directory)
-                 (dired-current-directory)))
-           (buffer-file-name
-            (file-name-directory (expand-file-name buffer-file-name)))))
-         (hit (and target (my/dired-collapse--find-hit target))))
+(defun my/dired-collapse--up-advice (orig-fn &optional other-window)
+  "Around-advice for `dired-up-directory' restoring collapsed round-trip.
+When the literal parent of `default-directory' is not already open as a
+dired buffer but an existing dired buffer shows the current directory
+inside a collapsed chain, pop to that buffer and place point on the
+collapsed line instead of opening a fresh dired for the literal parent."
+  (let* ((dir (and (derived-mode-p 'dired-mode)
+                   (stringp default-directory)
+                   (expand-file-name default-directory)))
+         (up (and dir (file-name-directory (directory-file-name dir))))
+         (parent-buf (and up (dired-find-buffer-nocreate up)))
+         (hit (and dir (null parent-buf)
+                   (my/dired-collapse--find-hit dir))))
     (if hit
         (let ((buf (car hit))
               (pos (cdr hit)))
@@ -2706,9 +2702,9 @@ both the file-buffer jump and the in-dired \"pop up a level\" path."
             (pop-to-buffer-same-window buf))
           (goto-char pos)
           (dired-move-to-filename))
-      (funcall orig-fn other-window file-name))))
+      (funcall orig-fn other-window))))
 
-(advice-add 'dired-jump :around #'my/dired-collapse--jump-advice)
+(advice-add 'dired-up-directory :around #'my/dired-collapse--up-advice)
 #+end_src
 
 ** DONE LLMs

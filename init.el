@@ -2047,7 +2047,7 @@ navigation still resolves to the deepest directory."
             (error nil))
           (forward-line))))))
 
-(add-hook 'dired-after-readin-hook #'my/dired-collapse -50)
+(add-hook 'dired-after-readin-hook #'my/dired-collapse)
 
 (defun my/dired-collapse--find-hit (target-dir)
   "Return (BUFFER . POS) of a dired buffer with a collapsed line covering TARGET-DIR.
@@ -2084,23 +2084,19 @@ descendant of it."
                       (forward-line))))))))))
     hit))
 
-(defun my/dired-collapse--jump-advice (orig-fn &optional other-window file-name)
-  "Around-advice for `dired-jump' that respects collapsed dired lines.
-When an existing dired buffer already shows the jump target inside a
-collapsed line, switch to that buffer and place point on the collapsed
-line instead of letting dired splice in a duplicate subdir.  Covers
-both the file-buffer jump and the in-dired \"pop up a level\" path."
-  (let* ((target
-          (cond
-           (file-name
-            (let ((f (expand-file-name file-name)))
-              (if (file-directory-p f) f (file-name-directory f))))
-           ((derived-mode-p 'dired-mode)
-            (and (fboundp 'dired-current-directory)
-                 (dired-current-directory)))
-           (buffer-file-name
-            (file-name-directory (expand-file-name buffer-file-name)))))
-         (hit (and target (my/dired-collapse--find-hit target))))
+(defun my/dired-collapse--up-advice (orig-fn &optional other-window)
+  "Around-advice for `dired-up-directory' restoring collapsed round-trip.
+When the literal parent of `default-directory' is not already open as a
+dired buffer but an existing dired buffer shows the current directory
+inside a collapsed chain, pop to that buffer and place point on the
+collapsed line instead of opening a fresh dired for the literal parent."
+  (let* ((dir (and (derived-mode-p 'dired-mode)
+                   (stringp default-directory)
+                   (expand-file-name default-directory)))
+         (up (and dir (file-name-directory (directory-file-name dir))))
+         (parent-buf (and up (dired-find-buffer-nocreate up)))
+         (hit (and dir (null parent-buf)
+                   (my/dired-collapse--find-hit dir))))
     (if hit
         (let ((buf (car hit))
               (pos (cdr hit)))
@@ -2109,9 +2105,9 @@ both the file-buffer jump and the in-dired \"pop up a level\" path."
             (pop-to-buffer-same-window buf))
           (goto-char pos)
           (dired-move-to-filename))
-      (funcall orig-fn other-window file-name))))
+      (funcall orig-fn other-window))))
 
-(advice-add 'dired-jump :around #'my/dired-collapse--jump-advice)
+(advice-add 'dired-up-directory :around #'my/dired-collapse--up-advice)
 
 (defun emacs-solo/ollama-run-model ()
   "Run `ollama list`, let the user choose a model, and open it in `ansi-term`.
