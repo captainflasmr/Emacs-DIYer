@@ -115,9 +115,18 @@ Each line is represented as a list of field values."
 
 (define-key icomplete-minibuffer-map (kbd "M-RET") 'my-icomplete-exit-minibuffer-with-input)
 
+(defcustom my/quick-window-split-width-threshold 160
+  "Minimum frame width (in columns) for a side-by-side split.
+When the sole window is narrower than this, `my/quick-window-jump'
+splits top/bottom instead so each pane keeps a usable width."
+  :type 'integer
+  :group 'convenience)
+
 (defun my/quick-window-jump ()
   "Jump to a window by typing its assigned character label.
-If there is only a single window, split it horizontally.
+If there is only a single window, split it: side-by-side when the
+frame is wide enough (see `my/quick-window-split-width-threshold'),
+otherwise top/bottom.
 If there are only two windows, jump directly to the other window.
 Side windows are ignored."
   (interactive)
@@ -126,7 +135,9 @@ Side windows are ignored."
                                   (window-list nil 'no-mini))))
     (cond
      ((= (length window-list) 1)
-      (split-window-horizontally)
+      (if (< (window-total-width) my/quick-window-split-width-threshold)
+          (split-window-vertically)
+        (split-window-horizontally))
       (other-window 1))
      ((= (length window-list) 2)
       (let ((other-window (if (eq (selected-window) (nth 0 window-list))
