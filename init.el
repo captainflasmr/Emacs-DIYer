@@ -456,10 +456,17 @@ are provided, they are used to separate the branches or tags in the display."
 ;; Bind to C-x v S (capital S for stash diff)
 (define-key vc-prefix-map (kbd "S") 'my-git-diff-stash)
 
+(defvar my/sync-ui-accent-color--current "orange"
+  "Current accent color used by `my/sync-ui-accent-color'.
+Updated on each call.  Used as the fallback when the function is
+called without a COLOR argument (e.g. from theme-change hooks or
+startup), so non-interactive callers never prompt.")
+
 (defun my/sync-ui-accent-color (&optional color)
   "Synchronize various Emacs UI elements with a chosen accent color.
 Affects mode-line, cursor, tab-bar, and other UI elements for a coherent theme.
-If COLOR is not provided, prompts for color selection interactively.
+When called interactively, prompts for COLOR.  When called from Lisp
+without COLOR, reuses `my/sync-ui-accent-color--current'.
 The function adjusts:
 - Mode-line (active and inactive states)
 - Cursor
@@ -467,8 +474,8 @@ The function adjusts:
 - Window borders and dividers
 - Highlighting
 - Fringes"
-  (interactive (list (when current-prefix-arg (read-color "Color: "))))
-  (let* ((accent-color (or color (read-color "Select accent color: ")))
+  (interactive (list (read-color "Select accent color: ")))
+  (let* ((accent-color (or color my/sync-ui-accent-color--current))
          (bg-color (face-background 'default))
          (fg-color (face-foreground 'default))
          (hl-color (face-background 'highlight))
@@ -514,7 +521,19 @@ The function adjusts:
        `(tab-bar-tab ((t (:inherit 'highlight :background ,accent-color))))
        `(tab-bar-tab-inactive ((t (:inherit default :background ,bg-color :foreground ,fg-color
                                             :box (:line-width 1 :color ,bg-color :style flat-button)))))))
-    ))
+    (setq my/sync-ui-accent-color--current accent-color)))
+
+(if (version<= "29.1" emacs-version)
+    ;; Emacs 29.1+ — use the official theme hook
+    (add-hook 'enable-theme-functions
+              (lambda (_theme)
+                (my/sync-ui-accent-color)))
+  ;; Older Emacs — fall back to advising load-theme
+  (progn
+    (defun selected-window-accent-sync-tab-bar-to-theme--after (&rest _)
+      (my/sync-ui-accent-color))
+    (advice-add 'load-theme :after
+                #'selected-window-accent-sync-tab-bar-to-theme--after)))
 
 (defun my/grep (search-term &optional directory glob)
   "Run ripgrep (rg) with SEARCH-TERM and optionally DIRECTORY and GLOB.
