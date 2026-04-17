@@ -877,7 +877,7 @@ On abort (C-g), restores the themes enabled before the preview began."
    (let* ((_ (require 'cus-theme))
           (themes (mapcar #'symbol-name (custom-available-themes)))
           (saved  (copy-sequence custom-enabled-themes))
-          (saved-names (mapcar #'symbol-name saved))
+          (saved-names (and saved (list (symbol-name (car saved)))))
           (affixate
            (lambda (cands)
              (mapcar
@@ -900,11 +900,22 @@ On abort (C-g), restores the themes enabled before the preview began."
                                        (propertize summary 'face 'completions-annotations))))
                   (list cand prefix suffix)))
               cands)))
+          (sort-fn
+           (lambda (cands)
+             (let (active rest)
+               (dolist (c cands)
+                 (if (member c saved-names)
+                     (push c active)
+                   (push c rest)))
+               (append (nreverse active)
+                       (sort (nreverse rest) #'string<)))))
           (collection
            (lambda (string pred action)
              (if (eq action 'metadata)
                  `(metadata
                    (category . theme)
+                   (display-sort-function . ,sort-fn)
+                   (cycle-sort-function . ,sort-fn)
                    (affixation-function . ,affixate))
                (complete-with-action action themes string pred))))
           (current nil)
