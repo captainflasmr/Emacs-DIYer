@@ -853,6 +853,58 @@ The function adjusts:
                 #'selected-window-accent-sync-tab-bar-to-theme--after)))
 #+end_src
 
+** DONE consult-theme
+
+The one feature from =consult-theme= that's hard to live without once you've had it is the /live preview/ as you step through candidates — the theme applies immediately, the accent-sync hook fires, and if you abort with =C-g= the previous theme is restored untouched.
+
+Rebuilding this with only built-ins is surprisingly compact.  The trick is to:
+
+1. Capture =custom-enabled-themes= before the =completing-read= starts.
+2. Install a buffer-local =post-command-hook= in the minibuffer that inspects the current candidate on every command.  With =icomplete-mode= / =fido-mode= the head of =completion-all-sorted-completions= is the selection; otherwise we fall back to the minibuffer text.
+3. On each new candidate, =disable-theme= the previous preview and =load-theme= the new one with =NO-CONFIRM= = =t= so we don't get the safety prompt every keystroke.
+4. Wrap everything in =unwind-protect= so both a clean return /and/ a =C-g= quit end by restoring the originally enabled themes.  The function body then loads the final pick, so the single source of truth for "which theme did the user actually commit to" is the return value of =completing-read=.
+
+#+begin_src elisp
+(defun my/consult-theme (theme)
+  "Load THEME with live preview during candidate navigation.
+A DIY replacement for `consult-theme'.  When called interactively,
+previews each candidate as you navigate the `completing-read'.
+On abort (C-g), restores the themes enabled before the preview began."
+  (interactive
+   (let* ((themes (mapcar #'symbol-name (custom-available-themes)))
+          (saved  (copy-sequence custom-enabled-themes))
+          (current nil)
+          (preview
+           (lambda ()
+             (let* ((cand
+                     (cond
+                      ((and (bound-and-true-p icomplete-mode)
+                            completion-all-sorted-completions)
+                       (car completion-all-sorted-completions))
+                      (t (minibuffer-contents-no-properties))))
+                    (match (and cand (car (member cand themes)))))
+               (when (and match (not (equal current match)))
+                 (setq current match)
+                 (mapc #'disable-theme custom-enabled-themes)
+                 (condition-case nil
+                     (load-theme (intern match) t)
+                   (error nil)))))))
+     (unwind-protect
+         (list (intern
+                (minibuffer-with-setup-hook
+                    (lambda ()
+                      (add-hook 'post-command-hook preview nil t))
+                  (completing-read "Load theme: " themes nil t))))
+       ;; Always restore originals — the body below loads the final pick.
+       (mapc #'disable-theme custom-enabled-themes)
+       (dolist (th (reverse saved))
+         (condition-case nil (load-theme th t) (error nil))))))
+  (mapc #'disable-theme custom-enabled-themes)
+  (load-theme theme t))
+
+(global-set-key (kbd "M-m") #'my/consult-theme)
+#+end_src
+
 ** DONE deadgrep
 CLOSED: [2024-12-20 Fri 08:54]
 

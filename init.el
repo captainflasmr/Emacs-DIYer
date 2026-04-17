@@ -535,6 +535,45 @@ The function adjusts:
     (advice-add 'load-theme :after
                 #'selected-window-accent-sync-tab-bar-to-theme--after)))
 
+(defun my/consult-theme (theme)
+  "Load THEME with live preview during candidate navigation.
+A DIY replacement for `consult-theme'.  When called interactively,
+previews each candidate as you navigate the `completing-read'.
+On abort (C-g), restores the themes enabled before the preview began."
+  (interactive
+   (let* ((themes (mapcar #'symbol-name (custom-available-themes)))
+          (saved  (copy-sequence custom-enabled-themes))
+          (current nil)
+          (preview
+           (lambda ()
+             (let* ((cand
+                     (cond
+                      ((and (bound-and-true-p icomplete-mode)
+                            completion-all-sorted-completions)
+                       (car completion-all-sorted-completions))
+                      (t (minibuffer-contents-no-properties))))
+                    (match (and cand (car (member cand themes)))))
+               (when (and match (not (equal current match)))
+                 (setq current match)
+                 (mapc #'disable-theme custom-enabled-themes)
+                 (condition-case nil
+                     (load-theme (intern match) t)
+                   (error nil)))))))
+     (unwind-protect
+         (list (intern
+                (minibuffer-with-setup-hook
+                    (lambda ()
+                      (add-hook 'post-command-hook preview nil t))
+                  (completing-read "Load theme: " themes nil t))))
+       ;; Always restore originals — the body below loads the final pick.
+       (mapc #'disable-theme custom-enabled-themes)
+       (dolist (th (reverse saved))
+         (condition-case nil (load-theme th t) (error nil))))))
+  (mapc #'disable-theme custom-enabled-themes)
+  (load-theme theme t))
+
+(global-set-key (kbd "M-m") #'my/consult-theme)
+
 (defun my/grep (search-term &optional directory glob)
   "Run ripgrep (rg) with SEARCH-TERM and optionally DIRECTORY and GLOB.
 If ripgrep is unavailable, fall back to Emacs's rgrep command. Highlights SEARCH-TERM in results.

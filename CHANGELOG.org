@@ -10,6 +10,10 @@ This document contains the release notes for Emacs-enhanced
 
 * Versions
 
+** <2026-04-17>
+
+Added a =consult-theme= replacement with live preview — previews each candidate as you step through the =completing-read=, restores the originally enabled themes on =C-g=, and pairs with the existing =enable-theme-functions= hook so the accent-sync fires on every preview step. Bound to =M-m=. Also fixed =my/sync-ui-accent-color= so it no longer prompts when called non-interactively (from startup or theme-change hooks) — it now caches the last-used color in =my/sync-ui-accent-color--current= and reuses it as the fallback.
+
 ** <2026-04-09>
 
 Added a dired-collapse replacement that squashes single-child directory chains into one dired line, using only built-in Emacs features. Rewrites the filename column in place, reapplies the dired-filename text property, and runs before the icon overlays so icons attach to the collapsed lines.
