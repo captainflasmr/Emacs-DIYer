@@ -869,10 +869,44 @@ Rebuilding this with only built-ins is surprisingly compact.  The trick is to:
   "Load THEME with live preview during candidate navigation.
 A DIY replacement for `consult-theme'.  When called interactively,
 previews each candidate as you navigate the `completing-read'.
+Each candidate is annotated with an [active] marker for themes
+that were enabled when the command was invoked, plus the theme's
+summary line where available.
 On abort (C-g), restores the themes enabled before the preview began."
   (interactive
-   (let* ((themes (mapcar #'symbol-name (custom-available-themes)))
+   (let* ((_ (require 'cus-theme))
+          (themes (mapcar #'symbol-name (custom-available-themes)))
           (saved  (copy-sequence custom-enabled-themes))
+          (saved-names (mapcar #'symbol-name saved))
+          (affixate
+           (lambda (cands)
+             (mapcar
+              (lambda (cand)
+                (let* ((sym (intern cand))
+                       (summary (or (ignore-errors (custom-theme-summary sym)) ""))
+                       (family (cond
+                                ((string-prefix-p "doom-" cand) "doom")
+                                ((string-prefix-p "ef-" cand) "ef")
+                                ((string-prefix-p "modus-" cand) "modus")
+                                ((string-prefix-p "timu-" cand) "timu")
+                                ((string-prefix-p "gruvbox" cand) "gruvbox")
+                                (t "built-in")))
+                       (prefix (if (member cand saved-names)
+                                   (propertize "* " 'face 'success)
+                                 "  "))
+                       (suffix (concat "  "
+                                       (propertize (format "%-10s" family) 'face 'shadow)
+                                       "  "
+                                       (propertize summary 'face 'completions-annotations))))
+                  (list cand prefix suffix)))
+              cands)))
+          (collection
+           (lambda (string pred action)
+             (if (eq action 'metadata)
+                 `(metadata
+                   (category . theme)
+                   (affixation-function . ,affixate))
+               (complete-with-action action themes string pred))))
           (current nil)
           (preview
            (lambda ()
@@ -894,7 +928,7 @@ On abort (C-g), restores the themes enabled before the preview began."
                 (minibuffer-with-setup-hook
                     (lambda ()
                       (add-hook 'post-command-hook preview nil t))
-                  (completing-read "Load theme: " themes nil t))))
+                  (completing-read "Load theme: " collection nil t))))
        ;; Always restore originals; the body below loads the final pick.
        (mapc #'disable-theme custom-enabled-themes)
        (dolist (th (reverse saved))
