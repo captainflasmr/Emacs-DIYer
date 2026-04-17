@@ -895,7 +895,7 @@ On abort (C-g), restores the themes enabled before the preview began."
                     (lambda ()
                       (add-hook 'post-command-hook preview nil t))
                   (completing-read "Load theme: " themes nil t))))
-       ;; Always restore originals — the body below loads the final pick.
+       ;; Always restore originals; the body below loads the final pick.
        (mapc #'disable-theme custom-enabled-themes)
        (dolist (th (reverse saved))
          (condition-case nil (load-theme th t) (error nil))))))
