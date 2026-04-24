@@ -2526,6 +2526,180 @@ Does dired actions asynchronously, originally I thought this was built-in but I 
 (dired-async-mode 1)
 #+end_src
 
+The built-in =dired-async= indicator lives at the far right of the modeline, which is easy to miss with window splits. The block below surfaces it as a global =header-line= that only appears while jobs are running. It is also the shared counter for the =rsync= backend defined below. Important: we do /not/ mutate =mode-line-format= here — a previous iteration did and left the modeline blank.
+
+#+begin_src elisp
+(defvar my/async-transfer-rsync-jobs nil
+  "Live rsync processes tracked for the async-transfer header-line.")
+
+(defvar my/async-transfer-rsync-progress nil
+  "Most recent parsed rsync progress fragment (e.g. \"[87% 12.3MB/s]\").")
+
+(defvar my/async-transfer-timer nil
+  "Repeating timer that refreshes the async-transfer header-line.")
+
+(defun my/async-transfer-count ()
+  "Return plist (:rsync N :dired-async M) of active transfer jobs."
+  (setq my/async-transfer-rsync-jobs
+        (seq-filter #'process-live-p my/async-transfer-rsync-jobs))
+  (list :rsync (length my/async-transfer-rsync-jobs)
+        :dired-async (if (fboundp 'dired-async-processes)
+                         (length (dired-async-processes)) 0)))
+
+(defun my/async-transfer-header-update ()
+  "Refresh a global header-line describing active rsync/dired-async jobs."
+  (let* ((c (my/async-transfer-count))
+         (r (plist-get c :rsync))
+         (d (plist-get c :dired-async))
+         (total (+ r d))
+         (face (if (facep 'dired-async-mode-message)
+                   'dired-async-mode-message 'mode-line-highlight)))
+    (setq-default header-line-format
+                  (when (> total 0)
+                    (propertize
+                     (concat
+                      " ⟳"
+                      (when (> r 0)
+                        (format " %d rsync%s" r
+                                (if my/async-transfer-rsync-progress
+                                    ;; Mode-line specs treat %X as a construct; escape % → %%.
+                                    (concat " "
+                                            (replace-regexp-in-string
+                                             "%" "%%"
+                                             my/async-transfer-rsync-progress))
+                                  "")))
+                      (when (and (> r 0) (> d 0)) " +")
+                      (when (> d 0) (format " %d dired-async" d))
+                      " running ")
+                     'face face)))
+    (force-mode-line-update t)
+    (when (and my/async-transfer-timer (zerop total))
+      (cancel-timer my/async-transfer-timer)
+      (setq my/async-transfer-timer nil))))
+
+(defun my/async-transfer-header-start (&rest _)
+  "Start the 0.5 s refresh timer if not already running."
+  (unless my/async-transfer-timer
+    (setq my/async-transfer-timer
+          (run-at-time 0 0.5 #'my/async-transfer-header-update))))
+
+(with-eval-after-load 'dired-async
+  (advice-add 'dired-async--modeline-mode :after
+              (lambda (&rest _)
+                (if (bound-and-true-p dired-async--modeline-mode)
+                    (my/async-transfer-header-start)
+                  (my/async-transfer-header-update))))
+  (setq dired-async-message-function
+        (lambda (text face &rest args)
+          (message "%s" (propertize (apply #'format text args) 'face face)))))
+#+end_src
+
+** DOING dired rsync async copy
+
+A more efficient asynchronous transfer than =dired-async= for anything large: delta-transfer, resumable, preserves metadata, and reports live progress. Uses only =start-process=, so it works on older Emacs that never shipped with async dired transfer — no =async.el= dependency. It reuses the header-line indicator above so rsync jobs appear in the same place as any =dired-async= jobs.
+
+Usage:
+
+- =M-x my/dired-rsync-do-copy= — rsync the marked dired files to a prompted destination.
+- Prefix arg turns the copy into a move (=--remove-source-files=).
+- =M-x my/dired-rsync-do-rename= — explicit move variant.
+- Progress like =[87% 12.3MB/s]= appears in the header-line; the per-job =*rsync*= buffer is kept for inspection on failure.
+- =/ssh:host:/path= TRAMP endpoints are translated to =host:/path= so rsync-over-ssh works; other TRAMP methods fall back to the literal path.
+- The bottom of the block contains an optional =define-key= to rebind dired's =C= / =R= to the rsync variants — commented out by default.
+
+#+begin_src elisp
+(defun my/dired-rsync--tramp-translate (path)
+  "Translate a local or /ssh: TRAMP PATH into an rsync-compatible form."
+  (cond
+   ((and (fboundp 'tramp-tramp-file-p)
+         (tramp-tramp-file-p path)
+         (string-match "\\`/ssh[^:]*:\\([^:]+\\):\\(.*\\)\\'" path))
+    (format "%s:%s" (match-string 1 path) (match-string 2 path)))
+   (t (expand-file-name path))))
+
+(defun my/dired-rsync--filter (proc chunk)
+  "Append CHUNK to PROC's buffer and capture the latest progress line.
+rsync --info=progress2 emits lines like \"   32.77M   6%   98.52MB/s  0:00:04\"
+separated by CRs, so a single CHUNK can contain several updates — we keep the
+last match. The character class covers both upper and lower case unit prefixes
+(rsync uses lower case =k= for small speeds, upper case =M=/=G= for larger)."
+  (when (buffer-live-p (process-buffer proc))
+    (with-current-buffer (process-buffer proc)
+      (goto-char (point-max))
+      (insert chunk)))
+  (let ((pos 0) (last nil))
+    (while (string-match
+            "\\([0-9]+\\)%[ \t]+\\([0-9.]+[kKMmGgTt]?B/s\\)"
+            chunk pos)
+      (setq last (cons (match-string 1 chunk) (match-string 2 chunk))
+            pos  (match-end 0)))
+    (when last
+      (setq my/async-transfer-rsync-progress
+            (format "[%s%% %s]" (car last) (cdr last))))))
+
+(defun my/dired-rsync--sentinel (proc _event)
+  "Sentinel: notify on completion and refresh any open dired buffers."
+  (when (memq (process-status proc) '(exit signal))
+    (let ((status (process-exit-status proc))
+          (label (process-get proc 'rsync-label)))
+      (setq my/async-transfer-rsync-progress nil)
+      (my/async-transfer-header-update)
+      (if (zerop status)
+          (message "rsync %s: done" label)
+        (message "rsync %s: FAILED (%d) — see %s"
+                 label status (buffer-name (process-buffer proc))))
+      (dolist (b (buffer-list))
+        (when (and (buffer-live-p b)
+                   (with-current-buffer b (derived-mode-p 'dired-mode)))
+          (with-current-buffer b (ignore-errors (revert-buffer nil t))))))))
+
+(defun my/dired-rsync-start (src-list dest &optional delete-after)
+  "Asynchronously rsync SRC-LIST (list of paths) into DEST.
+When DELETE-AFTER is non-nil, pass --remove-source-files (a move)."
+  (unless (executable-find "rsync")
+    (user-error "rsync executable not found on PATH"))
+  (let* ((label (format "→ %s" (abbreviate-file-name dest)))
+         (buf (generate-new-buffer (format " *rsync %s*" label)))
+         (srcs (mapcar #'my/dired-rsync--tramp-translate src-list))
+         (rdest (my/dired-rsync--tramp-translate dest))
+         (args (append '("-ah" "--info=progress2")
+                       (when delete-after '("--remove-source-files"))
+                       srcs
+                       (list rdest)))
+         (proc (apply #'start-process "rsync" buf "rsync" args)))
+    (process-put proc 'rsync-label label)
+    (set-process-filter proc #'my/dired-rsync--filter)
+    (set-process-sentinel proc #'my/dired-rsync--sentinel)
+    (push proc my/async-transfer-rsync-jobs)
+    (my/async-transfer-header-start)
+    (message "rsync %s: started (%d item%s)" label
+             (length src-list) (if (= 1 (length src-list)) "" "s"))
+    proc))
+
+(defun my/dired-rsync-do-copy (&optional arg)
+  "Replacement for `dired-do-copy' using rsync asynchronously.
+With prefix ARG, delete sources after a successful transfer (a move)."
+  (interactive "P")
+  (let* ((files (dired-get-marked-files))
+         (default-dest (and (fboundp 'dired-dwim-target-directory)
+                            (dired-dwim-target-directory)))
+         (dest (read-directory-name
+                (format "rsync %d file%s → "
+                        (length files) (if (= 1 (length files)) "" "s"))
+                default-dest)))
+    (my/dired-rsync-start files dest arg)))
+
+(defun my/dired-rsync-do-rename ()
+  "Replacement for `dired-do-rename' using rsync + --remove-source-files."
+  (interactive)
+  (my/dired-rsync-do-copy t))
+
+;; Optional: rebind C / R in dired to the rsync variants.
+(with-eval-after-load 'dired
+  (define-key dired-mode-map (kbd "C") #'my/dired-rsync-do-copy)
+  (define-key dired-mode-map (kbd "R") #'my/dired-rsync-do-rename))
+#+end_src
+
 Could I just call out to =async-shell-command=, something like:
 
 #+begin_src elisp
