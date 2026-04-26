@@ -196,16 +196,28 @@ Side windows are ignored."
   (interactive)
   (remove-overlays (point-min) (point-max) 'my/rainbow t))
 
-(defun toggle-centered-buffer ()
-  "Toggle center alignment of the buffer by adjusting window margins based on the fill-column."
-  (interactive)
-  (let* ((current-margins (window-margins))
-         (margin (if (or (equal current-margins '(0 . 0))
-                         (null (car (window-margins))))
-                     (/ (- (window-total-width) fill-column) 2)
-                   0)))
-    (visual-line-mode 1)
-    (set-window-margins nil margin margin)))
+(defvar my/center-buffer-width 120
+  "Desired text width in characters when `my/center-buffer-mode' is active.")
+
+(defun my/center-buffer--adjust-margins ()
+  "Recalculate window margins to center content at `my/center-buffer-width'."
+  (when my/center-buffer-mode
+    (let ((margin (max 0 (/ (- (window-total-width) my/center-buffer-width) 2))))
+      (set-window-margins nil margin margin))))
+
+(define-minor-mode my/center-buffer-mode
+  "Toggle centered document layout by adjusting window margins."
+  :lighter " Center"
+  :group 'editing
+  (if my/center-buffer-mode
+      (progn
+        (visual-line-mode 1)
+        (add-hook 'window-configuration-change-hook
+                  #'my/center-buffer--adjust-margins nil :local)
+        (my/center-buffer--adjust-margins))
+    (set-window-margins nil nil nil)
+    (remove-hook 'window-configuration-change-hook
+                 #'my/center-buffer--adjust-margins :local)))
 
 (defun my/find-file ()
   "Find file from current directory in many different ways."
