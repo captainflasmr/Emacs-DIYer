@@ -10,6 +10,10 @@ This document contains the release notes for Emacs-enhanced
 
 * Versions
 
+** <2026-04-26>
+
+Added =persistent-scratch= replacement — saves the =*scratch*= buffer to =~/.emacs.d/.scratch= on every edit via a buffer-local =after-change-functions= hook, so even a hard crash loses at most the last keystroke. Restores from that file on startup.
+
 ** <2026-04-24>
 
 Added an async-transfer header-line indicator and an rsync-based dired copy. The indicator replaces =dired-async='s far-right modeline lighter — easy to miss with splits — with a global =header-line= that only appears while jobs are running, counting both =dired-async= and rsync jobs in the same spot. Critically it never mutates =mode-line-format=. The rsync backend uses only =start-process= so it works on older Emacs without =async.el=, shells out to =rsync -ah --info=progress2=, streams live =[NN% NN.NMB/s]= progress into the header-line, handles moves via =--remove-source-files=, and translates =/ssh:= TRAMP endpoints to rsync-over-ssh.

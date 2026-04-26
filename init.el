@@ -1373,8 +1373,8 @@ universal argument, DIRECTORY and GLOB are prompted for as well."
              for tag = (if (string= my/popup--source "") ""
                          (concat "(" my/popup--source ")"))
              for left = (concat " "
-                         (substring-no-properties c)
-                         " " ann)
+                                (substring-no-properties c)
+                                " " ann)
              for left-trunc = (truncate-string-to-width
                                left (- w (1+ (length tag))) 0 ?\s)
              for raw = (concat left-trunc " " tag)
@@ -1532,8 +1532,8 @@ Picks up extra capf properties via `completion-extra-properties'."
     (cond
      ((memq this-command
             '(my/popup-next my/popup-prev
-              my/popup-insert my/popup-abort
-              my/popup-complete completion-at-point))
+                            my/popup-insert my/popup-abort
+                            my/popup-complete completion-at-point))
       nil)
      ((and my/popup--beg (>= (point) my/popup--beg)
            (or (eq this-command 'self-insert-command)
@@ -2464,7 +2464,7 @@ If a region is selected, prompt for additional input and pass it as a query."
       (setq-local header-line-format
                   (format " %s to insert text or %s to cancel."
                           (propertize "C-c C-c" 'face 'help-key-binding)
-			  (propertize "C-c C-k" 'face 'help-key-binding)))
+			              (propertize "C-c C-k" 'face 'help-key-binding)))
       ;; Make the frame more temporary-like
       (set-frame-parameter frame 'delete-before-kill-buffer t)
       (set-window-dedicated-p (selected-window) t))))
@@ -2575,3 +2575,32 @@ Use f/s for speed, [/] for size, b/n to skip, SPC to pause, q to quit."
                                :annotation-function fn))))))
 
 (add-hook 'minibuffer-setup-hook #'tiny-marginalia--setup)
+
+(defvar my/persistent-scratch-file
+  (expand-file-name ".scratch" user-emacs-directory)
+  "File where *scratch* buffer contents are persisted.")
+
+(defun my/persistent-scratch-save ()
+  "Persist *scratch* buffer contents to disk."
+  (when (get-buffer "*scratch*")
+    (let ((content (with-current-buffer "*scratch*"
+                     (buffer-substring-no-properties (point-min) (point-max)))))
+      (with-temp-file my/persistent-scratch-file
+        (insert content)))))
+
+(defun my/persistent-scratch-restore ()
+  "Restore *scratch* buffer from persisted file."
+  (when (file-exists-p my/persistent-scratch-file)
+    (with-current-buffer "*scratch*"
+      (let ((inhibit-read-only t))
+        (erase-buffer)
+        (insert-file-contents my/persistent-scratch-file)))))
+
+(add-hook 'after-init-hook #'my/persistent-scratch-restore)
+(add-hook 'kill-emacs-hook #'my/persistent-scratch-save)
+(add-hook 'after-init-hook
+          (lambda ()
+            (with-current-buffer "*scratch*"
+              (add-hook 'after-change-functions
+                        (lambda (&rest _) (my/persistent-scratch-save))
+                        nil t))))

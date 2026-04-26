@@ -23,6 +23,10 @@ Used in concert with https://github.com/captainflasmr/Emacs-vanilla
 
 * Whats New
 
+** <2026-04-26>
+
+Added persistent-scratch replacement to survive Emacs crashes with minimal code
+
 ** <2026-04-06>
 
 Added overlay-based in-buffer popup completion to replace corfu/company, using only built-in Emacs features. Supports live filtering, scrolling, annotations, and eglot integration with exit-function handling.
@@ -1825,8 +1829,8 @@ Navigation is =C-n= / =C-p= to move through candidates, =RET= or =TAB= to insert
              for tag = (if (string= my/popup--source "") ""
                          (concat "(" my/popup--source ")"))
              for left = (concat " "
-                         (substring-no-properties c)
-                         " " ann)
+                                (substring-no-properties c)
+                                " " ann)
              for left-trunc = (truncate-string-to-width
                                left (- w (1+ (length tag))) 0 ?\s)
              for raw = (concat left-trunc " " tag)
@@ -1984,8 +1988,8 @@ Picks up extra capf properties via `completion-extra-properties'."
     (cond
      ((memq this-command
             '(my/popup-next my/popup-prev
-              my/popup-insert my/popup-abort
-              my/popup-complete completion-at-point))
+                            my/popup-insert my/popup-abort
+                            my/popup-complete completion-at-point))
       nil)
      ((and my/popup--beg (>= (point) my/popup--beg)
            (or (eq this-command 'self-insert-command)
@@ -3348,7 +3352,7 @@ Taken directly from [[https://thanosapollo.org/posts/use-emacs-everywhere/][Emac
       (setq-local header-line-format
                   (format " %s to insert text or %s to cancel."
                           (propertize "C-c C-c" 'face 'help-key-binding)
-			  (propertize "C-c C-k" 'face 'help-key-binding)))
+			              (propertize "C-c C-k" 'face 'help-key-binding)))
       ;; Make the frame more temporary-like
       (set-frame-parameter frame 'delete-before-kill-buffer t)
       (set-window-dedicated-p (selected-window) t))))
@@ -3544,4 +3548,39 @@ bookmarks.
                                :annotation-function fn))))))
 
 (add-hook 'minibuffer-setup-hook #'tiny-marginalia--setup)
+#+end_src
+
+** DONE persistent-scratch
+
+Replacing the =persistent-scratch= package with a minimal built-in implementation that saves the =*scratch*= buffer to disk on every edit and restores it on startup. Since each change is written immediately, even a hard crash loses at most the last keystroke.
+
+#+begin_src elisp
+(defvar my/persistent-scratch-file
+  (expand-file-name ".scratch" user-emacs-directory)
+  "File where *scratch* buffer contents are persisted.")
+
+(defun my/persistent-scratch-save ()
+  "Persist *scratch* buffer contents to disk."
+  (when (get-buffer "*scratch*")
+    (let ((content (with-current-buffer "*scratch*"
+                     (buffer-substring-no-properties (point-min) (point-max)))))
+      (with-temp-file my/persistent-scratch-file
+        (insert content)))))
+
+(defun my/persistent-scratch-restore ()
+  "Restore *scratch* buffer from persisted file."
+  (when (file-exists-p my/persistent-scratch-file)
+    (with-current-buffer "*scratch*"
+      (let ((inhibit-read-only t))
+        (erase-buffer)
+        (insert-file-contents my/persistent-scratch-file)))))
+
+(add-hook 'after-init-hook #'my/persistent-scratch-restore)
+(add-hook 'kill-emacs-hook #'my/persistent-scratch-save)
+(add-hook 'after-init-hook
+          (lambda ()
+            (with-current-buffer "*scratch*"
+              (add-hook 'after-change-functions
+                        (lambda (&rest _) (my/persistent-scratch-save))
+                        nil t))))
 #+end_src
