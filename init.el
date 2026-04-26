@@ -200,10 +200,15 @@ Side windows are ignored."
   "Desired text width in characters when `my/center-buffer-mode' is active.")
 
 (defun my/center-buffer--adjust-margins ()
-  "Recalculate window margins to center content at `my/center-buffer-width'."
+  "Recalculate window margins to center content at `my/center-buffer-width'.
+Walks every window showing the current buffer so it coexists with
+packages like `selected-window-accent-mode' that also set margins."
   (when my/center-buffer-mode
     (let ((margin (max 0 (/ (- (window-total-width) my/center-buffer-width) 2))))
-      (set-window-margins nil margin margin))))
+      (dolist (win (get-buffer-window-list nil nil t))
+        (if (> margin 0)
+            (set-window-margins win margin margin)
+          (set-window-margins win 0 0))))))
 
 (define-minor-mode my/center-buffer-mode
   "Toggle centered document layout by adjusting window margins."
@@ -213,10 +218,15 @@ Side windows are ignored."
       (progn
         (visual-line-mode 1)
         (add-hook 'window-configuration-change-hook
-                  #'my/center-buffer--adjust-margins nil :local)
+                  #'my/center-buffer--adjust-margins 90 :local)
+        (add-hook 'window-state-change-hook
+                  #'my/center-buffer--adjust-margins 90 :local)
         (my/center-buffer--adjust-margins))
-    (set-window-margins nil nil nil)
+    (dolist (win (get-buffer-window-list nil nil t))
+      (set-window-margins win 0 0))
     (remove-hook 'window-configuration-change-hook
+                 #'my/center-buffer--adjust-margins :local)
+    (remove-hook 'window-state-change-hook
                  #'my/center-buffer--adjust-margins :local)))
 
 (defun my/find-file ()
