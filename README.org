@@ -3606,3 +3606,234 @@ Replacing the =persistent-scratch= package with a minimal built-in implementatio
                         (lambda (&rest _) (my/persistent-scratch-save))
                         nil t))))
 #+end_src
+
+** DOING diff-minimap
+
+A VSCode-style minimap sidebar that shows a ~scaled overview of the entire buffer~, highlighting only regions changed relative to the Git index (added, modified, deleted). Unlike demap which shows a miniature of the visible window, this renders the complete file top-to-bottom scaled to fill the side-window height, so you always see where every change lives in the file at a glance.
+
+It reads diff regions from =diff-hl= overlays and renders them as coloured blocks in a narrow side window. Unchanged regions appear as a dim background stripe. Clicking any row scrolls the main buffer to that position, and a viewport indicator shows where the current window sits within the file.
+
+#+begin_src elisp
+(defgroup my/diff-minimap nil
+  "VSCode-style minimap showing diff regions across the entire buffer."
+  :group 'tools)
+
+(defface my/diff-minimap-normal
+  '((t :background "#1a1a1a" :extend t))
+  "Face for unchanged regions in the diff minimap.")
+
+(defface my/diff-minimap-added
+  '((t :background "#335533" :extend t))
+  "Face for added lines in the diff minimap.")
+
+(defface my/diff-minimap-modified
+  '((t :background "#555533" :extend t))
+  "Face for modified lines in the diff minimap.")
+
+(defface my/diff-minimap-removed
+  '((t :background "#553333" :extend t))
+  "Face for deleted lines in the diff minimap.")
+
+(defface my/diff-minimap-viewport
+  '((t :background "#555577" :extend t))
+  "Face for the current viewport indicator in the diff minimap.")
+
+(defcustom my/diff-minimap-width 18
+  "Width in characters of the diff-minimap side window."
+  :type 'integer
+  :group 'my/diff-minimap)
+
+(defcustom my/diff-minimap-side 'right
+  "Which side to display the diff-minimap window."
+  :type '(choice (const left) (const right))
+  :group 'my/diff-minimap)
+
+(defvar-local my/diff-minimap--dirty nil
+  "Non-nil when the minimap needs re-rendering.")
+
+(defvar-local my/diff-minimap--last-ws nil
+  "Last recorded `window-start' for scroll-change detection.")
+
+(defun my/diff-minimap--collect-diff-regions ()
+  "Collect (start-line end-line type) for every diff-hl overlay.
+Returns a list sorted by start line."
+  (let ((regions nil))
+    (when (bound-and-true-p diff-hl-mode)
+      (save-excursion
+        (dolist (ov (overlays-in (point-min) (point-max)))
+          (when (overlay-get ov 'diff-hl-hunk)
+            (let ((start (overlay-start ov))
+                  (end (overlay-end ov))
+                  (type (overlay-get ov 'diff-hl-hunk-type)))
+              (when (and start end type)
+                (goto-char start)
+                (let ((sl (line-number-at-pos))
+                      (el (progn (goto-char end)
+                                 (if (bolp)
+                                     (1- (line-number-at-pos))
+                                   (line-number-at-pos)))))
+                  (push (list sl el type) regions))))))))
+    (sort regions (lambda (a b) (< (car a) (car b))))))
+
+(defun my/diff-minimap--lookup-diff-type (line regions)
+  "Return the diff-hl type for LINE (1-indexed) from REGIONS, or nil."
+  (catch 'found
+    (dolist (r regions)
+      (when (and (>= line (car r)) (<= line (cadr r)))
+        (throw 'found (nth 2 r))))
+    nil))
+
+(defun my/diff-minimap--render (source-buf)
+  "Render the full-file diff minimap for SOURCE-BUF."
+  (let ((minimap-buf (get-buffer-create " *diff-minimap*")))
+    (and (buffer-live-p source-buf)
+         (with-current-buffer source-buf
+           (let* ((total-lines (line-number-at-pos (point-max) t))
+                  (minimap-win (get-buffer-window minimap-buf))
+                  (win-height (if minimap-win
+                                  (window-height minimap-win)
+                                (frame-height)))
+                  (scale (max 1 (/ (float total-lines) win-height)))
+                  (diff-regions (my/diff-minimap--collect-diff-regions))
+                  (src-win (get-buffer-window source-buf))
+                  (ws-line (if src-win
+                               (with-selected-window src-win
+                                 (line-number-at-pos (window-start)))
+                             1))
+                  (we-line (if src-win
+                               (with-selected-window src-win
+                                 (save-excursion
+                                   (goto-char (window-end nil t))
+                                   (line-number-at-pos)))
+                             total-lines)))
+             (with-current-buffer minimap-buf
+               (let ((inhibit-read-only t))
+                 (erase-buffer)
+                 (dotimes (i win-height)
+                   (let* ((src-line (1+ (floor (* i scale))))
+                          (in-viewport (and (>= src-line ws-line)
+                                            (<= src-line we-line)))
+                          (diff-type (my/diff-minimap--lookup-diff-type
+                                      src-line diff-regions))
+                          (face (if in-viewport
+                                    'my/diff-minimap-viewport
+                                  (pcase diff-type
+                                    ('insert 'my/diff-minimap-added)
+                                    ('change 'my/diff-minimap-modified)
+                                    ('delete 'my/diff-minimap-removed)
+                                    (_ 'my/diff-minimap-normal)))))
+                     (insert
+                      (propertize
+                       (make-string my/diff-minimap-width ?\s)
+                       'face face
+                       'source-line src-line
+                       'source-buf source-buf))
+                     (insert "\n"))))))
+            (setq my/diff-minimap--dirty nil)))))
+
+(defun my/diff-minimap--click-handler ()
+  "Handle mouse click in the minimap: scroll source to clicked line."
+  (interactive)
+  (let* ((pos (event-start last-input-event))
+         (line (get-text-property (posn-point pos) 'source-line))
+         (buf (get-text-property (posn-point pos) 'source-buf)))
+    (when (and line buf (buffer-live-p buf))
+      (let ((w (get-buffer-window buf)))
+        (when w (select-window w))
+        (with-current-buffer buf
+          (goto-char (point-min))
+          (forward-line (1- line))
+          (recenter 0))))))
+
+(defun my/diff-minimap--check-scroll ()
+  "Mark minimap dirty if the visible portion of the buffer changed."
+  (when (and (bound-and-true-p diff-hl-mode)
+             (get-buffer-window " *diff-minimap*" (selected-frame)))
+    (let ((ws (window-start)))
+      (unless (eq ws my/diff-minimap--last-ws)
+        (setq my/diff-minimap--last-ws ws
+              my/diff-minimap--dirty t)))))
+
+(defun my/diff-minimap--render-if-dirty ()
+  "Re-render the minimap if the dirty flag is set."
+  (when (and my/diff-minimap--dirty
+             (get-buffer-window " *diff-minimap*" (selected-frame))
+             (bound-and-true-p diff-hl-mode))
+    (my/diff-minimap--render (current-buffer))))
+
+(defvar my/diff-minimap--idle-timer nil
+  "Idle timer that triggers minimap re-render when dirty.")
+
+(defun my/diff-minimap--schedule-render ()
+  "Schedule render on idle if dirty and not already scheduled."
+  (when (and my/diff-minimap--dirty
+             (not my/diff-minimap--idle-timer))
+    (setq my/diff-minimap--idle-timer
+          (run-with-idle-timer
+           0.15 nil
+           (lambda (buf)
+             (setq my/diff-minimap--idle-timer nil)
+             (when (and (buffer-live-p buf)
+                        (buffer-local-value 'my/diff-minimap--dirty buf)
+                        (get-buffer-window " *diff-minimap*" (selected-frame)))
+               (with-current-buffer buf
+                 (my/diff-minimap--render buf))))
+           (current-buffer)))))
+
+(defun my/diff-minimap-toggle ()
+  "Toggle the diff minimap side window for the current buffer."
+  (interactive)
+  (let ((minimap-buf (get-buffer-create " *diff-minimap*")))
+    (if (get-buffer-window minimap-buf)
+        (progn
+          (my/diff-minimap-mode -1)
+          (delete-window (get-buffer-window minimap-buf)))
+      (my/diff-minimap--render (current-buffer))
+      (display-buffer-in-side-window
+       minimap-buf
+       `((side . ,my/diff-minimap-side)
+         (window-width . ,my/diff-minimap-width)
+         (no-delete-other-windows . t)
+         (preserve-size . (t . nil))))
+      (with-current-buffer minimap-buf
+        (setq buffer-read-only t)
+        (setq cursor-type nil)
+        (let ((map (make-sparse-keymap)))
+          (define-key map [mouse-1]
+                      #'my/diff-minimap--click-handler)
+          (define-key map [down-mouse-1] #'ignore)
+          (use-local-map map))
+        (setq-local mode-line-format nil)
+        (setq-local header-line-format nil))
+      (my/diff-minimap-mode 1))))
+
+(define-minor-mode my/diff-minimap-mode
+  "Minor mode to keep the diff minimap updated on save and scroll."
+  :lighter " DMap"
+  :global nil
+  (if my/diff-minimap-mode
+      (progn
+        (setq my/diff-minimap--dirty t
+              my/diff-minimap--last-ws (window-start))
+        (add-hook 'after-save-hook
+                  #'my/diff-minimap--update nil t)
+        (add-hook 'post-command-hook
+                  #'my/diff-minimap--check-scroll nil t)
+        (add-hook 'post-command-hook
+                  #'my/diff-minimap--schedule-render nil t))
+    (when my/diff-minimap--idle-timer
+      (cancel-timer my/diff-minimap--idle-timer)
+      (setq my/diff-minimap--idle-timer nil))
+    (remove-hook 'after-save-hook
+                 #'my/diff-minimap--update t)
+    (remove-hook 'post-command-hook
+                 #'my/diff-minimap--check-scroll t)
+    (remove-hook 'post-command-hook
+                 #'my/diff-minimap--schedule-render t)))
+
+(defun my/diff-minimap--update ()
+  "Mark the minimap dirty after a save."
+  (setq my/diff-minimap--dirty t))
+
+(define-key vc-prefix-map (kbd "m") #'my/diff-minimap-toggle)
+#+end_src
