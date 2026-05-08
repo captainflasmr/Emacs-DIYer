@@ -2630,6 +2630,7 @@ Usage:
 - Prefix arg turns the copy into a move (=--remove-source-files=).
 - =M-x my/dired-rsync-do-rename= — explicit move variant.
 - Progress like =[87% 12.3MB/s]= appears in the header-line; the per-job =*rsync*= buffer is kept for inspection on failure.
+- On successful completion, point moves to the destination directory (opened in another window).
 - =/ssh:host:/path= TRAMP endpoints are translated to =host:/path= so rsync-over-ssh works; other TRAMP methods fall back to the literal path.
 - The bottom of the block contains an optional =define-key= to rebind dired's =C= / =R= to the rsync variants — commented out by default.
 
@@ -2664,14 +2665,18 @@ last match. The character class covers both upper and lower case unit prefixes
             (format "[%s%% %s]" (car last) (cdr last))))))
 
 (defun my/dired-rsync--sentinel (proc _event)
-  "Sentinel: notify on completion and refresh any open dired buffers."
+  "Sentinel: notify on completion, refresh dired buffers, and move point to DEST."
   (when (memq (process-status proc) '(exit signal))
     (let ((status (process-exit-status proc))
-          (label (process-get proc 'rsync-label)))
+          (label (process-get proc 'rsync-label))
+          (dest (process-get proc 'rsync-dest)))
       (setq my/async-transfer-rsync-progress nil)
       (my/async-transfer-header-update)
       (if (zerop status)
-          (message "rsync %s: done" label)
+          (progn
+            (message "rsync %s: done" label)
+            (when dest
+              (find-file-other-window dest)))
         (message "rsync %s: FAILED (%d) — see %s"
                  label status (buffer-name (process-buffer proc))))
       (dolist (b (buffer-list))
@@ -2694,6 +2699,7 @@ When DELETE-AFTER is non-nil, pass --remove-source-files (a move)."
                        (list rdest)))
          (proc (apply #'start-process "rsync" buf "rsync" args)))
     (process-put proc 'rsync-label label)
+    (process-put proc 'rsync-dest dest)
     (set-process-filter proc #'my/dired-rsync--filter)
     (set-process-sentinel proc #'my/dired-rsync--sentinel)
     (push proc my/async-transfer-rsync-jobs)

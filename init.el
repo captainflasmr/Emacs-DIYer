@@ -2069,14 +2069,18 @@ last match. The character class covers both upper and lower case unit prefixes
             (format "[%s%% %s]" (car last) (cdr last))))))
 
 (defun my/dired-rsync--sentinel (proc _event)
-  "Sentinel: notify on completion and refresh any open dired buffers."
+  "Sentinel: notify on completion, refresh dired buffers, and move point to DEST."
   (when (memq (process-status proc) '(exit signal))
     (let ((status (process-exit-status proc))
-          (label (process-get proc 'rsync-label)))
+          (label (process-get proc 'rsync-label))
+          (dest (process-get proc 'rsync-dest)))
       (setq my/async-transfer-rsync-progress nil)
       (my/async-transfer-header-update)
       (if (zerop status)
-          (message "rsync %s: done" label)
+          (progn
+            (message "rsync %s: done" label)
+            (when dest
+              (find-file-other-window dest)))
         (message "rsync %s: FAILED (%d) — see %s"
                  label status (buffer-name (process-buffer proc))))
       (dolist (b (buffer-list))
@@ -2099,6 +2103,7 @@ When DELETE-AFTER is non-nil, pass --remove-source-files (a move)."
                        (list rdest)))
          (proc (apply #'start-process "rsync" buf "rsync" args)))
     (process-put proc 'rsync-label label)
+    (process-put proc 'rsync-dest dest)
     (set-process-filter proc #'my/dired-rsync--filter)
     (set-process-sentinel proc #'my/dired-rsync--sentinel)
     (push proc my/async-transfer-rsync-jobs)
