@@ -229,9 +229,11 @@ packages like `selected-window-accent-mode' that also set margins."
     (remove-hook 'window-state-change-hook
                  #'my/center-buffer--adjust-margins :local)))
 
-(defun my/find-file ()
-  "Find file from current directory in many different ways."
-  (interactive)
+(defun my/find-file (&optional arg)
+  "Find file from current directory using rg, find, or fd.
+Without C-u: use rg if available, otherwise fall back to find-name-dired.
+With C-u: show the full completing-read list of all available backends."
+  (interactive "P")
   (let* ((find-options (delq nil
                              (list (when (executable-find "rg")
                                      '("rg --follow --files --null" . :string))
@@ -241,9 +243,14 @@ packages like `selected-window-accent-mode' that also set margins."
                                      '("fd --absolute-path --type f -0" . :string))
                                    (when (fboundp 'find-name-dired)
                                      '("find-name-dired" . :command)))))
-         (selection (completing-read "Select: " find-options))
-         file-list
-         file)
+         (selection
+          (if arg
+              (completing-read "Select: " find-options)
+            (or (car (car (seq-filter
+                           (lambda (x) (eq (cdr x) :string))
+                           find-options)))
+                "find-name-dired")))
+         file-list file)
     (pcase (alist-get selection find-options nil nil #'string=)
       (:command
        (call-interactively (intern selection)))

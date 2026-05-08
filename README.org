@@ -370,14 +370,16 @@ packages like `selected-window-accent-mode' that also set margins."
 ** DONE find-name-dired
 CLOSED: [2024-12-18 Wed 09:27]
 
-Currently, the file type jump key functionality for core is limited to =find-name-dired=. However, it might be better to implement a more flexible version that defaults to =find-name-dired= but also presents additional options if tools like =ripgrep= or =find= are available. This would offer a potentially more modern and versatile approach.
+A flexible file finder bound to =C-c f=. Without a prefix argument it uses =rg --follow --files= if ripgrep is available, falling back to =find-name-dired= otherwise. With =C-u= it presents a completing-read menu of all available backends (=rg=, =find=, =fd=, =find-name-dired=).
 
 Being solved with the following code:
 
 #+begin_src elisp
-(defun my/find-file ()
-  "Find file from current directory in many different ways."
-  (interactive)
+(defun my/find-file (&optional arg)
+  "Find file from current directory using rg, find, or fd.
+Without C-u: use rg if available, otherwise fall back to find-name-dired.
+With C-u: show the full completing-read list of all available backends."
+  (interactive "P")
   (let* ((find-options (delq nil
                              (list (when (executable-find "rg")
                                      '("rg --follow --files --null" . :string))
@@ -387,9 +389,14 @@ Being solved with the following code:
                                      '("fd --absolute-path --type f -0" . :string))
                                    (when (fboundp 'find-name-dired)
                                      '("find-name-dired" . :command)))))
-         (selection (completing-read "Select: " find-options))
-         file-list
-         file)
+         (selection
+          (if arg
+              (completing-read "Select: " find-options)
+            (or (car (car (seq-filter
+                           (lambda (x) (eq (cdr x) :string))
+                           find-options)))
+                "find-name-dired")))
+         file-list file)
     (pcase (alist-get selection find-options nil nil #'string=)
       (:command
        (call-interactively (intern selection)))
