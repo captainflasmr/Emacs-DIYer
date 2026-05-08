@@ -3625,7 +3625,7 @@ Updates continuously on every command via =post-command-hook= with a short idle 
   :type 'float
   :group 'my/diff-minimap)
 
-(defcustom my/diff-minimap-width 14
+(defcustom my/diff-minimap-width 8
   "Width in characters of the diff-minimap side window (at the small font)."
   :type 'integer
   :group 'my/diff-minimap)

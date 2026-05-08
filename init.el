@@ -2636,7 +2636,7 @@ Use f/s for speed, [/] for size, b/n to skip, SPC to pause, q to quit."
   :type 'float
   :group 'my/diff-minimap)
 
-(defcustom my/diff-minimap-width 14
+(defcustom my/diff-minimap-width 8
   "Width in characters of the diff-minimap side window (at the small font)."
   :type 'integer
   :group 'my/diff-minimap)
@@ -2733,10 +2733,10 @@ Use f/s for speed, [/] for size, b/n to skip, SPC to pause, q to quit."
                                      (invp view-bg)
                                      (t norm-bg))))
                   (let ((ind-face (cond ((= i cur-row) `(:foreground ,cur-bg :background ,cur-bg))
-                                         (dtype (cond ((eq dtype 'added) `(:foreground ,ins-fg :background ,ins-bg))
-                                                      ((eq dtype 'changed) `(:foreground ,chg-fg :background ,chg-bg))
-                                                      ((eq dtype 'removed) `(:foreground ,del-fg :background ,del-bg))
-                                                      (t `(:foreground ,norm-bg :background ,norm-bg))))
+                                        (dtype (cond ((eq dtype 'added) `(:foreground ,ins-fg :background ,ins-bg))
+                                                     ((eq dtype 'changed) `(:foreground ,chg-fg :background ,chg-bg))
+                                                     ((eq dtype 'removed) `(:foreground ,del-fg :background ,del-bg))
+                                                     (t `(:foreground ,norm-bg :background ,norm-bg))))
                                          (invp `(:foreground ,view-bg :background ,view-bg))
                                          (t `(:foreground ,norm-bg :background ,norm-bg))))
                         (bg-face `(:background ,row-bg :extend t)))

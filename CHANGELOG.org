@@ -10,6 +10,10 @@ This document contains the release notes for Emacs-enhanced
 
 * Versions
 
+** <2026-05-08>
+
+Added =my/diff-minimap-toggle= — a side-window minimap that renders diff-hl hunk status as coloured rows showing added, changed, and removed regions alongside a viewport indicator and cursor marker. Togglable via =C-x v m=, with mouse-click navigation and automatic sync on scroll and save.
+
 ** <2026-04-26>
 
 Added =persistent-scratch= replacement — saves the =*scratch*= buffer to =~/.emacs.d/.scratch= on every edit via a buffer-local =after-change-functions= hook, so even a hard crash loses at most the last keystroke. Restores from that file on startup.
