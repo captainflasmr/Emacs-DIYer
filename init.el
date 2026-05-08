@@ -2683,14 +2683,19 @@ Use f/s for speed, [/] for size, b/n to skip, SPC to pause, q to quit."
           (dolist (ov (overlays-in (point-min) (point-max)))
             (let ((ty (overlay-get ov 'diff-hl-hunk-type)))
               (when (or ty (overlay-get ov 'diff-hl-hunk))
-                (let ((st (overlay-start ov))
+                (let* ((st (overlay-start ov))
                       (en (overlay-end ov))
-                      (ty (or ty 'change)))
+                      (raw-ty (or ty 'change))
+                      (ty (pcase (format "%s" raw-ty)
+                            ((or "insert" "add" "added") 'added)
+                            ((or "delete" "removed" "remove") 'removed)
+                            (_ 'changed))))
                   (when (and st en)
+                    (message "DMM: hunk at %d-%d type=%S" st en ty)
                   (save-excursion
                     (goto-char st)
                     (let* ((sl (line-number-at-pos))
-                          (el (if (eq ty 'delete)
+                          (el (if (eq ty 'removed)
                                   sl
                                 (progn (goto-char en)
                                         (if (bolp) (1- (line-number-at-pos))
@@ -2700,13 +2705,19 @@ Use f/s for speed, [/] for size, b/n to skip, SPC to pause, q to quit."
                             (lr (min (1- nrows) (floor (/ el scale)))))
                         (cl-loop for r from fr to lr
                                  do (aset row-diff r ty)))))))))))
-        (let* ((fbg (lambda (f d) (let ((bg (face-attribute f :background nil t)))
-                                    (if (or (not bg) (eq bg 'unspecified)) d bg))))
-               (norm-bg (funcall fbg 'fringe "#1a1a1a"))
-               (view-bg (funcall fbg 'region "#505070"))
-               (ins-bg  (funcall fbg 'diff-added (funcall fbg 'diff-hl-insert "#335533")))
-               (chg-bg  (funcall fbg 'diff-changed (funcall fbg 'diff-hl-change "#555533")))
-               (del-bg  (funcall fbg 'diff-removed (funcall fbg 'diff-hl-delete "#553333"))))
+        (let* ((fbg (lambda (f attr d)
+                      (let ((v (face-attribute f attr nil t)))
+                        (if (or (not v) (eq v 'unspecified) (not (stringp v)))
+                            d v))))
+               (norm-bg (funcall fbg 'fringe :background "#1a1a1a"))
+               (view-bg (funcall fbg 'region :background "#404060"))
+               (ins-bg  (funcall fbg 'diff-added :background (funcall fbg 'diff-hl-insert :background "#006600")))
+               (chg-bg  (funcall fbg 'diff-changed :background (funcall fbg 'diff-hl-change :background "#666600")))
+               (del-bg  (funcall fbg 'diff-removed :background (funcall fbg 'diff-hl-delete :background "#660000")))
+               (ins-fg  (funcall fbg 'diff-added :foreground (funcall fbg 'diff-hl-insert :foreground "#00ff00")))
+               (chg-fg  (funcall fbg 'diff-changed :foreground (funcall fbg 'diff-hl-change :foreground "#ffff00")))
+               (del-fg  (funcall fbg 'diff-removed :foreground (funcall fbg 'diff-hl-delete :foreground "#ff0000")))
+               (cur-bg  (funcall fbg 'cursor :background "#00ffff")))
           (message "DMM: hunks=%d nrows=%d scale=%.1f norm=%s view=%s ins=%s chg=%s del=%s"
                    hunk-count nrows scale norm-bg view-bg ins-bg chg-bg del-bg)
           (with-current-buffer mm-buf
@@ -2716,30 +2727,26 @@ Use f/s for speed, [/] for size, b/n to skip, SPC to pause, q to quit."
                 (let* ((sline (1+ (floor (* i scale))))
                        (dtype (aref row-diff i))
                        (invp (and (>= sline ws-line) (<= sline we-line)))
-                       (row-bg (cond (dtype (pcase dtype
-                                              ((or 'insert 'add 'added) ins-bg)
-                                              ((or 'change 'changed 'modify) chg-bg)
-                                              ((or 'delete 'removed 'remove) del-bg)
-                                              (_ norm-bg)))
+                       (row-bg (cond ((eq dtype 'added) ins-bg)
+                                     ((eq dtype 'changed) chg-bg)
+                                     ((eq dtype 'removed) del-bg)
                                      (invp view-bg)
                                      (t norm-bg))))
-                  (insert
-                   (propertize
-                    (concat
-                     (propertize "│"
-                                 'face (cond ((= i cur-row) '(:foreground "#ffffff" :background "#ffffff"))
-                                             (dtype (pcase dtype
-                                                      ((or 'insert 'add 'added) `(:foreground ,ins-bg :background ,row-bg))
-                                                      ((or 'change 'changed 'modify) `(:foreground ,chg-bg :background ,row-bg))
-                                                      ((or 'delete 'removed 'remove) `(:foreground ,del-bg :background ,row-bg))
-                                                      (_ `(:foreground ,norm-bg :background ,norm-bg))))
-                                             (invp `(:foreground ,view-bg :background ,view-bg))
-                                             (t `(:foreground ,norm-bg :background ,norm-bg))))
+                  (let ((ind-face (cond ((= i cur-row) `(:foreground ,cur-bg :background ,cur-bg))
+                                         (dtype (cond ((eq dtype 'added) `(:foreground ,ins-fg :background ,ins-bg))
+                                                      ((eq dtype 'changed) `(:foreground ,chg-fg :background ,chg-bg))
+                                                      ((eq dtype 'removed) `(:foreground ,del-fg :background ,del-bg))
+                                                      (t `(:foreground ,norm-bg :background ,norm-bg))))
+                                         (invp `(:foreground ,view-bg :background ,view-bg))
+                                         (t `(:foreground ,norm-bg :background ,norm-bg))))
+                        (bg-face `(:background ,row-bg :extend t)))
+                    (insert
+                     (propertize " " 'face ind-face
+                                 'source-line sline 'source-buf this-buf)
                      (propertize (make-string (1- my/diff-minimap-width) ?\s)
-                                 'face `(:background ,row-bg :extend t)))
-                    'source-line sline
-                    'source-buf this-buf)
-                   "\n"))))))))))
+                                 'face bg-face
+                                 'source-line sline 'source-buf this-buf)
+                     (propertize "\n" 'face bg-face))))))))))))
 
 (defun my/diff-minimap--update ()
   "Re-render the minimap unconditionally."
@@ -2799,6 +2806,9 @@ Use f/s for speed, [/] for size, b/n to skip, SPC to pause, q to quit."
         (setq buffer-read-only t)
         (setq cursor-type nil)
         (setq line-spacing 0)
+        (setq-local truncate-lines t)
+        (setq-local left-fringe-width 0)
+        (setq-local right-fringe-width 0)
         (face-remap-set-base 'default :height my/diff-minimap-font-scale)
         (let ((map (make-sparse-keymap)))
           (define-key map [mouse-1] #'my/diff-minimap--click-handler)
