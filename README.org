@@ -3615,7 +3615,7 @@ Colours are extracted from the active theme at render time: normal rows use the 
 
 Updates continuously on every command via =post-command-hook= with a short idle debounce.
 
-#+begin_src elisp
+#+begin_src elisp :tangle no
 (defgroup my/diff-minimap nil
   "VSCode-style minimap showing diff regions across the entire buffer."
   :group 'tools)
