@@ -373,8 +373,31 @@ are provided, they are used to separate the branches or tags in the display."
 ;; Bind keys in vc-dir-mode
 (with-eval-after-load 'vc-dir
   (define-key vc-dir-mode-map (kbd "B") 'my/vc-dir-show-branches-and-tags)
-  (define-key vc-dir-mode-map (kbd "T") 'my/vc-dir-show-all-tags)  ; New key for showing all tags
-  (define-key vc-dir-mode-map (kbd "F") 'my/vc-dir-show-tracked-files)) ; Changed from T to F
+  (define-key vc-dir-mode-map (kbd "T") 'my/vc-dir-show-all-tags)
+  (define-key vc-dir-mode-map (kbd "F") 'my/vc-dir-show-tracked-files)
+  (define-key vc-dir-mode-map (kbd "S") 'my/vc-stash-checkout-file))
+
+(defun my/vc-stash-checkout-file (stash-ref file)
+  "Restore a single FILE from a git STASH-REF without dropping the stash.
+Prompts for the stash and the file to restore interactively."
+  (interactive
+   (let* ((raw (shell-command-to-string "git stash list"))
+          (stashes (split-string raw "\n" t))
+          (stash-line (completing-read "Restore file from stash: " stashes nil t))
+          (stash-ref (and stash-line
+                          (car (split-string stash-line ":")))))
+     (unless (and stash-ref (string-match-p "^stash@{" stash-ref))
+       (user-error "No stash selected or invalid stash format"))
+     (let* ((files (split-string (shell-command-to-string
+                                   (format "git stash show --name-only %s --" stash-ref))
+                                  "\n" t))
+            (file (completing-read "File to restore: " files nil t)))
+       (unless file
+         (user-error "No file selected"))
+       (list stash-ref file))))
+  (let ((default-directory (vc-root-dir)))
+    (shell-command-to-string (format "git checkout %s -- %s" stash-ref file))
+    (message "Restored %s from %s" file stash-ref)))
 
 (setq emacs-solo-dired-gutter-enabled t)
 
