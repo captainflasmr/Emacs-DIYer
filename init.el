@@ -2098,17 +2098,36 @@ last match. The character class covers both upper and lower case unit prefixes
       (setq my/async-transfer-rsync-progress
             (format "[%s%% %s]" (car last) (cdr last))))))
 
+(defun my/dired-rsync--remove-empty-dirs (dir)
+  "Delete empty directories under DIR, bottom-up."
+  (when (file-directory-p dir)
+    (dolist (entry (directory-files dir t nil t))
+      (let ((fname (file-name-nondirectory entry)))
+        (unless (or (string= fname ".") (string= fname ".."))
+          (my/dired-rsync--remove-empty-dirs entry))))
+    (when (directory-empty-p dir)
+      (delete-directory dir))))
+
 (defun my/dired-rsync--sentinel (proc _event)
-  "Sentinel: notify on completion, refresh dired buffers, and move point to DEST."
+  "Sentinel: notify on completion, refresh dired buffers, and clean up dirs.
+When the rsync transfer used `--remove-source-files`, any
+directories that held the now-deleted files remain as empty
+shells.  This sentinel removes them bottom-up so the rename
+behaves like a true mv(1)."
   (when (memq (process-status proc) '(exit signal))
     (let ((status (process-exit-status proc))
           (label (process-get proc 'rsync-label))
-          (dest (process-get proc 'rsync-dest)))
+          (dest (process-get proc 'rsync-dest))
+          (src-list (process-get proc 'rsync-src-list))
+          (delete-after (process-get proc 'rsync-delete-after)))
       (setq my/async-transfer-rsync-progress nil)
       (my/async-transfer-header-update)
       (if (zerop status)
           (progn
             (message "rsync %s: done" label)
+            (when delete-after
+              (dolist (src src-list)
+                (my/dired-rsync--remove-empty-dirs src)))
             (when dest
               (find-file-other-window dest)))
         (message "rsync %s: FAILED (%d) — see %s"
@@ -2134,6 +2153,8 @@ When DELETE-AFTER is non-nil, pass --remove-source-files (a move)."
          (proc (apply #'start-process "rsync" buf "rsync" args)))
     (process-put proc 'rsync-label label)
     (process-put proc 'rsync-dest dest)
+    (process-put proc 'rsync-src-list src-list)
+    (process-put proc 'rsync-delete-after delete-after)
     (set-process-filter proc #'my/dired-rsync--filter)
     (set-process-sentinel proc #'my/dired-rsync--sentinel)
     (push proc my/async-transfer-rsync-jobs)
@@ -2156,7 +2177,9 @@ With prefix ARG, delete sources after a successful transfer (a move)."
     (my/dired-rsync-start files dest arg)))
 
 (defun my/dired-rsync-do-rename ()
-  "Replacement for `dired-do-rename' using rsync + --remove-source-files."
+  "Replacement for `dired-do-rename' using rsync + --remove-source-files.
+Empty source directories are cleaned up afterwards so this
+behaves like a true mv(1)."
   (interactive)
   (my/dired-rsync-do-copy t))
 
