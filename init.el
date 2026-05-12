@@ -1991,7 +1991,12 @@ process, FILENAME is the input Org file, and PUB-DIR is the publishing directory
 ;; Hook into minibuffer setup
 (add-hook 'minibuffer-setup-hook #'setup-minibuffer-completion-styles)
 
+(defun my/dired-async-shell-command-nohup (orig-fun command &optional arg file-list)
+  "Wrap COMMAND with `nohup' so the process survives Emacs exit."
+  (funcall orig-fun (concat "nohup " command) arg file-list))
+
 (with-eval-after-load 'dired
+  (advice-add 'dired-do-async-shell-command :around #'my/dired-async-shell-command-nohup)
   (define-key dired-mode-map (kbd "W") 'dired-do-async-shell-command)
   (setq dired-guess-shell-alist-user
         '(("\\.\\(jpg\\|jpeg\\|png\\|gif\\|bmp\\)$" "gthumb")
