@@ -2123,8 +2123,7 @@ Picks up extra capf properties via `completion-extra-properties'."
 
 (setq tab-always-indent 'complete)
 (setq completion-in-region-function #'my/popup-completion-in-region)
-(global-set-key (kbd "C-c TAB") #'my/popup-complete)
-(global-set-key (kbd "C-c <tab>") #'my/popup-complete)
+;; C-c TAB / C-c <tab> left unbound so Org's org-table-toggle-column-width works
 (global-set-key (kbd "C-M-i") #'my/popup-complete)
 (with-eval-after-load 'flyspell
   (define-key flyspell-mode-map (kbd "C-M-i") nil))
