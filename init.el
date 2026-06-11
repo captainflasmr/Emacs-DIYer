@@ -573,17 +573,17 @@ The function adjusts:
                                                 :box (:line-width 1 :color ,bg-color :style flat-button)))))))))
     (setq my/sync-ui-accent-color--current accent-color)))
 
-(if (version<= "29.1" emacs-version)
-    ;; Emacs 29.1+ — use the official theme hook
-    (add-hook 'enable-theme-functions
-              (lambda (_theme)
-                (my/sync-ui-accent-color)))
-  ;; Older Emacs — fall back to advising load-theme
-  (progn
-    (defun selected-window-accent-sync-tab-bar-to-theme--after (&rest _)
-      (my/sync-ui-accent-color))
-    (advice-add 'load-theme :after
-                #'selected-window-accent-sync-tab-bar-to-theme--after)))
+;; (if (version<= "29.1" emacs-version)
+;;     ;; Emacs 29.1+ — use the official theme hook
+;;     (add-hook 'enable-theme-functions
+;;               (lambda (_theme)
+;;                 (my/sync-ui-accent-color)))
+;;   ;; Older Emacs — fall back to advising load-theme
+;;   (progn
+;;     (defun selected-window-accent-sync-tab-bar-to-theme--after (&rest _)
+;;       (my/sync-ui-accent-color))
+;;     (advice-add 'load-theme :after
+;;                 #'selected-window-accent-sync-tab-bar-to-theme--after)))
 
 (defun my/consult-theme (theme)
   "Load THEME with live preview during candidate navigation.
