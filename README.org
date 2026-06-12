@@ -1566,15 +1566,31 @@ collect/export could be solved with a TAB showing completions buffer
 
 ** DONE popper
 
-Mainly used for popping in popping out shells, testing the following implementation:
+Mainly used for popping in and popping out shells.
+
+Two concerns are kept deliberately separate:
+
+- =my/popper-toggle-current= is about *recency* - it hides a visible
+  popup, or re-shows the *last* popup you had up (tracked explicitly in
+  =my/popper-last-buffer=), so toggling always returns to where you were.
+- =my/popper-cycle-popup= is about *browsing* - it walks the matching
+  buffers in a stable, name-sorted order so cycling is predictable and
+  does not drift with buffer-list recency.
+
+The popup height is governed entirely by =display-buffer-alist= (in
+Emacs-vanilla), which is the single source of truth - popper does not
+resize windows itself.
 
 #+begin_src elisp
+(defvar my/popper-last-buffer nil
+  "The most recently shown or hidden popup buffer.
+Used by `my/popper-toggle-current' to re-show the last popup.")
+
 (defun my/popper-matching-buffers ()
-  "Return a list of buffers matching pop-up patterns but excluding specific buffers."
-  (let ((popup-patterns '("\\*\.*shell\.*\\*"
-                          "\\*\.*term\.*\\*"
-                          "\\*eldoc\.*\\*"
-                          "\\*Flymake\.*"))
+  "Return live popup buffers, in `buffer-list' (most-recent-first) order.
+Matches shells and terminals, excluding the indirect comint buffer."
+  (let ((popup-patterns '("\\*.*shell.*\\*"
+                          "\\*.*term.*\\*"))
         (exclusion-patterns '("\\*shell\\*-comint-indirect")))
     (seq-filter (lambda (buf)
                   (let ((bufname (buffer-name buf)))
@@ -1586,52 +1602,64 @@ Mainly used for popping in popping out shells, testing the following implementat
                                         exclusion-patterns)))))
                 (buffer-list))))
 
-(defun my/popper-handle-popup (buffer)
-  "Display BUFFER as a popup, setting it as the current popup."
+(defun my/popper-visible-window ()
+  "Return a window currently displaying a popup buffer, or nil."
+  (seq-find (lambda (win)
+              (member (window-buffer win) (my/popper-matching-buffers)))
+            (window-list)))
+
+(defun my/popper-show (buffer)
+  "Display BUFFER as a bottom popup and remember it as the last popup.
+Height is left to `display-buffer-alist' as the single source of truth."
+  (setq my/popper-last-buffer buffer)
   (pop-to-buffer buffer
                  '((display-buffer-reuse-window display-buffer-at-bottom)
-                   (inhibit-same-window . t)
-                   (window-height . 0.4)))
-  (message "Displayed pop-up buffer: %s" (buffer-name buffer)))
+                   (inhibit-same-window . t)))
+  (message "Popup: %s" (buffer-name buffer)))
 
-(defun my/popper-cycle-popup ()
-  "Cycle visibility of pop-up buffers."
-  (interactive)
-  (let* ((popup-buffers (my/popper-matching-buffers))
-         (current-popup-window (car (seq-filter (lambda (win)
-                                                  (member (window-buffer win) popup-buffers))
-                                                (window-list)))))
-    (when current-popup-window
-      (let ((buf (window-buffer current-popup-window)))
-        (delete-window current-popup-window)
-        (bury-buffer buf)
-        (setq popup-buffers (my/popper-matching-buffers))
-        (message "Hid pop-up buffer: %s" (buffer-name buf))))
-    (if popup-buffers
-        (my/popper-handle-popup (car popup-buffers))
-      (message "No pop-up buffers to display!"))))
+(defun my/popper-hide (window)
+  "Hide popup WINDOW, remembering its buffer as the last popup."
+  (let ((buf (window-buffer window)))
+    (setq my/popper-last-buffer buf)
+    (delete-window window)
+    (message "Hid popup: %s" (buffer-name buf))))
 
 (defun my/popper-toggle-current ()
-  "Toggle visibility of pop-up buffers."
+  "Toggle the last popup buffer.
+If a popup is visible, hide it.  Otherwise re-show the last popup
+(`my/popper-last-buffer'), falling back to the most recent match."
   (interactive)
-  (let* ((popup-buffers (my/popper-matching-buffers))
-         (current-popup-window (car (seq-filter (lambda (win)
-                                                  (member (window-buffer win) popup-buffers))
-                                                (window-list)))))
-    (if current-popup-window
-        (let ((buf (window-buffer current-popup-window)))
-          (delete-window current-popup-window)
-          (message "Hid pop-up buffer: %s" (buffer-name buf)))
-      (if popup-buffers
-          (my/popper-handle-popup (car popup-buffers))
-        (message "No pop-up buffers to display!")))))
+  (let ((win (my/popper-visible-window)))
+    (if win
+        (my/popper-hide win)
+      (let ((buf (or (and (buffer-live-p my/popper-last-buffer)
+                          my/popper-last-buffer)
+                     (car (my/popper-matching-buffers)))))
+        (if buf
+            (my/popper-show buf)
+          (message "No popup buffers available"))))))
 
-;; Toggle the currently selected popup.
+(defun my/popper-cycle-popup ()
+  "Show the next popup buffer in a stable, name-sorted order."
+  (interactive)
+  (let* ((buffers (sort (my/popper-matching-buffers)
+                        (lambda (a b)
+                          (string< (buffer-name a) (buffer-name b)))))
+         (win (my/popper-visible-window)))
+    (if (null buffers)
+        (message "No popup buffers available")
+      (let* ((current (and win (window-buffer win)))
+             (pos (and current (seq-position buffers current)))
+             (next (nth (mod (1+ (or pos -1)) (length buffers)) buffers)))
+        (when win (delete-window win))
+        (my/popper-show next)))))
+
+;; Toggle the last/visible popup.
 (global-set-key (kbd "C-x j") #'my/popper-toggle-current)
 (global-set-key (kbd "C-'") #'my/popper-toggle-current)
 (global-set-key (kbd "C-`") #'my/popper-toggle-current)
 
-;; Cycle through popups or show the next popup.
+;; Cycle through popups in a stable order.
 (global-set-key (kbd "C-M-<return>") #'my/popper-cycle-popup)
 #+end_src
 
