@@ -1152,7 +1152,7 @@ universal argument, DIRECTORY and GLOB are prompted for as well."
   (pop-to-buffer buffer
                  '((display-buffer-reuse-window display-buffer-at-bottom)
                    (inhibit-same-window . t)
-                   (window-height . 0.3)))
+                   (window-height . 0.4)))
   (message "Displayed pop-up buffer: %s" (buffer-name buffer)))
 
 (defun my/popper-cycle-popup ()
