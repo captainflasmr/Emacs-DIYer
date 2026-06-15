@@ -1160,15 +1160,18 @@ Matches shells and terminals, excluding the indirect comint buffer."
   "Display BUFFER as a bottom popup and remember it as the last popup.
 Height is left to `display-buffer-alist' as the single source of truth."
   (setq my/popper-last-buffer buffer)
-  (pop-to-buffer buffer
-                 '((display-buffer-reuse-window display-buffer-at-bottom)
-                   (inhibit-same-window . t)))
+  (when-let ((win (display-buffer buffer
+                                  '((display-buffer-reuse-window display-buffer-at-bottom)
+                                    (inhibit-same-window . t)))))
+    (set-window-dedicated-p win t)
+    (select-window win))
   (message "Popup: %s" (buffer-name buffer)))
 
 (defun my/popper-hide (window)
   "Hide popup WINDOW, remembering its buffer as the last popup."
   (let ((buf (window-buffer window)))
     (setq my/popper-last-buffer buf)
+    (set-window-dedicated-p window nil)
     (delete-window window)
     (message "Hid popup: %s" (buffer-name buf))))
 
