@@ -1134,21 +1134,15 @@ universal argument, DIRECTORY and GLOB are prompted for as well."
   "The most recently shown or hidden popup buffer.
 Used by `my/popper-toggle-current' to re-show the last popup.")
 
+(defvar-local my/popper-popup nil
+  "When non-nil, this buffer is managed as a popper popup.
+Set by `my/shell-menu' when creating shell/term buffers.")
+
 (defun my/popper-matching-buffers ()
-  "Return live popup buffers, in `buffer-list' (most-recent-first) order.
-Matches shells and terminals, excluding the indirect comint buffer."
-  (let ((popup-patterns '("\\*.*shell.*\\*"
-                          "\\*.*term.*\\*"))
-        (exclusion-patterns '("\\*shell\\*-comint-indirect")))
-    (seq-filter (lambda (buf)
-                  (let ((bufname (buffer-name buf)))
-                    (and (seq-some (lambda (pattern)
-                                     (string-match-p pattern bufname))
-                                   popup-patterns)
-                         (not (seq-some (lambda (pattern)
-                                          (string-match-p pattern bufname))
-                                        exclusion-patterns)))))
-                (buffer-list))))
+  "Return live popup buffers tagged via `my/popper-popup', most-recent-first."
+  (seq-filter (lambda (buf)
+                (buffer-local-value 'my/popper-popup buf))
+              (buffer-list)))
 
 (defun my/popper-visible-window ()
   "Return a window currently displaying a popup buffer, or nil."
@@ -1158,13 +1152,23 @@ Matches shells and terminals, excluding the indirect comint buffer."
 
 (defun my/popper-show (buffer)
   "Display BUFFER as a bottom popup and remember it as the last popup.
-Height is left to `display-buffer-alist' as the single source of truth."
+If a popup window is already visible, reuse it in place rather than
+opening a second one.  Otherwise height is left to `display-buffer-alist'."
   (setq my/popper-last-buffer buffer)
-  (when-let ((win (display-buffer buffer
-                                  '((display-buffer-reuse-window display-buffer-at-bottom)
-                                    (inhibit-same-window . t)))))
-    (set-window-dedicated-p win t)
-    (select-window win))
+  (let ((win (my/popper-visible-window)))
+    (if win
+        ;; Reuse the existing popup window: swap its dedicated buffer in place.
+        (progn
+          (set-window-dedicated-p win nil)
+          (set-window-buffer win buffer)
+          (set-window-dedicated-p win t)
+          (select-window win))
+      (when (setq win (display-buffer
+                       buffer
+                       '((display-buffer-reuse-window display-buffer-at-bottom)
+                         (inhibit-same-window . t))))
+        (set-window-dedicated-p win t)
+        (select-window win))))
   (message "Popup: %s" (buffer-name buffer)))
 
 (defun my/popper-hide (window)
@@ -1212,6 +1216,68 @@ If a popup is visible, hide it.  Otherwise re-show the last popup
 
 ;; Cycle through popups in a stable order.
 (global-set-key (kbd "C-M-<return>") #'my/popper-cycle-popup)
+
+(defun my/shell-menu-new-eshell ()
+  "Create a named eshell buffer tagged as a popup, uniquifying the name."
+  (interactive)
+  (let* ((name (generate-new-buffer-name
+                (read-string "Eshell buffer name: " "*eshell*")))
+         (buf (get-buffer-create name)))
+    (with-current-buffer buf
+      (unless (derived-mode-p 'eshell-mode)
+        (eshell-mode))
+      (setq-local my/popper-popup t))
+    (my/popper-show buf)))
+
+(defun my/shell-menu-new-shell ()
+  "Create a named comint shell buffer tagged as a popup, uniquifying the name."
+  (interactive)
+  (let* ((name (generate-new-buffer-name
+                (read-string "Shell buffer name: " "*shell*")))
+         (buf (shell name)))
+    (with-current-buffer buf
+      (setq-local my/popper-popup t))
+    (my/popper-show buf)))
+
+(defun my/shell-menu-new-vterm ()
+  "Create a named vterm buffer tagged as a popup, uniquifying the name."
+  (interactive)
+  (if (not (fboundp 'vterm))
+      (message "vterm not available")
+    (let* ((name (generate-new-buffer-name
+                  (read-string "Vterm buffer name: " "*vterm*")))
+           (buf (vterm name)))
+      (with-current-buffer buf
+        (setq-local my/popper-popup t))
+      (my/popper-show buf))))
+
+(defun my/shell-menu--existing-children (_)
+  "Return dynamic transient suffixes numbered 1-9 for each tagged popup buffer."
+  (let ((bufs (my/popper-matching-buffers)))
+    (if (null bufs)
+        (list (transient-parse-suffix 'my/shell-menu '("-" "(no shells open)" ignore)))
+      (cl-loop for buf in bufs
+               for i from 1 to 9
+               collect (let* ((name (buffer-name buf))
+                              (sym (intern (format "my/shell-menu--switch-%d" i))))
+                         (fset sym (lambda () (interactive)
+                                     (my/popper-show (get-buffer name))))
+                         (transient-parse-suffix
+                          'my/shell-menu
+                          `(,(number-to-string i) ,name ,sym)))))))
+
+(require 'transient)
+(transient-define-prefix my/shell-menu ()
+  "Shell popup manager — switch by number or create a new shell."
+  ["Shells"
+   :class transient-column
+   :setup-children my/shell-menu--existing-children]
+  [["New"
+    ("e" "eshell"  my/shell-menu-new-eshell)
+    ("s" "shell"   my/shell-menu-new-shell)
+    ("v" "vterm"   my/shell-menu-new-vterm)]])
+
+(global-set-key (kbd "M-[") #'my/shell-menu)
 
 (defun my/md-to-org-convert-buffer ()
   "Convert the current buffer from Markdown to Org-mode format."
