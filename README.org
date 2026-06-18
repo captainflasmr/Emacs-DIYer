@@ -2797,7 +2797,7 @@ Cygwin-style (/cygdrive/c/...) so rsync can resolve them."
    ((and (eq system-type 'windows-nt)
          (string-match "\\`\\([a-zA-Z]\\):[/\\]" path))
     (concat "/cygdrive/" (downcase (match-string 1 path)) "/"
-            (replace-regexp-in-string "\\" "/" (substring path (match-end 0)))))
+            (replace-regexp-in-string "\\\\" "/" (substring path (match-end 0)))))
    (t (expand-file-name path))))
 
 (defun my/dired-rsync--filter (proc chunk)
