@@ -2156,12 +2156,18 @@ process, FILENAME is the input Org file, and PUB-DIR is the publishing directory
           (message "%s" (propertize (apply #'format text args) 'face face)))))
 
 (defun my/dired-rsync--tramp-translate (path)
-  "Translate a local or /ssh: TRAMP PATH into an rsync-compatible form."
+  "Translate a local or /ssh: TRAMP PATH into an rsync-compatible form.
+On Windows with cwrsync, convert drive-letter paths (c:/...) to
+Cygwin-style (/cygdrive/c/...) so rsync can resolve them."
   (cond
    ((and (fboundp 'tramp-tramp-file-p)
          (tramp-tramp-file-p path)
          (string-match "\\`/ssh[^:]*:\\([^:]+\\):\\(.*\\)\\'" path))
     (format "%s:%s" (match-string 1 path) (match-string 2 path)))
+   ((and (eq system-type 'windows-nt)
+         (string-match "\\`\\([a-zA-Z]\\):[/\\]" path))
+    (concat "/cygdrive/" (downcase (match-string 1 path)) "/"
+            (replace-regexp-in-string "\\" "/" (substring path (match-end 0)))))
    (t (expand-file-name path))))
 
 (defun my/dired-rsync--filter (proc chunk)
@@ -2229,7 +2235,7 @@ When DELETE-AFTER is non-nil, pass --remove-source-files (a move)."
   (unless (executable-find "rsync")
     (user-error "rsync executable not found on PATH"))
   (let* ((label (format "→ %s" (abbreviate-file-name dest)))
-         (buf (generate-new-buffer (format " *rsync %s*" label)))
+         (buf (generate-new-buffer (format "*rsync %s*" label)))
          (srcs (mapcar #'my/dired-rsync--tramp-translate src-list))
          (rdest (my/dired-rsync--tramp-translate dest))
          (args (append '("-ah" "--info=progress2")

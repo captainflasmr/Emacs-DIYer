@@ -2780,16 +2780,24 @@ Usage:
 - Progress like =[87% 12.3MB/s]= appears in the header-line; the per-job =*rsync*= buffer is kept for inspection on failure.
 - On successful completion, point moves to the destination directory (opened in another window).
 - =/ssh:host:/path= TRAMP endpoints are translated to =host:/path= so rsync-over-ssh works; other TRAMP methods fall back to the literal path.
+- On Windows with cwrsync, drive-letter paths (=c:/...=, =C:\...=) are converted to Cygwin-style (=/cygdrive/c/...=) so rsync can resolve them; backslashes are normalized to forward slashes.
+- The process buffer name starts with =*rsync= (no leading space) so it shows up in =list-buffers= / =switch-to-buffer= for inspection on failure.
 - The bottom of the block contains an optional =define-key= to rebind dired's =C= / =R= to the rsync variants — commented out by default.
 
 #+begin_src elisp
 (defun my/dired-rsync--tramp-translate (path)
-  "Translate a local or /ssh: TRAMP PATH into an rsync-compatible form."
+  "Translate a local or /ssh: TRAMP PATH into an rsync-compatible form.
+On Windows with cwrsync, convert drive-letter paths (c:/...) to
+Cygwin-style (/cygdrive/c/...) so rsync can resolve them."
   (cond
    ((and (fboundp 'tramp-tramp-file-p)
          (tramp-tramp-file-p path)
          (string-match "\\`/ssh[^:]*:\\([^:]+\\):\\(.*\\)\\'" path))
     (format "%s:%s" (match-string 1 path) (match-string 2 path)))
+   ((and (eq system-type 'windows-nt)
+         (string-match "\\`\\([a-zA-Z]\\):[/\\]" path))
+    (concat "/cygdrive/" (downcase (match-string 1 path)) "/"
+            (replace-regexp-in-string "\\" "/" (substring path (match-end 0)))))
    (t (expand-file-name path))))
 
 (defun my/dired-rsync--filter (proc chunk)
@@ -2857,7 +2865,7 @@ When DELETE-AFTER is non-nil, pass --remove-source-files (a move)."
   (unless (executable-find "rsync")
     (user-error "rsync executable not found on PATH"))
   (let* ((label (format "→ %s" (abbreviate-file-name dest)))
-         (buf (generate-new-buffer (format " *rsync %s*" label)))
+         (buf (generate-new-buffer (format "*rsync %s*" label)))
          (srcs (mapcar #'my/dired-rsync--tramp-translate src-list))
          (rdest (my/dired-rsync--tramp-translate dest))
          (args (append '("-ah" "--info=progress2")
