@@ -2841,10 +2841,12 @@ behaves like a true mv(1)."
           (label (process-get proc 'rsync-label))
           (dest (process-get proc 'rsync-dest))
           (src-list (process-get proc 'rsync-src-list))
-          (delete-after (process-get proc 'rsync-delete-after)))
+          (delete-after (process-get proc 'rsync-delete-after))
+          (is-robocopy (process-get proc 'rsync-robocopy)))
       (setq my/async-transfer-rsync-progress nil)
       (my/async-transfer-header-update)
-      (if (zerop status)
+      (if (or (zerop status)
+              (and is-robocopy (<= status 7)))
           (progn
             (message "rsync %s: done" label)
             (when delete-after
@@ -2860,30 +2862,68 @@ behaves like a true mv(1)."
           (with-current-buffer b (ignore-errors (revert-buffer nil t))))))))
 
 (defun my/dired-rsync-start (src-list dest &optional delete-after)
-  "Asynchronously rsync SRC-LIST (list of paths) into DEST.
-When DELETE-AFTER is non-nil, pass --remove-source-files (a move)."
-  (unless (executable-find "rsync")
-    (user-error "rsync executable not found on PATH"))
-  (let* ((label (format "→ %s" (abbreviate-file-name dest)))
-         (buf (generate-new-buffer (format "*rsync %s*" label)))
-         (srcs (mapcar #'my/dired-rsync--tramp-translate src-list))
-         (rdest (my/dired-rsync--tramp-translate dest))
-         (args (append '("-ah" "--info=progress2")
-                       (when delete-after '("--remove-source-files"))
-                       srcs
-                       (list rdest)))
-         (proc (apply #'start-process "rsync" buf "rsync" args)))
-    (process-put proc 'rsync-label label)
-    (process-put proc 'rsync-dest dest)
-    (process-put proc 'rsync-src-list src-list)
-    (process-put proc 'rsync-delete-after delete-after)
-    (set-process-filter proc #'my/dired-rsync--filter)
-    (set-process-sentinel proc #'my/dired-rsync--sentinel)
-    (push proc my/async-transfer-rsync-jobs)
-    (my/async-transfer-header-start)
-    (message "rsync %s: started (%d item%s)" label
-             (length src-list) (if (= 1 (length src-list)) "" "s"))
-    proc))
+  "Asynchronously copy SRC-LIST (list of paths) into DEST.
+Uses rsync on Linux, robocopy on Windows.
+When DELETE-AFTER is non-nil, delete sources after a successful transfer."
+  (cond
+   ((eq system-type 'windows-nt)
+    (unless (executable-find "robocopy")
+      (user-error "robocopy executable not found on PATH"))
+    (let* ((label (format "→ %s" (abbreviate-file-name dest)))
+           (dest-dir (file-name-as-directory (expand-file-name dest)))
+           (common-args '("/COPY:DAT" "/R:0" "/W:0" "/NP" "/NJH" "/NJS"
+                          "/NDL" "/NFL" "/BYTES")))
+      (dolist (src src-list)
+        (let* ((src-name (file-name-nondirectory
+                          (directory-file-name src)))
+               (target (expand-file-name src-name dest-dir))
+               (args
+                (if (file-directory-p src)
+                    (append (list (directory-file-name src) target "/E")
+                            common-args
+                            (when delete-after '("/MOVE"))
+                            '("/MT:8"))
+                  (append (list (file-name-directory src) dest-dir src-name)
+                          common-args
+                          (when delete-after '("/MOV")))))
+               (buf (generate-new-buffer
+                     (format "*robocopy %s*" src-name)))
+               (proc (apply #'start-process "robocopy" buf "robocopy" args)))
+          (process-put proc 'rsync-label label)
+          (process-put proc 'rsync-dest dest)
+          (process-put proc 'rsync-src-list (list src))
+          (process-put proc 'rsync-delete-after delete-after)
+          (process-put proc 'rsync-robocopy t)
+          (set-process-filter proc #'my/dired-rsync--filter)
+          (set-process-sentinel proc #'my/dired-rsync--sentinel)
+          (push proc my/async-transfer-rsync-jobs)))
+      (my/async-transfer-header-start)
+      (message "robocopy %s: started (%d item%s)" label
+               (length src-list) (if (= 1 (length src-list)) "" "s"))
+      (car my/async-transfer-rsync-jobs)))
+   (t
+    (unless (executable-find "rsync")
+      (user-error "rsync executable not found on PATH"))
+    (let* ((label (format "→ %s" (abbreviate-file-name dest)))
+           (buf (generate-new-buffer (format "*rsync %s*" label)))
+           (srcs (mapcar #'my/dired-rsync--tramp-translate src-list))
+           (rdest (my/dired-rsync--tramp-translate dest))
+           (args (append '("-ah" "--info=progress2")
+                         (when delete-after '("--remove-source-files"))
+                         srcs
+                         (list rdest)))
+           (proc (apply #'start-process "rsync" buf "rsync" args)))
+      (process-put proc 'rsync-label label)
+      (process-put proc 'rsync-dest dest)
+      (process-put proc 'rsync-src-list src-list)
+      (process-put proc 'rsync-delete-after delete-after)
+      (set-process-filter proc #'my/dired-rsync--filter)
+      (set-process-sentinel proc #'my/dired-rsync--sentinel)
+      (push proc my/async-transfer-rsync-jobs)
+      (my/async-transfer-header-start)
+      (message "rsync %s: started (%d item%s)" label
+               (length src-list) (if (= 1 (length src-list)) "" "s"))
+      proc))))
 
 (defun my/dired-rsync-do-copy (&optional arg)
   "Replacement for `dired-do-copy' using rsync asynchronously.
