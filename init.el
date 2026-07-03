@@ -2516,9 +2516,9 @@ navigation still resolves to the deepest directory."
                                (end (dired-move-to-end-of-filename t))
                                (displayed (buffer-substring-no-properties
                                            start end))
-                               (suffix (substring deepest
-                                                  (1+ (length file))))
-                               (new (concat displayed "/" suffix)))
+                                (suffix (substring deepest
+                                                   (length file)))
+                                (new (concat displayed suffix)))
                           (delete-region start end)
                           (goto-char start)
                           (insert (propertize new

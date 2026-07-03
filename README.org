@@ -3181,8 +3181,8 @@ navigation still resolves to the deepest directory."
                                (displayed (buffer-substring-no-properties
                                            start end))
                                (suffix (substring deepest
-                                                  (1+ (length file))))
-                               (new (concat displayed "/" suffix)))
+                                                  (length file)))
+                               (new (concat displayed suffix)))
                           (delete-region start end)
                           (goto-char start)
                           (insert (propertize new
