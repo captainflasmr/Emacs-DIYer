@@ -1239,17 +1239,19 @@ If a popup is visible, hide it.  Otherwise re-show the last popup
       (setq-local my/popper-popup t))
     (my/popper-show buf)))
 
-(defun my/shell-menu-new-vterm ()
-  "Create a named vterm buffer tagged as a popup, uniquifying the name."
+(defun my/shell-menu-new-ansi-term ()
+  "Create a named ansi-term buffer tagged as a popup, uniquifying the name."
   (interactive)
-  (if (not (fboundp 'vterm))
-      (message "vterm not available")
-    (let* ((name (generate-new-buffer-name
-                  (read-string "Vterm buffer name: " "*vterm*")))
-           (buf (vterm name)))
-      (with-current-buffer buf
-        (setq-local my/popper-popup t))
-      (my/popper-show buf))))
+  (let* ((base-name (read-string "Ansi-term buffer name: " "*ansi-term*"))
+         (temp-name (replace-regexp-in-string
+                     "\\`\\*\\|\\*\\'" ""
+                     (generate-new-buffer-name "*ansi-term-temp*")))
+         (shell-prog (or explicit-shell-file-name shell-file-name "/bin/bash"))
+         (buf (ansi-term shell-prog temp-name)))
+    (with-current-buffer buf
+      (rename-buffer (generate-new-buffer-name base-name))
+      (setq-local my/popper-popup t))
+    (my/popper-show buf)))
 
 (defun my/shell-menu--existing-children (_)
   "Return dynamic transient suffixes numbered 1-9 for each tagged popup buffer."
@@ -1261,7 +1263,7 @@ If a popup is visible, hide it.  Otherwise re-show the last popup
                collect (let* ((name (buffer-name buf))
                               (sym (intern (format "my/shell-menu--switch-%d" i))))
                          (fset sym (lambda () (interactive)
-                                     (my/popper-show (get-buffer name))))
+                                      (my/popper-show (get-buffer name))))
                          (transient-parse-suffix
                           'my/shell-menu
                           `(,(number-to-string i) ,name ,sym)))))))
@@ -1273,9 +1275,9 @@ If a popup is visible, hide it.  Otherwise re-show the last popup
    :class transient-column
    :setup-children my/shell-menu--existing-children]
   [["New"
-    ("e" "eshell"  my/shell-menu-new-eshell)
-    ("s" "shell"   my/shell-menu-new-shell)
-    ("v" "vterm"   my/shell-menu-new-vterm)]])
+    ("e" "eshell"     my/shell-menu-new-eshell)
+    ("s" "shell"      my/shell-menu-new-shell)
+    ("a" "ansi-term"  my/shell-menu-new-ansi-term)]])
 
 (global-set-key (kbd "M-[") #'my/shell-menu)
 
