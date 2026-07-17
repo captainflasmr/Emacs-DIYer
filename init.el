@@ -667,7 +667,7 @@ On abort (C-g), restores the themes enabled before the preview began."
   (mapc #'disable-theme custom-enabled-themes)
   (load-theme theme t))
 
-(global-set-key (kbd "M-m") #'my/consult-theme)
+(define-key my-overrides-mode-map (kbd "M-m") #'my/consult-theme)
 
 (defun my/grep (search-term &optional directory glob)
   "Run ripgrep (rg) with SEARCH-TERM and optionally DIRECTORY and GLOB.
@@ -998,37 +998,37 @@ universal argument, DIRECTORY and GLOB are prompted for as well."
           (insert new-color))
       (error "No valid hex color code at point"))))
 
-(global-set-key (kbd "M-<up>") 
+(define-key my-overrides-mode-map (kbd "M-<up>") 
                 (lambda () 
                   (interactive) 
                   (my/replace-color-at-point 'my/color-adjust-brightness 0.02) 
                   (my/rainbow-mode)))
-(global-set-key (kbd "M-<down>") 
+(define-key my-overrides-mode-map (kbd "M-<down>") 
                 (lambda () 
                   (interactive) 
                   (my/replace-color-at-point 'my/color-adjust-brightness -0.02) 
                   (my/rainbow-mode)))
-(global-set-key (kbd "M-<prior>") 
+(define-key my-overrides-mode-map (kbd "M-<prior>") 
                 (lambda () 
                   (interactive) 
                   (my/replace-color-at-point 'my/color-adjust-saturation 0.02) 
                   (my/rainbow-mode)))
-(global-set-key (kbd "M-<next>") 
+(define-key my-overrides-mode-map (kbd "M-<next>") 
                 (lambda () 
                   (interactive) 
                   (my/replace-color-at-point 'my/color-adjust-saturation -0.02) 
                   (my/rainbow-mode)))
-(global-set-key (kbd "M-<left>") 
+(define-key my-overrides-mode-map (kbd "M-<left>") 
                 (lambda () 
                   (interactive) 
                   (my/replace-color-at-point 'my/color-adjust-hue -5) 
                   (my/rainbow-mode)))
-(global-set-key (kbd "M-<right>") 
+(define-key my-overrides-mode-map (kbd "M-<right>") 
                 (lambda () 
                   (interactive) 
                   (my/replace-color-at-point 'my/color-adjust-hue 5) 
                   (my/rainbow-mode)))
-(global-set-key (kbd "M-<home>") 'my/insert-random-color-at-point)
+(define-key my-overrides-mode-map (kbd "M-<home>") 'my/insert-random-color-at-point)
 
 (global-set-key (kbd "M-g o") #'org-goto)
 (setq org-goto-interface 'outline-path-completion)
@@ -1210,12 +1210,12 @@ If a popup is visible, hide it.  Otherwise re-show the last popup
         (my/popper-show next)))))
 
 ;; Toggle the last/visible popup.
-(global-set-key (kbd "C-x j") #'my/popper-toggle-current)
-(global-set-key (kbd "C-'") #'my/popper-toggle-current)
-(global-set-key (kbd "C-`") #'my/popper-toggle-current)
+(define-key my-overrides-mode-map (kbd "C-x j") #'my/popper-toggle-current)
+(define-key my-overrides-mode-map (kbd "C-'") #'my/popper-toggle-current)
+(define-key my-overrides-mode-map (kbd "C-`") #'my/popper-toggle-current)
 
 ;; Cycle through popups in a stable order.
-(global-set-key (kbd "C-M-<return>") #'my/popper-cycle-popup)
+(define-key my-overrides-mode-map (kbd "C-M-<return>") #'my/popper-cycle-popup)
 
 (defun my/shell-menu-new-eshell ()
   "Create a named eshell buffer tagged as a popup, uniquifying the name."
@@ -1279,7 +1279,7 @@ If a popup is visible, hide it.  Otherwise re-show the last popup
     ("s" "shell"      my/shell-menu-new-shell)
     ("a" "ansi-term"  my/shell-menu-new-ansi-term)]])
 
-(global-set-key (kbd "M-[") #'my/shell-menu)
+(define-key my-overrides-mode-map (kbd "M-[") #'my/shell-menu)
 
 (defun my/md-to-org-convert-buffer ()
   "Convert the current buffer from Markdown to Org-mode format."
@@ -1750,7 +1750,7 @@ Picks up extra capf properties via `completion-extra-properties'."
 (setq tab-always-indent 'complete)
 (setq completion-in-region-function #'my/popup-completion-in-region)
 ;; C-c TAB / C-c <tab> left unbound so Org's org-table-toggle-column-width works
-(global-set-key (kbd "C-M-i") #'my/popup-complete)
+(define-key my-overrides-mode-map (kbd "C-M-i") #'my/popup-complete)
 (with-eval-after-load 'flyspell
   (define-key flyspell-mode-map (kbd "C-M-i") nil))
 
@@ -2518,9 +2518,9 @@ navigation still resolves to the deepest directory."
                                (end (dired-move-to-end-of-filename t))
                                (displayed (buffer-substring-no-properties
                                            start end))
-                                (suffix (substring deepest
-                                                   (length file)))
-                                (new (concat displayed suffix)))
+                               (suffix (substring deepest
+                                                  (length file)))
+                               (new (concat displayed suffix)))
                           (delete-region start end)
                           (goto-char start)
                           (insert (propertize new
