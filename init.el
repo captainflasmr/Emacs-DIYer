@@ -117,17 +117,15 @@ Each line is represented as a list of field values."
 
 (defun my/quick-window-jump ()
   "Jump to a window by typing its assigned character label.
-If there is only a single window, split it left-to-right.
 If there are only two windows, jump directly to the other window.
-Side windows are ignored."
+With a single window, do nothing.  Side windows are ignored."
   (interactive)
   (let* ((window-list (seq-filter (lambda (w)
                                     (not (window-parameter w 'window-side)))
                                   (window-list nil 'no-mini))))
     (cond
      ((= (length window-list) 1)
-      (split-window-horizontally)
-      (other-window 1))
+      (message "Single window"))
      ((= (length window-list) 2)
       (let ((other-window (if (eq (selected-window) (nth 0 window-list))
                               (nth 1 window-list)
@@ -151,7 +149,7 @@ Side windows are ignored."
                                (window (cdr entry))
                                (start (window-start window))
                                (overlay (make-overlay start start (window-buffer window))))
-                          (overlay-put overlay 'after-string 
+                          (overlay-put overlay 'after-string
                                        (propertize (format "[%s]" key)
                                                    'face 'highlight))
                           (overlay-put overlay 'window window)
@@ -163,6 +161,28 @@ Side windows are ignored."
           (setq my/quick-window-overlays nil)
           (when-let ((selected-window (cdr (assoc (char-to-string key) window-map))))
             (select-window selected-window))))))))
+
+(defun my/tiling-split ()
+  "Split the selected window using a column-aware tiling rule.
+The frame grows as vertical columns, modelled on a swaywm dynamic
+tiling WM: an empty frame splits side-by-side to start the first
+column; a window that spans the full frame height (a column) splits
+top-to-bottom to stack a new pane inside it; any shorter pane inside
+a column splits side-by-side to start a fresh column to its right.
+Focus moves to the new window and all live windows are rebalanced so
+they share the frame evenly."
+  (interactive)
+  (let* ((wins (seq-filter (lambda (w)
+                             (not (window-parameter w 'window-side)))
+                           (window-list nil 'no-mini)))
+         (max-height (apply #'max (mapcar #'window-total-height wins)))
+         (new-window
+          (cond
+           ((= (length wins) 1)                  (split-window-right))
+           ((>= (window-total-height) max-height) (split-window-below))
+           (t                                    (split-window-right)))))
+    (select-window new-window)
+    (balance-windows)))
 
 (defun my/rainbow-mode ()
   "Overlay colors represented as hex values in the current buffer."

@@ -23,6 +23,10 @@ Used in concert with https://github.com/captainflasmr/Emacs-vanilla
 
 * Whats New
 
+** <2026-07-23>
+
+Restored `my/quick-window-jump` to ace-window-style window jumping (bound on `M-a` in `Emacs-vanilla`); with a single window it messages instead of splitting. Added new `my/tiling-split` (bound on `M-;`): a swaywm-style dynamic tiling split whose direction is driven by the selected window's geometry rather than blind alternation -- the frame grows as vertical columns, so an empty frame splits side-by-side, a full-height column stacks top-to-bottom, and a shorter pane starts a new column to its right. All live windows are rebalanced after each split. Window jumping across many windows uses `M-o` (`other-window`). `save-buffer` is no longer on an `M-` key; use `C-x C-s`.
+
 ** <2026-04-26>
 
 Added persistent-scratch replacement to survive Emacs crashes with minimal code
@@ -235,22 +239,20 @@ Each line is represented as a list of field values."
 ** DONE ace-window
 CLOSED: [2024-12-08 Sun 13:53]
 
-Solved with the code below:
+Implemented with the code below:
 
 #+begin_src elisp
 (defun my/quick-window-jump ()
   "Jump to a window by typing its assigned character label.
-If there is only a single window, split it left-to-right.
 If there are only two windows, jump directly to the other window.
-Side windows are ignored."
+With a single window, do nothing.  Side windows are ignored."
   (interactive)
   (let* ((window-list (seq-filter (lambda (w)
                                     (not (window-parameter w 'window-side)))
                                   (window-list nil 'no-mini))))
     (cond
      ((= (length window-list) 1)
-      (split-window-horizontally)
-      (other-window 1))
+      (message "Single window"))
      ((= (length window-list) 2)
       (let ((other-window (if (eq (selected-window) (nth 0 window-list))
                               (nth 1 window-list)
@@ -274,7 +276,7 @@ Side windows are ignored."
                                (window (cdr entry))
                                (start (window-start window))
                                (overlay (make-overlay start start (window-buffer window))))
-                          (overlay-put overlay 'after-string 
+                          (overlay-put overlay 'after-string
                                        (propertize (format "[%s]" key)
                                                    'face 'highlight))
                           (overlay-put overlay 'window window)
@@ -286,6 +288,35 @@ Side windows are ignored."
           (setq my/quick-window-overlays nil)
           (when-let ((selected-window (cdr (assoc (char-to-string key) window-map))))
             (select-window selected-window))))))))
+#+end_src
+
+** DONE tiling-split
+CLOSED: [2026-07-23]
+
+Implemented with the code below:
+
+#+begin_src elisp
+(defun my/tiling-split ()
+  "Split the selected window using a column-aware tiling rule.
+The frame grows as vertical columns, modelled on a swaywm dynamic
+tiling WM: an empty frame splits side-by-side to start the first
+column; a window that spans the full frame height (a column) splits
+top-to-bottom to stack a new pane inside it; any shorter pane inside
+a column splits side-by-side to start a fresh column to its right.
+Focus moves to the new window and all live windows are rebalanced so
+they share the frame evenly."
+  (interactive)
+  (let* ((wins (seq-filter (lambda (w)
+                             (not (window-parameter w 'window-side)))
+                           (window-list nil 'no-mini)))
+         (max-height (apply #'max (mapcar #'window-total-height wins)))
+         (new-window
+          (cond
+           ((= (length wins) 1)                  (split-window-right))
+           ((>= (window-total-height) max-height) (split-window-below))
+           (t                                    (split-window-right)))))
+    (select-window new-window)
+    (balance-windows)))
 #+end_src
 
 ** DONE rainbow-mode
