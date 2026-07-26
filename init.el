@@ -676,7 +676,7 @@ On abort (C-g), restores the themes enabled before the preview began."
   (mapc #'disable-theme custom-enabled-themes)
   (load-theme theme t))
 
-(define-key my-overrides-mode-map (kbd "M-m") #'my/consult-theme)
+(define-key my-overrides-mode-map (kbd "M-t") #'my/consult-theme)
 
 (defun my/grep (search-term &optional directory glob)
   "Run ripgrep (rg) with SEARCH-TERM and optionally DIRECTORY and GLOB.
