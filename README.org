@@ -1025,7 +1025,7 @@ On abort (C-g), restores the themes enabled before the preview began."
   (mapc #'disable-theme custom-enabled-themes)
   (load-theme theme t))
 
-(define-key my-overrides-mode-map (kbd "M-t") #'my/consult-theme)
+(define-key my-overrides-mode-map (kbd "M-0") #'my/consult-theme)
 #+end_src
 
 ** DONE deadgrep
