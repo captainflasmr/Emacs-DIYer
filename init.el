@@ -2086,8 +2086,10 @@ process, FILENAME is the input Org file, and PUB-DIR is the publishing directory
 (add-hook 'minibuffer-setup-hook #'setup-minibuffer-completion-styles)
 
 (defun my/dired-async-shell-command-nohup (orig-fun command &optional arg file-list)
-  "Wrap COMMAND with `nohup' so the process survives Emacs exit."
-  (funcall orig-fun (concat "nohup " command) arg file-list))
+  "Wrap COMMAND with `nohup' so the process survives Emacs exit.
+Redirect stdout and stderr to /dev/null so `nohup' does not create a
+nohup.out file in the current directory."
+  (funcall orig-fun (concat "nohup " command " >/dev/null 2>&1") arg file-list))
 
 (with-eval-after-load 'dired
   (advice-add 'dired-do-async-shell-command :around #'my/dired-async-shell-command-nohup)
