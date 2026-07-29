@@ -657,24 +657,57 @@ On abort (C-g), restores the themes enabled before the preview began."
                        (car completion-all-sorted-completions))
                       (t (minibuffer-contents-no-properties))))
                     (match (and cand (car (member cand themes)))))
-               (when (and match (not (equal current match)))
-                 (setq current match)
-                 (mapc #'disable-theme custom-enabled-themes)
-                 (condition-case nil
-                     (load-theme (intern match) t)
-                   (error nil)))))))
+                (when (and match (not (equal current match)))
+                  (setq current match)
+                  (condition-case nil
+                      (let ((new (intern match))
+                            (inhibit-redisplay t))
+                        (if (memq new saved)
+                            ;; Navigating to an originally-enabled theme:
+                            ;; it was never disabled during preview, so just
+                            ;; promote it to the front with `enable-theme'
+                            ;; (no theme-file re-eval, no flash) instead of
+                            ;; reloading it.
+                            (enable-theme new)
+                          ;; New preview theme: load it on top, then retire
+                          ;; the previous preview theme.  Saved themes are
+                          ;; left enabled underneath so C-g can restore them
+                          ;; by disabling alone (no reload, no flash).
+                          ;; inhibit-redisplay keeps theme-change hooks
+                          ;; (fringe sync, selected-window-accent, etc.)
+                          ;; from drawing an intermediate frame.
+                          (load-theme new t)
+                          (dolist (th (copy-sequence custom-enabled-themes))
+                            (unless (or (eq th new) (memq th saved))
+                              (disable-theme th)))))
+                    (error nil)))))))
      (unwind-protect
          (list (intern
                 (minibuffer-with-setup-hook
                     (lambda ()
                       (add-hook 'post-command-hook preview nil t))
                   (completing-read "Load theme: " collection nil t))))
-       ;; Always restore originals; the body below loads the final pick.
-       (mapc #'disable-theme custom-enabled-themes)
-       (dolist (th (reverse saved))
-         (condition-case nil (load-theme th t) (error nil))))))
-  (mapc #'disable-theme custom-enabled-themes)
-  (load-theme theme t))
+        ;; Restore originals by disabling anything previewed on top of the
+        ;; saved themes.  Saved themes were never disabled during preview,
+        ;; so there is nothing to reload here -- disabling the previewed
+        ;; themes is enough, which avoids a load-theme (and its
+        ;; hook-driven redraw) on abort.  inhibit-redisplay makes it atomic.
+        (let ((inhibit-redisplay t))
+          (dolist (th (copy-sequence custom-enabled-themes))
+            (unless (memq th saved)
+              (disable-theme th)))))))
+  ;; Commit the chosen theme.  If it is already enabled (e.g. the user
+  ;; picked an originally-enabled theme, which was never disabled during
+  ;; preview), just promote it to the front with `enable-theme' instead of
+  ;; reloading; otherwise load it.  Then retire every other theme.
+  ;; inhibit-redisplay keeps theme-change hooks from flashing.
+  (let ((inhibit-redisplay t))
+    (if (memq theme custom-enabled-themes)
+        (enable-theme theme)
+      (load-theme theme t))
+    (dolist (th (copy-sequence custom-enabled-themes))
+      (unless (eq th theme)
+        (disable-theme th)))))
 
 (define-key my-overrides-mode-map (kbd "M-0") #'my/consult-theme)
 

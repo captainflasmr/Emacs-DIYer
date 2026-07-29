@@ -10,6 +10,10 @@ This document contains the release notes for Emacs-enhanced
 
 * Versions
 
+** <2026-07-29>
+
+Eliminated the white flash in =my/consult-theme= on open, on each preview step, on =C-g= abort, and on commit. Root cause was =load-theme= being called when it didn't need to be — re-evaluating an already-active theme on open, and reloading the saved themes to restore them on =C-g= — each call firing =enable-theme-functions= (and =selected-window-accent-mode='s theme reaction) and producing a visible redraw. The preview now (a) skips =load-theme= for already-enabled themes, promoting them with =enable-theme= instead; (b) stacks preview themes on top of the saved themes instead of swapping, so the saved themes are never disabled and =C-g= can restore them by =disable-theme=-ing alone (no reload); and (c) wraps every load/enable/disable in =inhibit-redisplay= so theme-change hooks can't draw an intermediate frame. The commit body likewise promotes with =enable-theme= when the chosen theme is already loaded.
+
 ** <2026-05-08>
 
 Added =my/diff-minimap-toggle= — a side-window minimap that renders diff-hl hunk status as coloured rows showing added, changed, and removed regions alongside a viewport indicator and cursor marker. Togglable via =C-x v m=, with mouse-click navigation and automatic sync on scroll and save.
