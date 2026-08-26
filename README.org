@@ -601,7 +601,6 @@ are provided, they are used to separate the branches or tags in the display."
 ;; Bind keys in vc-dir-mode
 (with-eval-after-load 'vc-dir
   (define-key vc-dir-mode-map (kbd "B") 'my/vc-dir-show-branches-and-tags)
-  (define-key vc-dir-mode-map (kbd "T") 'my/vc-dir-show-all-tags)
   (define-key vc-dir-mode-map (kbd "F") 'my/vc-dir-show-tracked-files)
   (define-key vc-dir-mode-map (kbd "S") 'my/vc-stash-checkout-file))
 #+end_src
