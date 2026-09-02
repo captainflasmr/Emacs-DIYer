@@ -2474,7 +2474,7 @@ Works with both standard `move-end-of-line` and `org-end-of-line`."
     (unless (minibufferp)       ;; Avoid enabling the mode in the minibuffer
       (simple-autosuggest-mode 1))))
 
-(global-simple-autosuggest-mode 1)
+(global-simple-autosuggest-mode -1)
 
 (defvar my/dired-icons-map
   '(("el" . "λ") ("rb" . "◆") ("js" . "○") ("ts" . "●") ("json" . "◎") ("md" . "■")
