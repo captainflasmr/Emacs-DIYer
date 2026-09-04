@@ -524,13 +524,15 @@ startup), so non-interactive callers never prompt.")
 
 (defun my/sync-ui-accent-color (&optional color)
   "Synchronize various Emacs UI elements with a chosen accent color.
-Affects mode-line, cursor, tab-bar, and other UI elements for a coherent theme.
+Affects mode-line, cursor, tab-bar, tab-line (inline tabs), and
+other UI elements for a coherent theme.
 When called interactively, prompts for COLOR.  When called from Lisp
 without COLOR, reuses `my/sync-ui-accent-color--current'.
 The function adjusts:
 - Mode-line (active and inactive states)
 - Cursor
 - Tab-bar (active and inactive tabs)
+- Tab-line / inline tabs (current and inactive tabs)
 - Window borders and dividers
 - Highlighting
 - Fringes"
@@ -568,7 +570,13 @@ The function adjusts:
              `(tab-bar ((t (:inherit default :background ,bg-color :foreground ,fg-color))))
              `(tab-bar-tab ((t (:inherit 'highlight :background ,accent-color :foreground "#000000"))))
              `(tab-bar-tab-inactive ((t (:inherit default :background ,bg-color :foreground ,fg-color
-                                                  :box (:line-width 1 :color ,bg-color :style flat-button))))))
+                                                  :box (:line-width 1 :color ,bg-color :style flat-button)))))
+             `(tab-line ((t (:inherit default :background ,bg-color :foreground ,fg-color))))
+             `(tab-line-tab-current ((t (:background ,accent-color :foreground "#000000"))))
+             `(tab-line-tab ((t (:background ,accent-color :foreground "#000000"))))
+             `(tab-line-tab-inactive ((t (:inherit default :background ,bg-color :foreground ,fg-color
+                                                   :box (:line-width 1 :color ,bg-color :style flat-button)))))
+             `(tab-line-highlight ((t (:background ,adjusted-bg-color)))))
           (custom-set-faces
            `(cursor ((t (:background ,accent-color))))
            `(hl-line ((t (:background ,adjusted-bg-color))))
@@ -578,20 +586,31 @@ The function adjusts:
            `(tab-bar ((t (:inherit default :background "#000000" :foreground ,bg-color))))
            `(tab-bar-tab ((t (:inherit 'highlight :background ,accent-color))))
            `(tab-bar-tab-inactive ((t (:inherit default :background ,bg-color :foreground ,fg-color
-                                                :box (:line-width 1 :color ,bg-color :style flat-button)))))))))
+                                                :box (:line-width 1 :color ,bg-color :style flat-button)))))
+           `(tab-line ((t (:inherit default :background "#000000" :foreground ,bg-color))))
+           `(tab-line-tab-current ((t (:background ,accent-color))))
+           `(tab-line-tab ((t (:background ,accent-color))))
+           `(tab-line-tab-inactive ((t (:inherit default :background ,bg-color :foreground ,fg-color
+                                                 :box (:line-width 1 :color ,bg-color :style flat-button)))))
+           `(tab-line-highlight ((t (:background ,adjusted-bg-color))))))))
     (setq my/sync-ui-accent-color--current accent-color)))
 
-;; (if (version<= "29.1" emacs-version)
-;;     ;; Emacs 29.1+ — use the official theme hook
-;;     (add-hook 'enable-theme-functions
-;;               (lambda (_theme)
-;;                 (my/sync-ui-accent-color)))
-;;   ;; Older Emacs — fall back to advising load-theme
-;;   (progn
-;;     (defun selected-window-accent-sync-tab-bar-to-theme--after (&rest _)
-;;       (my/sync-ui-accent-color))
-;;     (advice-add 'load-theme :after
-;;                 #'selected-window-accent-sync-tab-bar-to-theme--after)))
+;; Re-apply the accent (including tab-line faces) after every theme
+;; change.  `enable-theme-functions' fires on both `load-theme' and
+;; `enable-theme', so this also covers `my/consult-theme' preview
+;; steps and its commit path.  Called without COLOR, the sync reuses
+;; `my/sync-ui-accent-color--current' and never prompts.
+(if (version<= "29.1" emacs-version)
+    ;; Emacs 29.1+ — use the official theme hook
+    (add-hook 'enable-theme-functions
+              (lambda (_theme)
+                (my/sync-ui-accent-color)))
+  ;; Older Emacs — fall back to advising load-theme
+  (progn
+    (defun selected-window-accent-sync-tab-bar-to-theme--after (&rest _)
+      (my/sync-ui-accent-color))
+    (advice-add 'load-theme :after
+                #'selected-window-accent-sync-tab-bar-to-theme--after)))
 
 (defun my/consult-theme (theme)
   "Load THEME with live preview during candidate navigation.
