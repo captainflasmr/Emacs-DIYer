@@ -2490,13 +2490,38 @@ Works with both standard `move-end-of-line` and `org-end-of-line`."
 
 (provide 'simple-autosuggest)
 
+(defgroup simple-autosuggest nil
+  "Inline auto-suggestions from history or dabbrev."
+  :group 'convenience)
+
+(defcustom simple-autosuggest-allowed-modes '(eshell-mode)
+  "Modes where `simple-autosuggest-mode' is enabled automatically.
+`simple-autosuggest--maybe-enable' (and the globalized mode) only
+switch the mode on in buffers derived from one of these modes.
+Add e.g. `comint-mode' to also cover shell-like buffers.  The
+minor mode itself can still be toggled manually anywhere."
+  :type '(repeat symbol)
+  :group 'simple-autosuggest)
+
+(defun simple-autosuggest--allowed-p ()
+  "Return non-nil if the current buffer may use auto-suggestions."
+  (and (not (minibufferp))
+       (apply #'derived-mode-p simple-autosuggest-allowed-modes)))
+
+(defun simple-autosuggest--maybe-enable ()
+  "Enable `simple-autosuggest-mode' if the current buffer is allowed."
+  (when (simple-autosuggest--allowed-p)
+    (simple-autosuggest-mode 1)))
+
 (define-globalized-minor-mode global-simple-autosuggest-mode
   simple-autosuggest-mode       ;; The mode to be globalized
   (lambda ()                    ;; A function to enable the mode
-    (unless (minibufferp)       ;; Avoid enabling the mode in the minibuffer
-      (simple-autosuggest-mode 1))))
+    (simple-autosuggest--maybe-enable)))
 
 (global-simple-autosuggest-mode -1)
+
+;; Auto-enable only in allowed contexts (see `simple-autosuggest-allowed-modes').
+(add-hook 'eshell-mode-hook #'simple-autosuggest--maybe-enable)
 
 (defvar my/dired-icons-map
   '(("el" . "λ") ("rb" . "◆") ("js" . "○") ("ts" . "●") ("json" . "◎") ("md" . "■")
