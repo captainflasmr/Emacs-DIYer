@@ -1491,6 +1491,8 @@ If a popup is visible, hide it.  Otherwise re-show the last popup
 (defvar-local my/popup--plist nil "Capf extra properties.")
 (defvar-local my/popup--scroll 0 "Scroll offset.")
 (defvar-local my/popup--source "" "Name of the capf that provided candidates.")
+(defvar-local my/popup--base-size 0
+  "Number of leading chars of the prefix that completion must keep.")
 
 (defvar my/popup-active-map
   (let ((map (make-sparse-keymap)))
@@ -1507,23 +1509,26 @@ If a popup is visible, hide it.  Otherwise re-show the last popup
   :keymap my/popup-active-map)
 
 (defun my/popup--get-candidates (prefix table pred)
-  "Get sorted candidates matching PREFIX from TABLE with PRED."
+  "Get sorted candidates matching PREFIX from TABLE with PRED.
+Return a cons (CANDIDATES . BASE-SIZE), where BASE-SIZE is the
+number of leading characters of PREFIX that completion must keep
+\(e.g. the directory part when completing file names)."
   (let* ((md (completion-metadata prefix table pred))
          (all (completion-all-completions
                prefix table pred (length prefix) md))
+         (base-size (or (cdr (last all)) 0))
          (sort-fn (or (completion-metadata-get
                        md 'display-sort-function)
                       #'identity)))
     (when (consp all)
-      (when (numberp (cdr (last all)))
-        (setcdr (last all) nil))
+      (setcdr (last all) nil)
       (setq all (cl-remove-if
                  (lambda (s)
                    (or (not (stringp s))
                        (zerop (string-width
                                (string-trim (substring-no-properties s))))))
                  all))
-      (funcall sort-fn all))))
+      (cons (funcall sort-fn all) base-size))))
 
 (defun my/popup--ann-fn ()
   "Get annotation function from metadata or capf plist."
@@ -1655,7 +1660,8 @@ If a popup is visible, hide it.  Otherwise re-show the last popup
     (let ((chosen (nth my/popup--idx my/popup--cands))
           (exit-fn (plist-get my/popup--plist :exit-function)))
       (when chosen
-        (delete-region my/popup--beg (point))
+        (delete-region (+ my/popup--beg (or my/popup--base-size 0))
+                       (point))
         (insert chosen)
         (when exit-fn
           (funcall exit-fn chosen 'finished)))))
@@ -1674,11 +1680,14 @@ If a popup is visible, hide it.  Otherwise re-show the last popup
         my/popup--plist nil
         my/popup--ovs nil
         my/popup--scroll 0
-        my/popup--source ""))
+        my/popup--source ""
+        my/popup--base-size 0))
 
-(defun my/popup--start (beg cands table pred plist)
-  "Start popup with BEG, CANDS, TABLE, PRED, and PLIST."
+(defun my/popup--start (beg cands table pred plist &optional base-size)
+  "Start popup with BEG, CANDS, TABLE, PRED, and PLIST.
+BASE-SIZE is the number of leading chars of the prefix to keep."
   (setq my/popup--beg beg
+        my/popup--base-size (or base-size 0)
         my/popup--cands cands
         my/popup--table table
         my/popup--pred pred
@@ -1687,7 +1696,7 @@ If a popup is visible, hide it.  Otherwise re-show the last popup
         my/popup--scroll 0)
   (if (= (length cands) 1)
       (progn
-        (delete-region beg (point))
+        (delete-region (+ beg (or base-size 0)) (point))
         (insert (car cands))
         (let ((exit-fn (plist-get plist :exit-function)))
           (when exit-fn
@@ -1700,10 +1709,10 @@ Picks up extra capf properties via `completion-extra-properties'."
   (my/popup-abort)
   (let* ((prefix (buffer-substring-no-properties beg end))
          (plist (bound-and-true-p completion-extra-properties))
-         (cands (my/popup--get-candidates prefix table pred)))
-    (when cands
+         (res (my/popup--get-candidates prefix table pred)))
+    (when res
       (setq my/popup--source "completion")
-      (my/popup--start beg cands table pred plist))))
+      (my/popup--start beg (car res) table pred plist (cdr res)))))
 
 (defun my/popup--refresh ()
   "Re-query candidates after prefix changed."
@@ -1711,11 +1720,12 @@ Picks up extra capf properties via `completion-extra-properties'."
              (>= (point) my/popup--beg))
     (let* ((prefix (buffer-substring-no-properties
                     my/popup--beg (point)))
-           (cands (my/popup--get-candidates
-                   prefix my/popup--table my/popup--pred)))
-      (if cands
-          (progn
+           (res (my/popup--get-candidates
+                 prefix my/popup--table my/popup--pred)))
+      (if res
+          (let ((cands (car res)))
             (setq my/popup--cands cands
+                  my/popup--base-size (cdr res)
                   my/popup--idx
                   (min my/popup--idx (1- (length cands)))
                   my/popup--scroll
@@ -1781,12 +1791,12 @@ Picks up extra capf properties via `completion-extra-properties'."
                (plist (nthcdr 3 data))
                (pred (plist-get plist :predicate))
                (prefix (buffer-substring-no-properties beg end))
-               (cands (my/popup--get-candidates
-                       prefix table pred)))
-          (if cands
+               (res (my/popup--get-candidates
+                     prefix table pred)))
+          (if res
               (progn
                 (setq my/popup--source source)
-                (my/popup--start beg cands table pred plist))
+                (my/popup--start beg (car res) table pred plist (cdr res)))
             (message "No completions for '%s'" prefix)))
       (message "No completion backend at point"))))
 
