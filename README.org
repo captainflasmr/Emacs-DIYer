@@ -639,32 +639,26 @@ For an extra bonus, lets try and put some git gutter status in dired, taken from
 #+begin_src elisp
 (setq emacs-solo-dired-gutter-enabled t)
 
-(defvar emacs-solo/dired-git-status-overlays nil
+(defvar-local emacs-solo/dired-git-status-overlays nil
   "List of active overlays in Dired for Git status.")
 
 (defun emacs-solo/dired--git-status-face (code)
   "Return a cons cell (STATUS . FACE) for a given Git porcelain CODE."
-  (let* ((git-status-untracked "??")
-         (git-status-modified " M")
+  (let* ((git-status-modified " M")
          (git-status-modified-alt "M ")
          (git-status-deleted "D ")
          (git-status-added "A ")
          (git-status-renamed "R ")
          (git-status-copied "C ")
-         (git-status-ignored "!!")
          (status (cond
-                  ((string-match-p "\\?\\?" code) git-status-untracked)
                   ((string-match-p "^ M" code) git-status-modified)
                   ((string-match-p "^M " code) git-status-modified-alt)
                   ((string-match-p "^D" code) git-status-deleted)
                   ((string-match-p "^A" code) git-status-added)
                   ((string-match-p "^R" code) git-status-renamed)
                   ((string-match-p "^C" code) git-status-copied)
-                  ((string-match-p "\\!\\!" code) git-status-ignored)
                   (t "  ")))
          (face (cond
-                ((string= status git-status-ignored) 'shadow)
-                ((string= status git-status-untracked) 'warning)
                 ((string= status git-status-modified) 'font-lock-function-name-face)
                 ((string= status git-status-modified-alt) 'font-lock-function-name-face)
                 ((string= status git-status-deleted) 'error)
@@ -686,7 +680,7 @@ For an extra bonus, lets try and put some git gutter status in dired, taken from
               (setq git-root (expand-file-name git-root))
               (let* ((git-status (vc-git--run-command-string
                                   nil "status" "--porcelain"
-                                  "--ignored" "--untracked-files=normal"))
+                                  "--untracked-files=normal"))
                      (status-map (make-hash-table :test 'equal)))
                 (mapc #'delete-overlay emacs-solo/dired-git-status-overlays)
                 (setq emacs-solo/dired-git-status-overlays nil)
