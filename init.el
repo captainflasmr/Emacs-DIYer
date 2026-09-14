@@ -2505,18 +2505,28 @@ Works with both standard `move-end-of-line` and `org-end-of-line`."
   :group 'convenience)
 
 (defcustom simple-autosuggest-allowed-modes '(eshell-mode)
-  "Modes where `simple-autosuggest-mode' is enabled automatically.
-`simple-autosuggest--maybe-enable' (and the globalized mode) only
-switch the mode on in buffers derived from one of these modes.
-Add e.g. `comint-mode' to also cover shell-like buffers.  The
-minor mode itself can still be toggled manually anywhere."
+  "Modes that always get `simple-autosuggest-mode'.
+Auto-suggestions stay on in these modes even when `C-c x' has
+switched them off everywhere else.  Add e.g. `comint-mode' to also
+cover shell-like buffers.  The minor mode itself can still be
+toggled manually anywhere."
   :type '(repeat symbol)
   :group 'simple-autosuggest)
+
+(defvar my/autosuggest-other-buffers nil
+  "Non-nil means `simple-autosuggest-mode' runs outside eshell too.
+Toggled by `my/toggle-autosuggest' (bound to \\[my/toggle-autosuggest]).")
+
+(defun simple-autosuggest--always-p ()
+  "Return non-nil if the current buffer always uses auto-suggestions."
+  (and (not (minibufferp))
+       (apply #'derived-mode-p simple-autosuggest-allowed-modes)))
 
 (defun simple-autosuggest--allowed-p ()
   "Return non-nil if the current buffer may use auto-suggestions."
   (and (not (minibufferp))
-       (apply #'derived-mode-p simple-autosuggest-allowed-modes)))
+       (or my/autosuggest-other-buffers
+           (apply #'derived-mode-p simple-autosuggest-allowed-modes))))
 
 (defun simple-autosuggest--maybe-enable ()
   "Enable `simple-autosuggest-mode' if the current buffer is allowed."
@@ -2528,10 +2538,32 @@ minor mode itself can still be toggled manually anywhere."
   (lambda ()                    ;; A function to enable the mode
     (simple-autosuggest--maybe-enable)))
 
-(global-simple-autosuggest-mode -1)
+;; The globalized mode stays enabled so that new buffers are handled
+;; by `after-change-major-mode-hook'; `simple-autosuggest--allowed-p'
+;; decides which ones actually get suggestions.
+(global-simple-autosuggest-mode 1)
 
-;; Auto-enable only in allowed contexts (see `simple-autosuggest-allowed-modes').
-(add-hook 'eshell-mode-hook #'simple-autosuggest--maybe-enable)
+(defun my/toggle-autosuggest ()
+  "Toggle inline auto-suggestions in every buffer except eshell.
+Eshell always keeps auto-suggestions (see
+`simple-autosuggest-allowed-modes')."
+  (interactive)
+  (setq my/autosuggest-other-buffers (not my/autosuggest-other-buffers))
+  (dolist (buf (buffer-list))
+    (with-current-buffer buf
+      (cond
+       ((minibufferp))
+       ((or (simple-autosuggest--always-p)
+            my/autosuggest-other-buffers)
+        (simple-autosuggest-mode 1))
+       (t
+        (simple-autosuggest-mode -1)))))
+  (message "Inline auto-suggestions %s (eshell always on)"
+           (if my/autosuggest-other-buffers
+               "enabled in all buffers"
+             "disabled outside eshell")))
+
+(global-set-key (kbd "C-c x") #'my/toggle-autosuggest)
 
 (defvar my/dired-icons-map
   '(("el" . "λ") ("rb" . "◆") ("js" . "○") ("ts" . "●") ("json" . "◎") ("md" . "■")
