@@ -2077,35 +2077,98 @@ process, FILENAME is the input Org file, and PUB-DIR is the publishing directory
       (message "Loading tags file: %s" my-tags-file)
       (visit-tags-table my-tags-file))))
 
-(when (executable-find "my-generate-etags.sh")
-  (defun my/etags-update ()
-    "Call external bash script to generate new etags for all languages it can find."
-    (interactive)
-    (async-shell-command "my-generate-etags.sh" "*etags*")))
+(defvar my/etags-excluded-dirs
+  '(".cache" ".gnupg" ".local" ".mozilla" ".thunderbird" ".wine" "Games"
+    "cache" "chromium" "elpa" "nas" "syncthing" "Image-Line" ".cargo"
+    ".git" ".svn" ".themes" "themes" "objs" "ArtRage")
+  "Directory basenames to prune (not descend into) when generating a TAGS file.")
 
-(defun predicate-exclusion-p (dir)
-  "exclusion of directories"
-  (not
-   (or
-    (string-match "/home/jdyer/examples/CPPrograms/nil" dir)
-    )))
+(defvar my/etags-excluded-paths '("/home/jdyer/examples/CPPrograms/nil")
+  "Absolute directory paths to prune when generating a TAGS file.")
 
-(defun my/generate-etags ()
-  "Generate TAGS file for various source files in `default-directory` and its subdirectories."
+(defconst my/etags-extension-regexp
+  (concat
+   "\\(?:"
+   "\\.ad[absm]$\\|\\.[CFHMSacfhlmpsty]$\\|\\.def$\\|\\.in[cs]$\\|\\.s[as]$\\|\\.src$"
+   "\\|\\.cc$\\|\\.hh$\\|\\.[chy]\\+\\+$\\|\\.[ch]pp$\\|\\.[ch]xx$\\|\\.pdb$\\|\\.[ch]s$"
+   "\\|\\.[Cc][Oo][Bb]$\\|\\.[eh]rl$\\|\\.f90$\\|\\.for$\\|\\.java$\\|\\.[cem]l$"
+   "\\|\\.clisp$\\|\\.lisp$\\|\\.[Ll][Ss][Pp]$\\|\\.pas$\\|\\.[Pp][LlMm]$\\|\\.psw$"
+   "\\|\\.lm$\\|\\.pc$\\|\\.prolog$\\|\\.oak$\\|\\.p[sy]$\\|\\.sch$\\|\\.scheme$"
+   "\\|\\.[Ss][Cc][Mm]$\\|\\.[Ss][Mm]$\\|\\.bib$\\|\\.cl[os]$\\|\\.ltx$\\|\\.sty$"
+   "\\|\\.TeX$\\|\\.tex$\\|\\.texi$\\|\\.texinfo$\\|\\.txi$\\|\\.x[bp]m$\\|\\.yy$"
+   "\\|\\.[Ss][Qq][Ll]$\\|^[Mm]akefile"
+   "\\)")
+  "File name regexp for files `etags' should parse.
+Mirrors the extension case statement of the original
+=my-generate-etags.sh= bash script.")
+
+(defun my/etags-include-dir-p (dir)
+  "Return non-nil if the subdirectory DIR should be descended into.
+Prunes `my/etags-excluded-dirs' basenames and `my/etags-excluded-paths'."
+  (not (or (member (file-name-nondirectory (directory-file-name dir))
+                   my/etags-excluded-dirs)
+           (member (expand-file-name dir) my/etags-excluded-paths))))
+
+(defun my/etags-shebang-p (file)
+  "Return non-nil if the first line of FILE is a `#!' interpreter line."
+  (when (and (file-regular-p file) (file-readable-p file))
+    (with-temp-buffer
+      (ignore-errors (insert-file-contents file nil 0 256))
+      (goto-char (point-min))
+      (looking-at-p "#!"))))
+
+(defun my/generate-etags (&optional root)
+  "Generate a TAGS file for source files found under ROOT.
+ROOT defaults to `default-directory'.  Files are collected by
+`my/etags-extension-regexp' or by a `#!' interpreter line, directories
+are pruned by `my/etags-include-dir-p', and the resulting file list is
+handed to a single `etags' process reading file names from stdin.  With
+a prefix argument, prompt for the root directory."
+  (interactive (list (if current-prefix-arg
+                         (read-directory-name "Root directory: ")
+                       default-directory)))
+  (setq root (expand-file-name (or root default-directory)))
+  (unless (executable-find "etags")
+    (user-error "The etags program is not available on this system"))
+  (message "Collecting source files under %s..." root)
+  (let* ((tags-file (expand-file-name "TAGS" root))
+         (candidates (directory-files-recursively root ".*" nil
+                                                  #'my/etags-include-dir-p))
+         (source-files
+          (delq nil
+                (mapcar
+                 (lambda (file)
+                   (cond
+                    ((file-equal-p file tags-file) nil)
+                    ((string-match-p my/etags-extension-regexp
+                                     (file-name-nondirectory file))
+                     file)
+                    ((my/etags-shebang-p file) file)))
+                 candidates))))
+    (if (not source-files)
+        (message "No source files found under %s" root)
+      (message "Found %d source files, running etags..." (length source-files))
+      (let ((start-time (current-time))
+            (default-directory root))
+        (with-temp-buffer
+          (dolist (file source-files)
+            (insert (file-relative-name file root) "\n"))
+          (call-process-region (point-min) (point-max) "etags" nil
+                               "*etags*" nil "-o" tags-file "-"))
+        (if (file-exists-p tags-file)
+            (message "TAGS generated for %d files in %.1f seconds: %s"
+                     (length source-files)
+                     (time-to-seconds (time-since start-time))
+                     tags-file)
+          (message "etags failed to create %s, see the *etags* buffer"
+                   tags-file))))))
+
+(defun my/etags-update ()
+  "Regenerate the TAGS file for the current directory tree.
+Replaces the old my-generate-etags.sh bash script with a pure elisp
+implementation, compatible with both Windows and Linux."
   (interactive)
-  (message "Getting file list...")
-  (let ((all-files
-         (append
-          (directory-files-recursively default-directory "\\(?:\\.cpp$\\|\\.c$\\|\\.h$\\)" nil 'predicate-exclusion-p)
-          (directory-files-recursively default-directory "\\.cs$" nil 'predicate-exclusion-p)
-          (directory-files-recursively default-directory "\\(?:\\.ads$\\|\\.adb$\\)" nil 'predicate-exclusion-p)))
-        (tags-file-path (expand-file-name (concat default-directory "TAGS"))))
-    (unless (file-directory-p default-directory)
-      (error "Default directory does not exist: %s" default-directory))
-    ;; Generate TAGS file
-    (dolist (file all-files)
-      (message file)
-      (shell-command (format "etags --append %s -o %s" file tags-file-path)))))
+  (my/generate-etags))
 (global-set-key (kbd "C-x p l") 'my/etags-load)
 (global-set-key (kbd "C-x p u") 'my/etags-update)
 

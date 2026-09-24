@@ -10,6 +10,10 @@ This document contains the release notes for Emacs-enhanced
 
 * Versions
 
+** <2026-09-24>
+
+Replaced the =my-generate-etags.sh= bash script with a pure elisp TAGS generator in =Emacs-DIYer=.  =my/generate-etags= walks the tree with =directory-files-recursively=, pruning =my/etags-excluded-dirs= (basenames, from the old =find -prune= list) and =my/etags-excluded-paths= (absolute paths, from the old =predicate-exclusion-p=); classifies files by =my/etags-extension-regexp= (anchored, mirroring the old bash =case= extension list, so =junk.elc= no longer masquerades as =.el=) or by a =#!= interpreter line read from the first 256 bytes of the file (=my/etags-shebang-p=, replacing the =file= and =head -- grep= pipeline); and then feeds the complete relative-path list to a single =etags -o TAGS -= process over stdin instead of spawning one =etags --append= process per file.  The =my/etags-update= command (C-x p u) no longer requires the bash script to be on =exec-path=, and with =C-u=, =my/generate-etags= prompts for the root directory.  Only =etags= itself remains an external dependency, so generation now works on Windows as well as Linux.
+
 ** <2026-07-29>
 
 Eliminated the white flash in =my/consult-theme= on open, on each preview step, on =C-g= abort, and on commit. Root cause was =load-theme= being called when it didn't need to be — re-evaluating an already-active theme on open, and reloading the saved themes to restore them on =C-g= — each call firing =enable-theme-functions= (and =selected-window-accent-mode='s theme reaction) and producing a visible redraw. The preview now (a) skips =load-theme= for already-enabled themes, promoting them with =enable-theme= instead; (b) stacks preview themes on top of the saved themes instead of swapping, so the saved themes are never disabled and =C-g= can restore them by =disable-theme=-ing alone (no reload); and (c) wraps every load/enable/disable in =inhibit-redisplay= so theme-change hooks can't draw an intermediate frame. The commit body likewise promotes with =enable-theme= when the chosen theme is already loaded.
