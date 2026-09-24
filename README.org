@@ -1080,6 +1080,39 @@ On abort (C-g), restores the themes enabled before the preview began."
 (define-key my-overrides-mode-map (kbd "M-0") #'my/consult-theme)
 #+end_src
 
+** DONE random-theme
+
+Choose a theme at random with =M-9= or =M-x my/random-theme=.  The command
+uses the same available-theme set as the theme picker, avoids the currently
+enabled themes when possible so every invocation produces a visible change,
+and leaves only the selected theme enabled.
+
+#+begin_src elisp
+(defun my/random-theme ()
+  "Enable a random available theme.
+Exclude the currently enabled themes when possible, so repeated invocations
+produce a visible change."
+  (interactive)
+  (require 'cus-theme)
+  (let* ((available (custom-available-themes))
+         (alternatives (seq-remove (lambda (theme)
+                                     (memq theme custom-enabled-themes))
+                                   available))
+         (candidates (or alternatives available))
+         (theme (and candidates
+                      (nth (random (length candidates)) candidates))))
+    (unless theme
+      (user-error "No available themes were found"))
+    (let ((inhibit-redisplay t))
+      (load-theme theme t)
+      (dolist (enabled-theme (copy-sequence custom-enabled-themes))
+        (unless (eq enabled-theme theme)
+          (disable-theme enabled-theme))))
+    (message "Enabled random theme: %s" theme)))
+
+(define-key my-overrides-mode-map (kbd "M-9") #'my/random-theme)
+#+end_src
+
 ** DONE deadgrep
 CLOSED: [2024-12-20 Fri 08:54]
 

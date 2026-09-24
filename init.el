@@ -726,6 +726,30 @@ On abort (C-g), restores the themes enabled before the preview began."
 
 (define-key my-overrides-mode-map (kbd "M-0") #'my/consult-theme)
 
+(defun my/random-theme ()
+  "Enable a random available theme.
+Exclude the currently enabled themes when possible, so repeated invocations
+produce a visible change."
+  (interactive)
+  (require 'cus-theme)
+  (let* ((available (custom-available-themes))
+         (alternatives (seq-remove (lambda (theme)
+                                     (memq theme custom-enabled-themes))
+                                   available))
+         (candidates (or alternatives available))
+         (theme (and candidates
+                      (nth (random (length candidates)) candidates))))
+    (unless theme
+      (user-error "No available themes were found"))
+    (let ((inhibit-redisplay t))
+      (load-theme theme t)
+      (dolist (enabled-theme (copy-sequence custom-enabled-themes))
+        (unless (eq enabled-theme theme)
+          (disable-theme enabled-theme))))
+    (message "Enabled random theme: %s" theme)))
+
+(define-key my-overrides-mode-map (kbd "M-9") #'my/random-theme)
+
 (defun my/grep (search-term &optional directory glob)
   "Run ripgrep (rg) with SEARCH-TERM and optionally DIRECTORY and GLOB.
 If ripgrep is unavailable, fall back to Emacs's rgrep command. Highlights SEARCH-TERM in results.
@@ -2069,14 +2093,6 @@ process, FILENAME is the input Org file, and PUB-DIR is the publishing directory
 </rss>"))
     (message "RSS feed generated at %s" rss-file)))
 
-(defun my/etags-load ()
-  "Load TAGS file from the first it can find up the directory stack."
-  (interactive)
-  (let ((my-tags-file (locate-dominating-file default-directory "TAGS")))
-    (when my-tags-file
-      (message "Loading tags file: %s" my-tags-file)
-      (visit-tags-table my-tags-file))))
-
 (defvar my/etags-excluded-dirs
   '(".cache" ".gnupg" ".local" ".mozilla" ".thunderbird" ".wine" "Games"
     "cache" "chromium" "elpa" "nas" "syncthing" "Image-Line" ".cargo"
@@ -2163,12 +2179,21 @@ a prefix argument, prompt for the root directory."
           (message "etags failed to create %s, see the *etags* buffer"
                    tags-file))))))
 
+(defun my/etags-load ()
+  "Load TAGS file from the first it can find up the directory stack."
+  (interactive)
+  (let ((my-tags-file (locate-dominating-file default-directory "TAGS")))
+    (when my-tags-file
+      (message "Loading tags file: %s" my-tags-file)
+      (visit-tags-table my-tags-file))))
+
 (defun my/etags-update ()
   "Regenerate the TAGS file for the current directory tree.
 Replaces the old my-generate-etags.sh bash script with a pure elisp
 implementation, compatible with both Windows and Linux."
   (interactive)
   (my/generate-etags))
+
 (global-set-key (kbd "C-x p l") 'my/etags-load)
 (global-set-key (kbd "C-x p u") 'my/etags-update)
 
