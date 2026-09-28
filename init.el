@@ -3004,31 +3004,16 @@ Use f/s for speed, [/] for size, b/n to skip, SPC to pause, q to quit."
 
 (add-hook 'minibuffer-setup-hook #'tiny-marginalia--setup)
 
-(defvar my/persistent-scratch-file
-  (expand-file-name ".scratch" user-emacs-directory)
-  "File where *scratch* buffer contents are persisted.")
-
-(defun my/persistent-scratch-save ()
-  "Persist *scratch* buffer contents to disk."
-  (when (get-buffer "*scratch*")
-    (let ((content (with-current-buffer "*scratch*"
-                     (buffer-substring-no-properties (point-min) (point-max)))))
-      (with-temp-file my/persistent-scratch-file
-        (insert content)))))
-
-(defun my/persistent-scratch-restore ()
-  "Restore *scratch* buffer from persisted file."
-  (when (file-exists-p my/persistent-scratch-file)
-    (with-current-buffer "*scratch*"
-      (let ((inhibit-read-only t))
-        (erase-buffer)
-        (insert-file-contents my/persistent-scratch-file)))))
-
-(add-hook 'after-init-hook #'my/persistent-scratch-restore)
-(add-hook 'kill-emacs-hook #'my/persistent-scratch-save)
-(add-hook 'after-init-hook
-          (lambda ()
-            (with-current-buffer "*scratch*"
-              (add-hook 'after-change-functions
-                        (lambda (&rest _) (my/persistent-scratch-save))
-                        nil t))))
+(require 'remember)
+(setq remember-data-file (expand-file-name "notes" user-emacs-directory)
+      ;; Keep remember's original *notes* buffer name
+      remember-notes-buffer-name "*notes*"
+      ;; ISO-ish sortable timestamp instead of ctime-style default
+      remember-time-format "%Y-%m-%d %a %H:%M"
+      ;; No source-file annotation appended to captures
+      remember-annotation-functions nil)
+;; C-c r r = capture note, C-c r c = capture clipboard, C-c r n = jump to *notes*
+(global-set-key (kbd "C-c r") 'remember-prefix-map)
+;; Recreate/visit the *notes* buffer at startup, in the background
+;; (does not change the startup buffer; *scratch* stays ephemeral)
+(add-hook 'after-init-hook #'remember-notes)

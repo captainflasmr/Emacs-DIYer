@@ -23,6 +23,10 @@ Used in concert with https://github.com/captainflasmr/Emacs-vanilla
 
 * Whats New
 
+** <2026-09-28>
+
+Replaced the hand-rolled =persistent-scratch= implementation with the built-in =remember= notes feature: a persistent =*notes*= buffer backed by =~/.emacs.d/notes=, saved on exit, kill, and =C-x s= without prompting, and preloaded in the background on startup. =C-c r= is the remember prefix: =C-c r r= quick capture, =C-c r c= clipboard capture, =C-c r n= jump to =*notes*=. =*scratch*= is ephemeral again; the old =~/.emacs.d/.scratch= file is left untouched.
+
 ** <2026-09-24>
 
 Converted the =my-generate-etags.sh= bash script to a single pure elisp implementation (=my/generate-etags=): elisp tree walk with the same directory prune list (=my/etags-excluded-dirs=, =my/etags-excluded-paths=), file classification by extension (=my/etags-extension-regexp=) or =#!= interpreter line (=my/etags-shebang-p=), and one =etags= process fed the whole file list from stdin instead of one =--append= process per file.  No =bash=, =find=, =file= or =head= dependencies, so TAGS generation now works on Windows as well as Linux.
@@ -3975,39 +3979,24 @@ bookmarks.
 (add-hook 'minibuffer-setup-hook #'tiny-marginalia--setup)
 #+end_src
 
-** DONE persistent-scratch
+** DONE remember
 
-Replacing the =persistent-scratch= package with a minimal built-in implementation that saves the =*scratch*= buffer to disk on every edit and restores it on startup. Since each change is written immediately, even a hard crash loses at most the last keystroke.
+Replacing the hand-rolled =persistent-scratch= implementation with the built-in =remember= notes feature. The persistent buffer is now =*notes*=, backed by =~/.emacs.d/notes=: saved on =C-c C-c= (save and bury), on =C-x C-s= and =C-x s= without prompting, and on kill or exit (=C-x k= save-and-buries instead of killing). The buffer is preloaded in the background on startup, while =*scratch*= returns to stock ephemeral behaviour; the old =~/.emacs.d/.scratch= file is left untouched on disk. =C-c r= binds remember's own prefix map: =C-c r r= captures a note, =C-c r c= captures the clipboard, =C-c r n= jumps to =*notes*=. Captures append with an ISO-style timestamp header and no source-file annotation.
 
 #+begin_src elisp
-(defvar my/persistent-scratch-file
-  (expand-file-name ".scratch" user-emacs-directory)
-  "File where *scratch* buffer contents are persisted.")
-
-(defun my/persistent-scratch-save ()
-  "Persist *scratch* buffer contents to disk."
-  (when (get-buffer "*scratch*")
-    (let ((content (with-current-buffer "*scratch*"
-                     (buffer-substring-no-properties (point-min) (point-max)))))
-      (with-temp-file my/persistent-scratch-file
-        (insert content)))))
-
-(defun my/persistent-scratch-restore ()
-  "Restore *scratch* buffer from persisted file."
-  (when (file-exists-p my/persistent-scratch-file)
-    (with-current-buffer "*scratch*"
-      (let ((inhibit-read-only t))
-        (erase-buffer)
-        (insert-file-contents my/persistent-scratch-file)))))
-
-(add-hook 'after-init-hook #'my/persistent-scratch-restore)
-(add-hook 'kill-emacs-hook #'my/persistent-scratch-save)
-(add-hook 'after-init-hook
-          (lambda ()
-            (with-current-buffer "*scratch*"
-              (add-hook 'after-change-functions
-                        (lambda (&rest _) (my/persistent-scratch-save))
-                        nil t))))
+(require 'remember)
+(setq remember-data-file (expand-file-name "notes" user-emacs-directory)
+      ;; Keep remember's original *notes* buffer name
+      remember-notes-buffer-name "*notes*"
+      ;; ISO-ish sortable timestamp instead of ctime-style default
+      remember-time-format "%Y-%m-%d %a %H:%M"
+      ;; No source-file annotation appended to captures
+      remember-annotation-functions nil)
+;; C-c r r = capture note, C-c r c = capture clipboard, C-c r n = jump to *notes*
+(global-set-key (kbd "C-c r") 'remember-prefix-map)
+;; Recreate/visit the *notes* buffer at startup, in the background
+;; (does not change the startup buffer; *scratch* stays ephemeral)
+(add-hook 'after-init-hook #'remember-notes)
 #+end_src
 
 ** DOING diff-minimap
