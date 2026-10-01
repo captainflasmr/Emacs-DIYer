@@ -750,6 +750,15 @@ produce a visible change."
 
 (define-key my-overrides-mode-map (kbd "M-9") #'my/random-theme)
 
+(defface my/grep-search-face
+  '((((background dark))
+     :background "#f9e2af" :foreground "#1e1e2e" :weight bold)
+    (t
+     :background "#4c4f69" :foreground "#eff1f5" :weight bold))
+  "Face for the `my/grep' search term in the mode line.
+An explicit background is used because `mode-line-emphasis' only adds a
+bold weight, which is easy to lose against a themed mode line.")
+
 (defun my/grep (search-term &optional directory glob)
   "Run ripgrep (rg) with SEARCH-TERM and optionally DIRECTORY and GLOB.
 If ripgrep is unavailable, fall back to Emacs's rgrep command. Highlights SEARCH-TERM in results.
@@ -787,7 +796,12 @@ universal argument, DIRECTORY and GLOB are prompted for as well."
             (grep-mode)
             (setq-local my/grep-search-term search-term)
             (setq-local my/grep-directory directory)
-            (setq-local my/grep-glob glob))
+            (setq-local my/grep-glob glob)
+            ;; Echo the active search term in the mode line, so it stays
+            ;; visible while scrolling through the results
+            (setq-local mode-line-process
+                        (list (propertize (format " [%s]" search-term)
+                                          'face 'my/grep-search-face))))
           
           (pop-to-buffer buffer)
           (goto-char (point-min))
