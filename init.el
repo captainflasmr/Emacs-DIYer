@@ -513,6 +513,44 @@ Prompts for the stash and the file to restore interactively."
 ;; Bind to C-x v S (capital S for stash diff)
 (define-key vc-prefix-map (kbd "S") 'my-git-diff-stash)
 
+(defun my/color--linear (channel)
+  "Linearize color CHANNEL (0.0-1.0) for WCAG relative luminance."
+  (if (<= channel 0.03928)
+      (/ channel 12.92)
+    (expt (/ (+ channel 0.055) 1.055) 2.4)))
+
+(defun my/color-luminance (color)
+  "Return the WCAG relative luminance of COLOR, or nil if unknown.
+Colors that the current frame cannot resolve (e.g. on a terminal
+frame) are reported as unknown rather than signalled as an error."
+  (when-let ((rgb (ignore-errors (color-name-to-rgb color))))
+    (+ (* 0.2126 (my/color--linear (nth 0 rgb)))
+       (* 0.7152 (my/color--linear (nth 1 rgb)))
+       (* 0.0722 (my/color--linear (nth 2 rgb))))))
+
+(defun my/color-contrast-ratio (color1 color2)
+  "Return the WCAG contrast ratio between COLOR1 and COLOR2, or nil."
+  (let ((l1 (my/color-luminance color1))
+        (l2 (my/color-luminance color2)))
+    (when (and l1 l2)
+      (/ (+ (max l1 l2) 0.05)
+         (+ (min l1 l2) 0.05)))))
+
+(defun my/readable-cursor-color (color &optional background)
+  "Return a cursor color based on COLOR that is clearly visible on BACKGROUND.
+COLOR is kept when its WCAG contrast ratio against BACKGROUND is at
+least 3:1; otherwise the higher-contrast of white and black is returned.
+BACKGROUND defaults to the `default' face background, i.e. the current
+theme's background."
+  (let* ((bg (or background (face-background 'default) "#000000"))
+         (ratio (my/color-contrast-ratio color bg)))
+    (if (and ratio (>= ratio 3.0))
+        color
+      (if (> (or (my/color-contrast-ratio "white" bg) 0)
+             (or (my/color-contrast-ratio "black" bg) 0))
+          "white"
+        "black"))))
+
 (defvar my/sync-ui-accent-color--current "orange"
   "Current accent color used by `my/sync-ui-accent-color'.
 Updated on each call.  Used as the fallback when the function is
@@ -523,6 +561,10 @@ startup), so non-interactive callers never prompt.")
   "Synchronize various Emacs UI elements with a chosen accent color.
 Affects mode-line, cursor, tab-bar, tab-line (inline tabs), and
 other UI elements for a coherent theme.
+The cursor colour is contrast-checked against the current theme
+background (WCAG ratio >= 3:1), falling back to white or black when the
+accent would be hard to see, so a theme change never leaves an invisible
+cursor.
 When called interactively, prompts for COLOR.  When called from Lisp
 without COLOR, reuses `my/sync-ui-accent-color--current'.
 The function adjusts:
@@ -559,7 +601,7 @@ The function adjusts:
                             :foreground "#aaaaaa")
         (if is-dark-theme
             (custom-set-faces
-             `(cursor ((t (:background ,accent-color))))
+             `(cursor ((t (:background ,(my/readable-cursor-color accent-color bg-color)))))
              `(hl-line ((t (:background ,adjusted-bg-color))))
              `(vertical-border ((t (:foreground ,(color-darken-name fg-color 60)))))
              `(window-divider ((t (:foreground ,(color-darken-name fg-color 60)))))
@@ -575,7 +617,7 @@ The function adjusts:
                                                    :box (:line-width 1 :color ,bg-color :style flat-button)))))
              `(tab-line-highlight ((t (:background ,adjusted-bg-color)))))
           (custom-set-faces
-           `(cursor ((t (:background ,accent-color))))
+           `(cursor ((t (:background ,(my/readable-cursor-color accent-color bg-color)))))
            `(hl-line ((t (:background ,adjusted-bg-color))))
            `(vertical-border ((t (:foreground ,(color-darken-name fg-color 60)))))
            `(window-divider ((t (:foreground ,(color-darken-name fg-color 60)))))
@@ -590,6 +632,15 @@ The function adjusts:
            `(tab-line-tab-inactive ((t (:inherit default :background ,bg-color :foreground ,fg-color
                                                  :box (:line-width 1 :color ,bg-color :style flat-button)))))
            `(tab-line-highlight ((t (:background ,adjusted-bg-color))))))))
+    ;; Repaint the cursor on every existing graphical frame: the
+    ;; `cursor-color' frame parameter is documented as equivalent to the
+    ;; `cursor' face background, and setting it explicitly guarantees
+    ;; frames pick up the contrast-checked colour.
+    (let ((cursor-color (my/readable-cursor-color
+                         accent-color (face-background 'default))))
+      (dolist (frame (frame-list))
+        (when (display-graphic-p frame)
+          (set-frame-parameter frame 'cursor-color cursor-color))))
     (setq my/sync-ui-accent-color--current accent-color)))
 
 ;; Re-apply the accent (including tab-line faces) after every theme
