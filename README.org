@@ -3981,13 +3981,19 @@ bookmarks.
 
 ** DONE remember
 
-Replacing the hand-rolled =persistent-scratch= implementation with the built-in =remember= notes feature. The persistent buffer is now =*notes*=, backed by =~/.emacs.d/notes=: saved on =C-c C-c= (save and bury), on =C-x C-s= and =C-x s= without prompting, and on kill or exit (=C-x k= save-and-buries instead of killing). The buffer is preloaded in the background on startup, while =*scratch*= returns to stock ephemeral behaviour; the old =~/.emacs.d/.scratch= file is left untouched on disk. =C-c r= binds remember's own prefix map: =C-c r r= captures a note, =C-c r c= captures the clipboard, =C-c r n= jumps to =*notes*=. Captures append with an ISO-style timestamp header and no source-file annotation.
+Replacing the hand-rolled =persistent-scratch= implementation with the built-in =remember= notes feature. The persistent buffer is now =*notes*=, backed by =~/.emacs.d/notes=: saved on =C-c C-c= (save and bury), on =C-x C-s= and =C-x s= without prompting, and on kill or exit (=C-x k= save-and-buries instead of killing). The buffer is preloaded in the background on startup, while =*scratch*= returns to stock ephemeral behaviour; the old =~/.emacs.d/.scratch= file is left untouched on disk. =C-c r= binds remember's own prefix map: =C-c r r= captures a note, =C-c r c= captures the clipboard, =C-c r n= jumps to =*notes*=. Both the persistent =*notes*= buffer and the transient capture buffer open in =org-mode=, and captures append as level-one Org headings (=*= leader text) with an ISO-style timestamp header and no source-file annotation. Finalizing a capture (=C-c C-c= or =C-x C-s=) pops the =*notes*= buffer with point on the newly filed note.
 
 #+begin_src elisp
 (require 'remember)
 (setq remember-data-file (expand-file-name "notes" user-emacs-directory)
       ;; Keep remember's original *notes* buffer name
       remember-notes-buffer-name "*notes*"
+      ;; Both the persistent *notes* buffer and the transient
+      ;; capture buffer open in org-mode
+      remember-notes-initial-major-mode #'org-mode
+      remember-initial-major-mode #'org-mode
+      ;; Level-one Org headings for captured notes
+      remember-leader-text "* "
       ;; ISO-ish sortable timestamp instead of ctime-style default
       remember-time-format "%Y-%m-%d %a %H:%M"
       ;; No source-file annotation appended to captures
@@ -3997,6 +4003,15 @@ Replacing the hand-rolled =persistent-scratch= implementation with the built-in 
 ;; Recreate/visit the *notes* buffer at startup, in the background
 ;; (does not change the startup buffer; *scratch* stays ephemeral)
 (add-hook 'after-init-hook #'remember-notes)
+;; After a capture is filed away, pop the *notes* buffer with point on
+;; the new note.  Must run after `remember-finalize' finishes, because
+;; `remember-destroy' restores the pre-capture window configuration.
+(defun my/remember-show-notes ()
+  "Display the notes buffer with point at the end of the new capture."
+  (with-current-buffer (remember-notes)
+    (goto-char (point-max))
+    (pop-to-buffer-same-window (current-buffer))))
+(advice-add 'remember-finalize :after #'my/remember-show-notes)
 #+end_src
 
 ** DOING diff-minimap

@@ -3008,6 +3008,12 @@ Use f/s for speed, [/] for size, b/n to skip, SPC to pause, q to quit."
 (setq remember-data-file (expand-file-name "notes" user-emacs-directory)
       ;; Keep remember's original *notes* buffer name
       remember-notes-buffer-name "*notes*"
+      ;; Both the persistent *notes* buffer and the transient
+      ;; capture buffer open in org-mode
+      remember-notes-initial-major-mode #'org-mode
+      remember-initial-major-mode #'org-mode
+      ;; Level-one Org headings for captured notes
+      remember-leader-text "* "
       ;; ISO-ish sortable timestamp instead of ctime-style default
       remember-time-format "%Y-%m-%d %a %H:%M"
       ;; No source-file annotation appended to captures
@@ -3017,3 +3023,12 @@ Use f/s for speed, [/] for size, b/n to skip, SPC to pause, q to quit."
 ;; Recreate/visit the *notes* buffer at startup, in the background
 ;; (does not change the startup buffer; *scratch* stays ephemeral)
 (add-hook 'after-init-hook #'remember-notes)
+;; After a capture is filed away, pop the *notes* buffer with point on
+;; the new note.  Must run after `remember-finalize' finishes, because
+;; `remember-destroy' restores the pre-capture window configuration.
+(defun my/remember-show-notes ()
+  "Display the notes buffer with point at the end of the new capture."
+  (with-current-buffer (remember-notes)
+    (goto-char (point-max))
+    (pop-to-buffer-same-window (current-buffer))))
+(advice-add 'remember-finalize :after #'my/remember-show-notes)
