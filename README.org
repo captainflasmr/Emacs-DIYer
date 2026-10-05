@@ -4046,7 +4046,7 @@ bookmarks.
 
 ** DONE remember
 
-Replacing the hand-rolled =persistent-scratch= implementation with the built-in =remember= notes feature. The persistent buffer is now =*notes*=, backed by =~/.emacs.d/notes=: saved on =C-c C-c= (save and bury), on =C-x C-s= and =C-x s= without prompting, and on kill or exit (=C-x k= save-and-buries instead of killing). The buffer is preloaded in the background on startup, while =*scratch*= returns to stock ephemeral behaviour; the old =~/.emacs.d/.scratch= file is left untouched on disk. =C-c r= binds remember's own prefix map: =C-c r r= captures a note, =C-c r c= captures the clipboard, =C-c r n= jumps to =*notes*=. Both the persistent =*notes*= buffer and the transient capture buffer open in =org-mode=, and captures append as level-one Org headings (=*= leader text) with an ISO-style timestamp header and no source-file annotation. Finalizing a capture (=C-c C-c= or =C-x C-s=) pops the =*notes*= buffer with point on the newly filed note.
+Replacing the hand-rolled =persistent-scratch= implementation with the built-in =remember= notes feature. The persistent buffer is now =*notes*=, backed by =~/.emacs.d/notes=: saved on =C-c C-c= (save and bury), on =C-x C-s= and =C-x s= without prompting, and on kill or exit (=C-x k= save-and-buries instead of killing). The buffer is no longer opened at startup (open it on demand with =C-c r n= or =M-x remember-notes=), while =*scratch*= returns to stock ephemeral behaviour; the old =~/.emacs.d/.scratch= file is left untouched on disk. =C-c r= binds remember's own prefix map: =C-c r r= captures a note, =C-c r c= captures the clipboard, =C-c r n= jumps to =*notes*=. Both the persistent =*notes*= buffer and the transient capture buffer open in =org-mode=, and captures append as level-one Org headings (=*= leader text) with an ISO-style timestamp header and no source-file annotation. Finalizing a capture (=C-c C-c= or =C-x C-s=) pops the =*notes*= buffer with point on the newly filed note.
 
 #+begin_src elisp
 (require 'remember)
@@ -4065,9 +4065,10 @@ Replacing the hand-rolled =persistent-scratch= implementation with the built-in 
       remember-annotation-functions nil)
 ;; C-c r r = capture note, C-c r c = capture clipboard, C-c r n = jump to *notes*
 (global-set-key (kbd "C-c r") 'remember-prefix-map)
-;; Recreate/visit the *notes* buffer at startup, in the background
-;; (does not change the startup buffer; *scratch* stays ephemeral)
-(add-hook 'after-init-hook #'remember-notes)
+;; The *notes* buffer is no longer recreated at startup (it made startup
+;; slower and popped an unwanted buffer).  Open it with C-c r n or
+;; M-x remember-notes when needed.
+;; (add-hook 'after-init-hook #'remember-notes)
 ;; After a capture is filed away, pop the *notes* buffer with point on
 ;; the new note.  Must run after `remember-finalize' finishes, because
 ;; `remember-destroy' restores the pre-capture window configuration.

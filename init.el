@@ -3085,9 +3085,10 @@ Use f/s for speed, [/] for size, b/n to skip, SPC to pause, q to quit."
       remember-annotation-functions nil)
 ;; C-c r r = capture note, C-c r c = capture clipboard, C-c r n = jump to *notes*
 (global-set-key (kbd "C-c r") 'remember-prefix-map)
-;; Recreate/visit the *notes* buffer at startup, in the background
-;; (does not change the startup buffer; *scratch* stays ephemeral)
-(add-hook 'after-init-hook #'remember-notes)
+;; The *notes* buffer is no longer recreated at startup (it made startup
+;; slower and popped an unwanted buffer).  Open it with C-c r n or
+;; M-x remember-notes when needed.
+;; (add-hook 'after-init-hook #'remember-notes)
 ;; After a capture is filed away, pop the *notes* buffer with point on
 ;; the new note.  Must run after `remember-finalize' finishes, because
 ;; `remember-destroy' restores the pre-capture window configuration.
