@@ -2424,6 +2424,20 @@ last match. The character class covers both upper and lower case unit prefixes
     (when (directory-empty-p dir)
       (delete-directory dir))))
 
+(defun my/dired-rsync--prune-empty-parents (src relbase)
+  "Delete empty ancestor directories of SRC up to (excluding) RELBASE."
+  (let ((top (directory-file-name (expand-file-name relbase)))
+        (dir (directory-file-name
+              (file-name-directory
+               (directory-file-name (expand-file-name src))))))
+    (while (and (not (string= dir top))
+                (string-prefix-p (file-name-as-directory top)
+                                 (file-name-as-directory dir))
+                (file-directory-p dir)
+                (ignore-errors (directory-empty-p dir)))
+      (delete-directory dir)
+      (setq dir (directory-file-name (file-name-directory dir))))))
+
 (defun my/dired-rsync--sentinel (proc _event)
   "Sentinel: notify on completion, refresh dired buffers, and clean up dirs.
 When the rsync transfer used `--remove-source-files`, any
@@ -2445,7 +2459,11 @@ behaves like a true mv(1)."
             (message "rsync %s: done" label)
             (when delete-after
               (dolist (src src-list)
-                (my/dired-rsync--remove-empty-dirs src)))
+                (my/dired-rsync--remove-empty-dirs src))
+              (let ((rb (process-get proc 'rsync-relbase)))
+                (when rb
+                  (dolist (src src-list)
+                    (my/dired-rsync--prune-empty-parents src rb)))))
             (when dest
               (find-file-other-window dest)))
         (message "rsync %s: FAILED (%d) — see %s"
@@ -2455,10 +2473,13 @@ behaves like a true mv(1)."
                    (with-current-buffer b (derived-mode-p 'dired-mode)))
           (with-current-buffer b (ignore-errors (revert-buffer nil t))))))))
 
-(defun my/dired-rsync-start (src-list dest &optional delete-after)
+(defun my/dired-rsync-start (src-list dest &optional delete-after relbase)
   "Asynchronously copy SRC-LIST (list of paths) into DEST.
 Uses rsync on Linux, robocopy on Windows.
-When DELETE-AFTER is non-nil, delete sources after a successful transfer."
+When DELETE-AFTER is non-nil, delete sources after a successful transfer.
+When RELBASE is a directory containing SRC-LIST, recreate each source
+under DEST relative to it, so a collapsed dired entry like RELBASE/a/b
+lands as DEST/a/b instead of DEST/b."
   (cond
    ((eq system-type 'windows-nt)
     (unless (executable-find "robocopy")
@@ -2468,25 +2489,37 @@ When DELETE-AFTER is non-nil, delete sources after a successful transfer."
            (common-args '("/COPY:DAT" "/R:0" "/W:0" "/NP" "/NJH" "/NJS"
                           "/NDL" "/NFL" "/BYTES")))
       (dolist (src src-list)
-        (let* ((src-name (file-name-nondirectory
-                          (directory-file-name src)))
-               (target (expand-file-name src-name dest-dir))
+        (let* ((rel (if (and relbase (file-directory-p relbase))
+                        (file-relative-name
+                         (expand-file-name src)
+                         (file-name-as-directory (expand-file-name relbase)))
+                      (file-name-nondirectory (directory-file-name src))))
+               ;; A source outside RELBASE falls back to basename.
+               (rel (if (or (string-prefix-p "../" rel)
+                            (file-name-absolute-p rel))
+                        (file-name-nondirectory (directory-file-name src))
+                      rel))
+               (target (expand-file-name rel dest-dir))
+               (_ (make-directory (file-name-directory target) t))
                (args
                 (if (file-directory-p src)
                     (append (list (directory-file-name src) target "/E")
                             common-args
                             (when delete-after '("/MOVE"))
                             '("/MT:8"))
-                  (append (list (file-name-directory src) dest-dir src-name)
+                  (append (list (file-name-directory src)
+                                (file-name-directory target)
+                                (file-name-nondirectory src))
                           common-args
                           (when delete-after '("/MOV")))))
                (buf (generate-new-buffer
-                     (format "*robocopy %s*" src-name)))
+                     (format "*robocopy %s*" rel)))
                (proc (apply #'start-process "robocopy" buf "robocopy" args)))
           (process-put proc 'rsync-label label)
           (process-put proc 'rsync-dest dest)
           (process-put proc 'rsync-src-list (list src))
           (process-put proc 'rsync-delete-after delete-after)
+          (process-put proc 'rsync-relbase relbase)
           (process-put proc 'rsync-robocopy t)
           (set-process-filter proc #'my/dired-rsync--filter)
           (set-process-sentinel proc #'my/dired-rsync--sentinel)
@@ -2500,12 +2533,29 @@ When DELETE-AFTER is non-nil, delete sources after a successful transfer."
       (user-error "rsync executable not found on PATH"))
     (let* ((label (format "→ %s" (abbreviate-file-name dest)))
            (buf (generate-new-buffer (format "*rsync %s*" label)))
-           (srcs (mapcar #'my/dired-rsync--tramp-translate src-list))
            (rdest (my/dired-rsync--tramp-translate dest))
+           ;; Anchor sources at RELBASE so collapsed dired entries keep
+           ;; their relative structure under DEST (rsync --relative with
+           ;; a BASE/./rel anchor). A plain child has rel = basename,
+           ;; so non-collapsed behavior is unchanged. Note the anchor
+           ;; must be assembled after translation: expand-file-name
+           ;; would normalize the /./ away.
+           (relbase (when (and relbase (file-directory-p relbase))
+                      (file-name-as-directory (expand-file-name relbase))))
+           (trelbase (when relbase
+                       (my/dired-rsync--tramp-translate relbase)))
+           (srcs (if relbase
+                     (mapcar (lambda (s)
+                               (concat trelbase "/./"
+                                       (file-relative-name
+                                        (expand-file-name s) relbase)))
+                             src-list)
+                   (mapcar #'my/dired-rsync--tramp-translate src-list)))
            ;; -a includes owner/group preservation, but chown/chgrp
            ;; fail on NAS/NFS targets with foreign uid/gid mapping
            ;; (rsync: chgrp "..." failed: Operation not permitted).
            (args (append '("-ah" "--info=progress2" "--no-o" "--no-g")
+                         (when relbase '("--relative"))
                          (when delete-after '("--remove-source-files"))
                          srcs
                          (list rdest)))
@@ -2514,6 +2564,7 @@ When DELETE-AFTER is non-nil, delete sources after a successful transfer."
       (process-put proc 'rsync-dest dest)
       (process-put proc 'rsync-src-list src-list)
       (process-put proc 'rsync-delete-after delete-after)
+      (process-put proc 'rsync-relbase relbase)
       (set-process-filter proc #'my/dired-rsync--filter)
       (set-process-sentinel proc #'my/dired-rsync--sentinel)
       (push proc my/async-transfer-rsync-jobs)
@@ -2524,7 +2575,9 @@ When DELETE-AFTER is non-nil, delete sources after a successful transfer."
 
 (defun my/dired-rsync-do-copy (&optional arg)
   "Replacement for `dired-do-copy' using rsync asynchronously.
-With prefix ARG, delete sources after a successful transfer (a move)."
+With prefix ARG, delete sources after a successful transfer (a move).
+Collapsed dired entries keep their displayed structure: copying
+BASE/a/b into DEST creates DEST/a/b, not DEST/b."
   (interactive "P")
   (let* ((files (dired-get-marked-files))
          (default-dest (and (fboundp 'dired-dwim-target-directory)
@@ -2532,8 +2585,18 @@ With prefix ARG, delete sources after a successful transfer (a move)."
          (dest (read-directory-name
                 (format "rsync %d file%s → "
                         (length files) (if (= 1 (length files)) "" "s"))
-                default-dest)))
-    (my/dired-rsync-start files dest arg)))
+                default-dest))
+         ;; Anchor at the dired directory so relative structure is
+         ;; recreated under DEST; void when a source escapes it.
+         (base (file-name-as-directory (expand-file-name default-directory)))
+         (relbase (unless (catch 'outside
+                            (dolist (f files nil)
+                              (when (string-prefix-p
+                                     "../" (file-relative-name
+                                             (expand-file-name f) base))
+                                (throw 'outside t))))
+                    base)))
+    (my/dired-rsync-start files dest arg relbase)))
 
 (defun my/dired-rsync-do-rename ()
   "Replacement for `dired-do-rename' using rsync + --remove-source-files.
