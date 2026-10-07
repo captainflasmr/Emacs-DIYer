@@ -3098,7 +3098,10 @@ When DELETE-AFTER is non-nil, delete sources after a successful transfer."
            (buf (generate-new-buffer (format "*rsync %s*" label)))
            (srcs (mapcar #'my/dired-rsync--tramp-translate src-list))
            (rdest (my/dired-rsync--tramp-translate dest))
-           (args (append '("-ah" "--info=progress2")
+           ;; -a includes owner/group preservation, but chown/chgrp
+           ;; fail on NAS/NFS targets with foreign uid/gid mapping
+           ;; (rsync: chgrp "..." failed: Operation not permitted).
+           (args (append '("-ah" "--info=progress2" "--no-o" "--no-g")
                          (when delete-after '("--remove-source-files"))
                          srcs
                          (list rdest)))
