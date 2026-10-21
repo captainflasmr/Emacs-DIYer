@@ -801,6 +801,179 @@ produce a visible change."
 
 (define-key my-overrides-mode-map (kbd "M-9") #'my/random-theme)
 
+(defvar my/consult-font-history nil
+  "Minibuffer history for `my/consult-font'.")
+
+(defvar my/consult-font--monospace-cache nil
+  "Cached list of monospaced font families.
+Computed on first use of the monospaced-only filter and reused for the
+rest of the session.")
+
+(defun my/consult-font--families ()
+  "Return the available font families, sorted and without duplicates."
+  (sort (delete-dups (font-family-list)) #'string<))
+
+(defun my/consult-font--raw-family (face)
+  "Return FACE's explicitly set family, or nil when unspecified."
+  (when (facep face)
+    (let ((family (face-attribute face :family nil nil)))
+      (unless (eq family 'unspecified)
+        family))))
+
+(defun my/consult-font--current-family ()
+  "Return the family used by the `default' face on the selected frame."
+  (or (my/consult-font--raw-family 'default)
+      (let ((family (face-attribute 'default :family nil 'default)))
+        (unless (eq family 'unspecified)
+          family))
+      "Monospace"))
+
+(defun my/consult-font--fixed-pitch-p (family)
+  "Return non-nil when FAMILY is a fixed-pitch font.
+Prefer the XLFD spacing field when the backend reports it.  Some fonts
+(notably Noto Sans Mono) leave that field unspecified, so fall back to
+comparing the font's maximum and average advance widths: in a
+monospaced font every glyph has the same width."
+  (let* ((info (ignore-errors (font-info family)))
+         (xlfd (and info (aref info 0))))
+    (cond
+     ((not info) nil)
+     ((and (stringp xlfd) (string-match-p "-[mc]-" xlfd)) t)
+     ((and (stringp xlfd) (string-match-p "-p-" xlfd)) nil)
+     (t (= (aref info 7) (aref info 11))))))
+
+(defun my/consult-font--monospace-families ()
+  "Return the available monospaced font families.
+The result is cached in `my/consult-font--monospace-cache'."
+  (unless my/consult-font--monospace-cache
+    (message "Checking font spacing...")
+    (setq my/consult-font--monospace-cache
+          (seq-filter #'my/consult-font--fixed-pitch-p
+                      (my/consult-font--families)))
+    (message nil))
+  my/consult-font--monospace-cache)
+
+(defun my/consult-font--set-families (default fixed variable)
+  "Set the `default', `fixed-pitch' and `variable-pitch' families.
+DEFAULT is the family for `default'.  FIXED and VARIABLE are the
+explicit families for the pitch faces; nil means restore the face to
+`unspecified' so it keeps inheriting from `default'."
+  (set-face-attribute 'default nil :family default)
+  (when (facep 'fixed-pitch)
+    (set-face-attribute 'fixed-pitch nil :family (or fixed 'unspecified)))
+  (when (facep 'variable-pitch)
+    (set-face-attribute 'variable-pitch nil :family (or variable 'unspecified))))
+
+(defun my/consult-font--preview (family saved-default saved-fixed saved-variable)
+  "Preview FAMILY, keeping the pitch faces consistent.
+SAVED-DEFAULT is the family active before previewing.  When FAMILY is
+that same family, leave the pitch faces untouched.  Return non-nil when
+FAMILY is fixed-pitch."
+  (let ((mono (my/consult-font--fixed-pitch-p family)))
+    (if (equal family saved-default)
+        (my/consult-font--set-families family saved-fixed saved-variable)
+      (my/consult-font--set-families
+       family
+       (if mono family saved-fixed)
+       (if mono saved-variable family)))
+    mono))
+
+(defun my/consult-font (font)
+  "Select FONT with live preview during candidate navigation.
+A DIY replacement for a `consult'-style font picker.  When called
+interactively, preview each font as you navigate the `completing-read';
+the font's height and the frame geometry are left unchanged.  With a
+prefix argument, offer only monospaced families.
+
+The current font is marked with `*' and every candidate is followed by
+a short sample rendered in that family.  Choices are applied to all
+existing frames and to future frames.  On abort (C-g), the font that
+was active before the preview is restored."
+  (interactive
+   (let* ((all-fonts (my/consult-font--families))
+          (fonts (if current-prefix-arg
+                     (my/consult-font--monospace-families)
+                   all-fonts))
+          (saved-default (my/consult-font--current-family))
+          (saved-fixed (my/consult-font--raw-family 'fixed-pitch))
+          (saved-variable (my/consult-font--raw-family 'variable-pitch))
+          (mono-cache my/consult-font--monospace-cache)
+          (affixate
+           (lambda (cands)
+             (mapcar
+              (lambda (cand)
+                (let* ((prefix (if (equal cand saved-default)
+                                   (propertize "* " 'face 'success)
+                                 "  "))
+                       (status (cond
+                                ((and mono-cache (member cand mono-cache))
+                                 (propertize "mono" 'face 'shadow))
+                                (mono-cache
+                                 (propertize "prop" 'face 'shadow))
+                                (t "")))
+                       (sample (propertize "AaBb 0123"
+                                           'face `(:family ,cand)))
+                       (suffix (concat "  " status
+                                       (if (string-empty-p status) "" "  ")
+                                       sample)))
+                  (list cand prefix suffix)))
+              cands)))
+          (sort-fn
+           (lambda (cands)
+             (let (active rest)
+               (dolist (cand cands)
+                 (if (equal cand saved-default)
+                     (push cand active)
+                   (push cand rest)))
+               (append (nreverse active)
+                       (sort (nreverse rest) #'string<)))))
+          (collection
+           (lambda (string pred action)
+             (if (eq action 'metadata)
+                 `(metadata
+                   (category . font)
+                   (display-sort-function . ,sort-fn)
+                   (cycle-sort-function . ,sort-fn)
+                   (affixation-function . ,affixate))
+               (complete-with-action action fonts string pred))))
+          (current nil)
+          (preview
+           (lambda ()
+             (let* ((cand
+                     (cond
+                      ((and (bound-and-true-p icomplete-mode)
+                            completion-all-sorted-completions)
+                       (car completion-all-sorted-completions))
+                      (t (minibuffer-contents-no-properties))))
+                    (match (and cand (car (member cand fonts)))))
+               (when (and match (not (equal current match)))
+                 (setq current match)
+                 (condition-case nil
+                     (let ((inhibit-redisplay t))
+                       (my/consult-font--preview
+                        match saved-default saved-fixed saved-variable))
+                   (error nil)))))))
+     (unless fonts
+       (user-error "No font families found (a graphical frame is required)"))
+     (unwind-protect
+         (list
+          (minibuffer-with-setup-hook
+              (lambda ()
+                (add-hook 'post-command-hook preview nil t))
+            (completing-read
+             (if current-prefix-arg "Monospaced font: " "Font family: ")
+             collection nil t nil 'my/consult-font-history)))
+       (let ((inhibit-redisplay t))
+         (my/consult-font--set-families
+          saved-default saved-fixed saved-variable)))))
+  (let ((mono (my/consult-font--preview
+               font (my/consult-font--current-family)
+               (my/consult-font--raw-family 'fixed-pitch)
+               (my/consult-font--raw-family 'variable-pitch))))
+    (message "Font: %s%s" font (if mono " (monospaced)" ""))))
+
+(define-key my-overrides-mode-map (kbd "M-8") #'my/consult-font)
+
 (defface my/grep-search-face
   '((((background dark))
      :background "#f9e2af" :foreground "#1e1e2e" :weight bold)

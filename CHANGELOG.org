@@ -10,6 +10,10 @@ This document contains the release notes for Emacs-enhanced
 
 * Versions
 
+** <2026-10-21>
+
+Added =my/consult-font=, a DIY replacement for a consult-style font picker with live preview (bound to =M-8=).  The current family is marked with =*= and each candidate carries a sample rendered in its own typeface.  Only the family changes, so the existing height and frame geometry are preserved; the choice applies to all existing and future frames.  On =C-g= the previous font is restored.  With =C-u= only monospaced families are offered, and that filtered list is cached for the session.  Monospaced picks also update =fixed-pitch=, while proportional picks update =variable-pitch=, keeping Org code blocks and prose consistent with the new family.
+
 ** <2026-09-28>
 
 Replaced the =persistent-scratch= replacement with the built-in =remember= package: the persistent buffer is now =*notes*=, backed by =~/.emacs.d/notes= and created by =M-x remember-notes= (preloaded in the background on startup). It saves on =C-c C-c= (save-and-bury), =C-x C-s= and =C-x s= (no prompt, via =buffer-save-without-query=), on kill-buffer (save-and-bury, so =C-x k= cannot lose it), and on exit. Quick capture lives under the =C-c r= prefix: =C-c r r= (=M-x remember=) appends a note to =*notes*= with an ISO-style timestamp header, =C-c r c= captures the clipboard, =C-c r n= jumps to the buffer. Captures carry no source-file annotation. =*scratch*= returns to stock ephemeral behaviour; the old =~/.emacs.d/.scratch= file is left untouched on disk.
