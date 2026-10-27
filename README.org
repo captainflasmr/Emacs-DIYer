@@ -934,15 +934,16 @@ The function adjusts:
              (adjusted-bg-color (if is-dark-theme
                                     (color-lighten-name bg-color 20)
                                   (color-darken-name bg-color 5))))
+        ;; Leave :height alone: `my/apply-main-font-sizes' owns the font
+        ;; sizes and applies them as override specs, so the mode line keeps
+        ;; its configured size across theme changes.
         (set-face-attribute 'mode-line nil 
-                            :height 140 
                             :underline nil 
                             :overline nil 
                             :box nil
                             :background accent-color 
                             :foreground "#000000")
         (set-face-attribute 'mode-line-inactive nil 
-                            :height 140 
                             :underline nil 
                             :overline nil
                             :background adjusted-bg-color 
