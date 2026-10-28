@@ -557,6 +557,11 @@ Updated on each call.  Used as the fallback when the function is
 called without a COLOR argument (e.g. from theme-change hooks or
 startup), so non-interactive callers never prompt.")
 
+(defvar my/divider-color "#606060"
+  "Standard middle grey for window borders and dividers.
+Kept fixed instead of being derived from the theme foreground, so the
+divider looks the same across every theme.")
+
 (defun my/sync-ui-accent-color (&optional color)
   "Synchronize various Emacs UI elements with a chosen accent color.
 Affects mode-line, cursor, tab-bar, tab-line (inline tabs), and
@@ -572,7 +577,7 @@ The function adjusts:
 - Cursor
 - Tab-bar (active and inactive tabs)
 - Tab-line / inline tabs (current and inactive tabs)
-- Window borders and dividers
+- Window borders and dividers (fixed middle grey, `my/divider-color')
 - Highlighting
 - Fringes"
   (interactive (list (read-color "Select accent color: ")))
@@ -604,8 +609,10 @@ The function adjusts:
             (custom-set-faces
              `(cursor ((t (:background ,(my/readable-cursor-color accent-color bg-color)))))
              `(hl-line ((t (:background ,adjusted-bg-color))))
-             `(vertical-border ((t (:foreground ,(color-darken-name fg-color 60)))))
-             `(window-divider ((t (:foreground ,(color-darken-name fg-color 60)))))
+             `(vertical-border ((t (:foreground ,my/divider-color))))
+             `(window-divider ((t (:foreground ,my/divider-color))))
+             `(window-divider-first-pixel ((t (:foreground ,my/divider-color))))
+             `(window-divider-last-pixel ((t (:foreground ,my/divider-color))))
              `(fringe ((t (:foreground ,bg-color :background ,bg-color))))
              `(tab-bar ((t (:inherit default :background ,bg-color :foreground ,fg-color))))
              `(tab-bar-tab ((t (:inherit 'highlight :background ,accent-color :foreground "#000000"))))
@@ -620,8 +627,10 @@ The function adjusts:
           (custom-set-faces
            `(cursor ((t (:background ,(my/readable-cursor-color accent-color bg-color)))))
            `(hl-line ((t (:background ,adjusted-bg-color))))
-           `(vertical-border ((t (:foreground ,(color-darken-name fg-color 60)))))
-           `(window-divider ((t (:foreground ,(color-darken-name fg-color 60)))))
+           `(vertical-border ((t (:foreground ,my/divider-color))))
+           `(window-divider ((t (:foreground ,my/divider-color))))
+           `(window-divider-first-pixel ((t (:foreground ,my/divider-color))))
+           `(window-divider-last-pixel ((t (:foreground ,my/divider-color))))
            `(fringe ((t (:foreground ,bg-color :background ,bg-color))))
            `(tab-bar ((t (:inherit default :background "#000000" :foreground ,bg-color))))
            `(tab-bar-tab ((t (:inherit 'highlight :background ,accent-color))))
