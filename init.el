@@ -575,8 +575,8 @@ without COLOR, reuses `my/sync-ui-accent-color--current'.
 The function adjusts:
 - Mode-line (active and inactive states)
 - Cursor
-- Tab-bar (active and inactive tabs)
-- Tab-line / inline tabs (current and inactive tabs)
+- Tab-bar (active and inactive tabs, always in `fixed-pitch')
+- Tab-line / inline tabs (current and inactive tabs, always in `fixed-pitch')
 - Window borders and dividers (fixed middle grey, `my/divider-color')
 - Highlighting
 - Fringes"
@@ -605,6 +605,9 @@ The function adjusts:
                             :overline nil
                             :background adjusted-bg-color 
                             :foreground "#aaaaaa")
+        ;; Tab faces inherit `fixed-pitch' (active labels inherit both
+        ;; `highlight' and `fixed-pitch') so a buffer-local
+        ;; `variable-pitch-mode' cannot change the tab typeface.
         (if is-dark-theme
             (custom-set-faces
              `(cursor ((t (:background ,(my/readable-cursor-color accent-color bg-color)))))
@@ -614,16 +617,16 @@ The function adjusts:
              `(window-divider-first-pixel ((t (:foreground ,my/divider-color))))
              `(window-divider-last-pixel ((t (:foreground ,my/divider-color))))
              `(fringe ((t (:foreground ,bg-color :background ,bg-color))))
-             `(tab-bar ((t (:inherit default :background ,bg-color :foreground ,fg-color))))
-             `(tab-bar-tab ((t (:inherit 'highlight :background ,accent-color :foreground "#000000"))))
-             `(tab-bar-tab-inactive ((t (:inherit default :background ,bg-color :foreground ,fg-color
+             `(tab-bar ((t (:inherit fixed-pitch :background ,bg-color :foreground ,fg-color))))
+             `(tab-bar-tab ((t (:inherit (highlight fixed-pitch) :background ,accent-color :foreground "#000000"))))
+             `(tab-bar-tab-inactive ((t (:inherit fixed-pitch :background ,bg-color :foreground ,fg-color
                                                   :box (:line-width 1 :color ,bg-color :style flat-button)))))
-             `(tab-line ((t (:inherit default :background ,bg-color :foreground ,fg-color))))
-             `(tab-line-tab-current ((t (:background ,accent-color :foreground "#000000"))))
-             `(tab-line-tab ((t (:background ,accent-color :foreground "#000000"))))
-             `(tab-line-tab-inactive ((t (:inherit default :background ,bg-color :foreground ,fg-color
+             `(tab-line ((t (:inherit fixed-pitch :background ,bg-color :foreground ,fg-color))))
+             `(tab-line-tab-current ((t (:inherit fixed-pitch :background ,accent-color :foreground "#000000"))))
+             `(tab-line-tab ((t (:inherit fixed-pitch :background ,accent-color :foreground "#000000"))))
+             `(tab-line-tab-inactive ((t (:inherit fixed-pitch :background ,bg-color :foreground ,fg-color
                                                    :box (:line-width 1 :color ,bg-color :style flat-button)))))
-             `(tab-line-highlight ((t (:background ,adjusted-bg-color)))))
+             `(tab-line-highlight ((t (:inherit fixed-pitch :background ,adjusted-bg-color)))))
           (custom-set-faces
            `(cursor ((t (:background ,(my/readable-cursor-color accent-color bg-color)))))
            `(hl-line ((t (:background ,adjusted-bg-color))))
@@ -632,16 +635,16 @@ The function adjusts:
            `(window-divider-first-pixel ((t (:foreground ,my/divider-color))))
            `(window-divider-last-pixel ((t (:foreground ,my/divider-color))))
            `(fringe ((t (:foreground ,bg-color :background ,bg-color))))
-           `(tab-bar ((t (:inherit default :background "#000000" :foreground ,bg-color))))
-           `(tab-bar-tab ((t (:inherit 'highlight :background ,accent-color))))
-           `(tab-bar-tab-inactive ((t (:inherit default :background ,bg-color :foreground ,fg-color
+           `(tab-bar ((t (:inherit fixed-pitch :background "#000000" :foreground ,bg-color))))
+           `(tab-bar-tab ((t (:inherit (highlight fixed-pitch) :background ,accent-color))))
+           `(tab-bar-tab-inactive ((t (:inherit fixed-pitch :background ,bg-color :foreground ,fg-color
                                                 :box (:line-width 1 :color ,bg-color :style flat-button)))))
-           `(tab-line ((t (:inherit default :background "#000000" :foreground ,bg-color))))
-           `(tab-line-tab-current ((t (:background ,accent-color))))
-           `(tab-line-tab ((t (:background ,accent-color))))
-           `(tab-line-tab-inactive ((t (:inherit default :background ,bg-color :foreground ,fg-color
+           `(tab-line ((t (:inherit fixed-pitch :background "#000000" :foreground ,bg-color))))
+           `(tab-line-tab-current ((t (:inherit fixed-pitch :background ,accent-color))))
+           `(tab-line-tab ((t (:inherit fixed-pitch :background ,accent-color))))
+           `(tab-line-tab-inactive ((t (:inherit fixed-pitch :background ,bg-color :foreground ,fg-color
                                                  :box (:line-width 1 :color ,bg-color :style flat-button)))))
-           `(tab-line-highlight ((t (:background ,adjusted-bg-color))))))))
+           `(tab-line-highlight ((t (:inherit fixed-pitch :background ,adjusted-bg-color))))))))
     ;; Repaint the cursor on every existing graphical frame: the
     ;; `cursor-color' frame parameter is documented as equivalent to the
     ;; `cursor' face background, and setting it explicitly guarantees
