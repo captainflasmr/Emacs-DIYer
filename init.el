@@ -987,6 +987,29 @@ was active before the preview is restored."
 
 (define-key my-overrides-mode-map (kbd "M-8") #'my/consult-font)
 
+(require 'transient)
+
+(transient-define-prefix my/appearance-menu ()
+  "Appearance — themes, fonts, and colours."
+  [["Theme"
+    ("t" "choose theme" my/consult-theme)
+    ("T" "random theme" my/random-theme)]
+   ["Font"
+    ("f" "choose font" my/consult-font)
+    ("+" "larger" (lambda () (interactive) (my/global-font-size-change 1))
+     :transient t)
+    ("-" "smaller" (lambda () (interactive) (my/global-font-size-change -1))
+     :transient t)
+    ("0" "reset zoom" my/reset-display-scale)]
+   ["Colours"
+    ("a" "accent" my/sync-ui-accent-color)
+    ("u" "cursor" set-cursor-color)
+    ("U" "foreground" set-foreground-color)
+    ("B" "background" set-background-color)
+    ("D" "divider" my/set-divider-color)]])
+
+(define-key my-win-keymap (kbd "a") #'my/appearance-menu)
+
 (defface my/grep-search-face
   '((((background dark))
      :background "#f9e2af" :foreground "#1e1e2e" :weight bold)

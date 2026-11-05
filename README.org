@@ -23,6 +23,10 @@ Used in concert with https://github.com/captainflasmr/Emacs-vanilla
 
 * Whats New
 
+** <2026-11-05>
+
+Added =my/appearance-menu= on =C-z a=: a transient that gathers the theme picker, random theme, font picker, global font-size controls, accent colour, and the cursor/foreground/background/divider colour commands already defined here and in =Emacs-vanilla=.  The direct keys remain unchanged (=M-0=, =M-9=, =M-8=, =C-z l=, =C-z u=, =C-z U=, =C-z B=, =C-z D=); =0= in the menu runs =my/reset-display-scale= (=C-z z=).
+
 ** <2026-10-21>
 
 Added =my/consult-font=, a DIY font picker with live preview (bound to =M-8=).  It keeps the current font height, applies the choice to every frame and to future frames, marks the current family, renders a short sample in each candidate's own typeface, and restores the previous font on =C-g=.  With =C-u= it lists only monospaced families.  Monospaced picks also update =fixed-pitch= and proportional picks update =variable-pitch=, so code blocks and prose follow the chosen family.
@@ -1386,6 +1390,35 @@ was active before the preview is restored."
     (message "Font: %s%s" font (if mono " (monospaced)" ""))))
 
 (define-key my-overrides-mode-map (kbd "M-8") #'my/consult-font)
+#+end_src
+
+** DONE appearance-menu
+
+=my/appearance-menu= (bound to =C-z a=) gathers the theme, font, and colour commands into one transient, so the =C-z= visual prefix has a single appearance entry point.  The direct keys remain available: =M-0= theme picker, =M-9= random theme, =M-8= font picker, and =C-z l= / =C-z u= / =C-z U= / =C-z B= / =C-z D= for colours.  The font-size entries reuse =my/global-font-size-change= from =Emacs-vanilla=, and =0= runs =my/reset-display-scale= (=C-z z=).
+
+#+begin_src elisp
+(require 'transient)
+
+(transient-define-prefix my/appearance-menu ()
+  "Appearance — themes, fonts, and colours."
+  [["Theme"
+    ("t" "choose theme" my/consult-theme)
+    ("T" "random theme" my/random-theme)]
+   ["Font"
+    ("f" "choose font" my/consult-font)
+    ("+" "larger" (lambda () (interactive) (my/global-font-size-change 1))
+     :transient t)
+    ("-" "smaller" (lambda () (interactive) (my/global-font-size-change -1))
+     :transient t)
+    ("0" "reset zoom" my/reset-display-scale)]
+   ["Colours"
+    ("a" "accent" my/sync-ui-accent-color)
+    ("u" "cursor" set-cursor-color)
+    ("U" "foreground" set-foreground-color)
+    ("B" "background" set-background-color)
+    ("D" "divider" my/set-divider-color)]])
+
+(define-key my-win-keymap (kbd "a") #'my/appearance-menu)
 #+end_src
 
 ** DONE deadgrep
