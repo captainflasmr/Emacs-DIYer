@@ -660,16 +660,24 @@ The function adjusts:
 ;; change.  `enable-theme-functions' fires on both `load-theme' and
 ;; `enable-theme', so this also covers `my/consult-theme' preview
 ;; steps and its commit path.  Called without COLOR, the sync reuses
-;; `my/sync-ui-accent-color--current' and never prompts.
+;; `my/sync-ui-accent-color--current' and never prompts.  Divider
+;; hiding is re-applied afterwards because the accent sync paints the
+;; divider faces with `my/divider-color'.
 (if (version<= "29.1" emacs-version)
     ;; Emacs 29.1+ — use the official theme hook
     (add-hook 'enable-theme-functions
               (lambda (_theme)
-                (my/sync-ui-accent-color)))
+                (my/sync-ui-accent-color)
+                (when (and (boundp 'my/window-dividers-hidden)
+                           my/window-dividers-hidden)
+                  (my/window-dividers--hide t))))
   ;; Older Emacs — fall back to advising load-theme
   (progn
     (defun selected-window-accent-sync-tab-bar-to-theme--after (&rest _)
-      (my/sync-ui-accent-color))
+      (my/sync-ui-accent-color)
+      (when (and (boundp 'my/window-dividers-hidden)
+                 my/window-dividers-hidden)
+        (my/window-dividers--hide t)))
     (advice-add 'load-theme :after
                 #'selected-window-accent-sync-tab-bar-to-theme--after)))
 
@@ -987,6 +995,99 @@ was active before the preview is restored."
 
 (define-key my-overrides-mode-map (kbd "M-8") #'my/consult-font)
 
+(defvar my/window-dividers-hidden t
+  "Non-nil when window dividers should be painted invisible.
+The default is t: dividers start with `window-divider-mode' enabled
+but use the frame background colour, so no divider line is visible.")
+
+(defvar my/window-dividers--saved-colors nil
+  "Alist of (FRAME . COLOR) saved before hiding window dividers.")
+
+(defconst my/window-dividers--faces
+  '(vertical-border
+    window-divider
+    window-divider-first-pixel
+    window-divider-last-pixel)
+  "Faces used for window borders and dividers.")
+
+(defun my/window-dividers--set-frame-color (frame color)
+  "Set the window divider faces on FRAME to COLOR."
+  (dolist (face my/window-dividers--faces)
+    (set-face-attribute face frame :foreground color)))
+
+(defun my/window-dividers-hidden-p ()
+  "Return non-nil when the divider face uses the frame background colour."
+  (let* ((frame (selected-frame))
+         (fg (face-foreground 'window-divider frame t))
+         (bg (face-background 'default frame)))
+    (or (equal fg bg)
+        (and fg bg
+             (equal (color-values fg) (color-values bg))))))
+
+(defun my/window-dividers--hide (&optional quiet)
+  "Enable window dividers and paint them with the frame background.
+When QUIET is non-nil, do not echo a status message."
+  (unless window-divider-mode
+    (window-divider-mode 1))
+  (setq my/window-dividers-hidden t)
+  (setq my/window-dividers--saved-colors
+        (mapcar (lambda (frame)
+                  (cons frame
+                        (face-foreground 'window-divider frame t)))
+                (frame-list)))
+  (dolist (frame (frame-list))
+    (my/window-dividers--set-frame-color
+     frame (face-background 'default frame)))
+  (dolist (face my/window-dividers--faces)
+    (set-face-attribute face nil :foreground (face-background 'default)))
+  (unless quiet
+    (message "Window dividers hidden")))
+
+(defun my/window-dividers--show ()
+  "Restore the saved window divider colours."
+  (unless window-divider-mode
+    (window-divider-mode 1))
+  (setq my/window-dividers-hidden nil)
+  (dolist (face my/window-dividers--faces)
+    (set-face-attribute face nil :foreground my/divider-color))
+  (dolist (saved my/window-dividers--saved-colors)
+    (when (frame-live-p (car saved))
+      (my/window-dividers--set-frame-color
+       (car saved) (or (cdr saved) my/divider-color))))
+  (dolist (frame (frame-list))
+    (unless (assq frame my/window-dividers--saved-colors)
+      (my/window-dividers--set-frame-color frame my/divider-color)))
+  (setq my/window-dividers--saved-colors nil)
+  (message "Window dividers shown"))
+
+(defun my/toggle-window-dividers ()
+  "Hide or show window dividers by colour instead of disabling the mode.
+Hiding enables `window-divider-mode' and paints the divider and
+`vertical-border' faces with the frame background, which removes the
+residual one-pixel line left when the mode is disabled.  Showing
+restores the saved divider colour."
+  (interactive)
+  (if (my/window-dividers-hidden-p)
+      (my/window-dividers--show)
+    (my/window-dividers--hide)))
+
+(defun my/set-divider-color-and-show ()
+  "Prompt for a divider colour and make window dividers visible."
+  (interactive)
+  (setq my/window-dividers-hidden nil
+        my/window-dividers--saved-colors nil)
+  (unless window-divider-mode
+    (window-divider-mode 1))
+  (call-interactively #'my/set-divider-color)
+  (dolist (frame (frame-list))
+    (set-face-attribute 'vertical-border frame :foreground
+                        (face-foreground 'window-divider frame t))))
+
+;; Dividers start hidden: mode enabled, faces painted with the frame
+;; background.  The theme hook re-applies this after every theme load.
+(when my/window-dividers-hidden
+  (my/window-dividers--hide t))
+
 (require 'transient)
 
 (transient-define-prefix my/appearance-menu ()
@@ -1006,9 +1107,11 @@ was active before the preview is restored."
     ("u" "cursor" set-cursor-color)
     ("U" "foreground" set-foreground-color)
     ("B" "background" set-background-color)
-    ("D" "divider" my/set-divider-color)]])
+    ("D" "divider colour" my/set-divider-color-and-show)
+    ("d" "hide/show dividers" my/toggle-window-dividers :transient t)]])
 
 (define-key my-win-keymap (kbd "a") #'my/appearance-menu)
+(define-key my-win-keymap (kbd "d") #'my/toggle-window-dividers)
 
 ;;
 ;; -> org-sell-summary
