@@ -1010,6 +1010,321 @@ was active before the preview is restored."
 
 (define-key my-win-keymap (kbd "a") #'my/appearance-menu)
 
+;;
+;; -> org-sell-summary
+;;
+(defun my/org-sell-summary--format (value)
+  "Return VALUE formatted for the summary table.
+Numeric values get two decimals; anything else, including nil and
+empty strings, is returned as trimmed text."
+  (let ((value (and value (string-trim value))))
+    (cond ((or (null value) (string= value "")) "")
+          ((string-match-p "\\`-?[0-9]+\\(?:\\.[0-9]+\\)?\\'" value)
+           (format "%.2f" (string-to-number value)))
+          (t value))))
+
+(defun my/org-sell-summary--rows ()
+  "Collect summary rows for each heading with a TODO keyword.
+Each row is a list (ITEM STATUS TARGET SOLD)."
+  (let (rows)
+    (org-element-map (org-element-parse-buffer) 'headline
+      (lambda (headline)
+        (when-let* ((keyword (org-element-property :todo-keyword headline)))
+          (push (list (org-element-property :raw-value headline)
+                      (format "%s" keyword)
+                      (my/org-sell-summary--format (org-element-property :TARGET headline))
+                      (my/org-sell-summary--format (org-element-property :SOLD headline)))
+                rows))))
+    (nreverse rows)))
+
+(defun my/org-sell-summary--sum (rows column)
+  "Return the sum of numeric COLUMN in ROWS, formatted with two decimals."
+  (format "%.2f"
+          (apply #'+ (mapcar (lambda (row) (string-to-number (nth column row)))
+                             rows))))
+
+(defun my/org-sell-summary--table ()
+  "Build the heading summary table for the current buffer."
+  (let* ((rows (my/org-sell-summary--rows))
+         (table (append rows
+                        (list (list "TOTAL" ""
+                                    (my/org-sell-summary--sum rows 2)
+                                    (my/org-sell-summary--sum rows 3))))))
+    (concat "| Item | Status | Target | Sold |\n"
+            "|------+--------+--------+------|\n"
+            (mapconcat (lambda (row)
+                         (concat "| " (mapconcat #'identity row " | ") " |"))
+                       table "\n"))))
+
+(defun org-dblock-write:sell-summary (_params)
+  "Write a summary table of the buffer's TODO headings."
+  (insert (my/org-sell-summary--table))
+  (org-table-align))
+
+(defun my/org-sell-summary--update-on-save ()
+  "Refresh `sell-summary' dynamic blocks before saving the buffer."
+  (when (and (derived-mode-p 'org-mode)
+             (save-excursion
+               (goto-char (point-min))
+               (re-search-forward "^[ \t]*#\\+BEGIN:[ \t]*sell-summary\\>" nil t)))
+    (let ((inhibit-message t))
+      (org-update-all-dblocks))))
+
+(add-hook 'before-save-hook #'my/org-sell-summary--update-on-save)
+
+(with-eval-after-load 'org
+  (org-dynamic-block-define "sell-summary"
+                            (lambda ()
+                              (interactive)
+                              (org-create-dblock '(:name "sell-summary")))))
+
+;;
+;; -> media-management
+;;
+(defun my/media-run (command &optional dir)
+  "Run a shell COMMAND asynchronously in DIR (defaulting to ~/nas)."
+  (let* ((default-directory (expand-file-name (or dir "~/nas")))
+         (buf-name (format "*media: %s*" command)))
+    (async-shell-command command buf-name)
+    (pop-to-buffer buf-name)))
+
+(defun my/media-tag-images ()
+  "Tag images in current directory using exiftool."
+  (interactive)
+  (my/media-run "tag_image_out.sh" default-directory))
+
+(defun my/media-tag-videos ()
+  "Tag videos in current directory using xmp sidecars."
+  (interactive)
+  (my/media-run "tag_video_out.sh" default-directory))
+
+(defun my/media-process-images ()
+  "Interactive image resizer (art, scans, photos)."
+  (interactive)
+  (my/media-run "images.sh"))
+
+(defun my/media-process-videos ()
+  "Resize videos from ~/nas/Photos to ~/DCIM/Videos."
+  (interactive)
+  (my/media-run "videos.sh"))
+
+(defun my/media-sync-nas ()
+  "Sync photos out to NAS."
+  (interactive)
+  (my/media-run "mysync --photos out"))
+
+(defun my/media-regenerate-thumbnails ()
+  "Regenerate missing tagged gallery thumbnails."
+  (interactive)
+  (my/media-run "tagged_thumbnail_update.sh" "~/DCIM/content/static/tagged"))
+
+(defun my/media-clean-images ()
+  "Remove resized jpg files from static image directories."
+  (interactive)
+  (my/media-run "rm -fr $(find ~/DCIM/content/static/art--gallery ~/DCIM/content/static/scans ~/DCIM/content/static/photos -mindepth 2 -name '*.jpg') 2>/dev/null; echo 'Image directories cleaned'"))
+
+(defun my/media-clean-tagged ()
+  "Remove resized jpg files from static/tagged directory."
+  (interactive)
+  (my/media-run "rm -fr $(find ~/DCIM/content/static/tagged -mindepth 2 -name '*.jpg') 2>/dev/null; echo 'Tagged directory cleaned'"))
+
+(defun my/media-clean-all ()
+  "Remove all resized images from static directories."
+  (interactive)
+  (my/media-run "rm -fr $(find ~/DCIM/content/static/art--gallery ~/DCIM/content/static/scans ~/DCIM/content/static/photos ~/DCIM/content/static/tagged -mindepth 2 -name '*.jpg') 2>/dev/null; echo 'All image directories cleaned'"))
+
+(unless noninteractive
+  (require 'transient)
+
+  (transient-define-prefix my/media-menu ()
+    "Media — tagging, syncing, cleaning, and web publishing."
+    [["Tag"
+      ("ti" "tag images"    my/media-tag-images)
+      ("tv" "tag videos"   my/media-tag-videos)]
+     ["Process & Sync"
+      ("p"  "process images"       my/media-process-images)
+      ("v"  "process videos"       my/media-process-videos)
+      ("s"  "sync to NAS"          my/media-sync-nas)]
+     ["Clean & Maint"
+      ("ci" "clean image dirs"     my/media-clean-images)
+      ("ct" "clean tagged dir"     my/media-clean-tagged)
+      ("ca" "clean all"            my/media-clean-all)
+      ("r"  "regenerate"           my/media-regenerate-thumbnails)]
+     ["Web Publishing"
+      ("wu" "web update site…"     (lambda (site)
+                                     (interactive (list (completing-read "Site: " '("dyerdwelling" "art" "katieboo85" "emacs") nil t)))
+                                     (my/media-run (format "web update %s" site))))
+      ("wp" "web publish site…"    (lambda (site)
+                                     (interactive (list (completing-read "Site: " '("dyerdwelling" "art" "katieboo85" "emacs") nil t)))
+                                     (my/media-run (format "web publish %s" site))))
+      ("wa" "web publish all"      (lambda () (interactive) (my/media-run "web publish all")))]])
+
+  (define-key my-overrides-mode-map (kbd "C-c M") #'my/media-menu))
+
+;;
+;; -> opencode-sessions
+;;
+(require 'cl-lib)
+(require 'sqlite nil t)
+
+;;; 1. Process launcher helper
+(defun opencode-open-session-terminal (session-id directory)
+  "Open a terminal at DIRECTORY running opencode connected to SESSION-ID."
+  (let* ((default-directory (if (and directory (file-directory-p directory))
+                                (file-name-as-directory directory)
+                              (expand-file-name "~")))
+         (terminal (cond ((executable-find "foot") "foot")
+                         ((executable-find "ghostty") "ghostty")
+                         ((executable-find "alacritty") "alacritty")
+                         ((executable-find "wezterm") "wezterm")
+                         (t "xterm")))
+         (args (cond
+                ((string= terminal "foot") (list "-D" default-directory "opencode" "--session" session-id))
+                ((string= terminal "ghostty") (list "--working-directory" default-directory "-e" "opencode" "--session" session-id))
+                ((string= terminal "wezterm") (list "start" "--cwd" default-directory "opencode" "--session" session-id))
+                (t (list "-e" "opencode" "--session" session-id)))))
+    (message "Launching %s for OpenCode session %s..." terminal session-id)
+    (apply #'start-process (concat "opencode-" session-id) nil terminal args)))
+
+;;; 2. Robust native session listing (with JSON/data parsing & filtering support)
+(cl-defun opencode-list-sessions-native (&optional title-filter)
+  "Query the local OpenCode SQLite database and render sessions as Org.
+Each session becomes a level-1 headline with a properties drawer, so
+folding, `org-goto', `imenu', sparse trees and `org-occur' work natively.
+If TITLE-FILTER is provided, filters results matching the session title."
+  (interactive)
+  (let* ((db-path (expand-file-name "~/.local/share/opencode/opencode.db"))
+         (buf (get-buffer-create "*OpenCode Sessions*")))
+    (if (not (file-exists-p db-path))
+        (error "OpenCode database not found at %s" db-path)
+      (unless (fboundp 'sqlite-open)
+        (error "Native SQLite support is not available in this Emacs build"))
+
+      (let* ((db (sqlite-open db-path))
+             ;; Model/agent live inside message.data (JSON); message text
+             ;; lives in the separate `part' table as type:"text" rows.
+             (query-base "
+               SELECT
+                 s.id,
+                 s.time_created,
+                 s.time_updated,
+                 s.title,
+                 s.directory,
+                 s.path,
+                 (SELECT json_extract(m.data,'$.modelID') || ' (' || json_extract(m.data,'$.providerID') || ')'
+                  FROM message m
+                  WHERE m.session_id = s.id AND json_extract(m.data,'$.modelID') IS NOT NULL
+                  ORDER BY m.time_created DESC LIMIT 1) as resolved_model,
+                 (SELECT json_extract(m.data,'$.agent')
+                  FROM message m
+                  WHERE m.session_id = s.id AND json_extract(m.data,'$.agent') IS NOT NULL
+                  ORDER BY m.time_created DESC LIMIT 1) as resolved_agent,
+                 (SELECT json_extract(p.data,'$.text')
+                  FROM part p
+                  WHERE p.session_id = s.id AND json_extract(p.data,'$.type') = 'text'
+                  ORDER BY p.time_created DESC LIMIT 1) as last_msg
+               FROM session s
+               WHERE s.parent_id IS NULL ")
+             ;; Apply filter if requested (? is bound to a LIKE pattern).
+             (filtered (and title-filter (not (string-empty-p title-filter))))
+             (query (if filtered
+                        (concat query-base
+                                "AND s.title LIKE ? ORDER BY s.time_updated DESC LIMIT 20;")
+                      (concat query-base "ORDER BY s.time_updated DESC LIMIT 20;")))
+             (rows (sqlite-select db query
+                                  (and filtered (vector (concat "%" title-filter "%"))))))
+        (sqlite-close db)
+
+        (with-current-buffer buf
+          (let ((inhibit-read-only t))
+            (erase-buffer)
+            (insert "#+TITLE: OpenCode Sessions\n")
+            (insert "#+STARTUP: overview\n")
+            (if title-filter
+                (insert (format "#+SUBTITLE: Filter %S — %d match(es), most recent first\n\n"
+                                title-filter (length rows)))
+              (insert "#+SUBTITLE: Most recent first — TAB folds, org-goto / imenu jumps, Connect opens a terminal\n\n"))
+
+            (if (null rows)
+                (insert "No matching sessions found.\n")
+              (dolist (row rows)
+                (let* ((id (nth 0 row))
+                       (created-raw (nth 1 row))
+                       (updated-raw (nth 2 row))
+                       (title-raw (or (nth 3 row) "Untitled Session"))
+                       ;; Headlines, properties and tables must stay single-line.
+                       (title (string-trim
+                               (replace-regexp-in-string "[ \t\n]+" " " title-raw)))
+                       (directory (nth 4 row))
+                       (path (nth 5 row))
+                       (model (or (nth 6 row) "default"))
+                       (agent (or (nth 7 row) "primary"))
+                       (last-msg-raw (nth 8 row))
+
+                       (project-root (cond
+                                      ((and directory (not (string-empty-p directory))) directory)
+                                      ((and path (not (string-empty-p path))) path)
+                                      (t "Unknown Workspace")))
+                       (project-short (if (string= project-root "Unknown Workspace")
+                                          project-root
+                                        (abbreviate-file-name project-root)))
+
+                       ;; SQL already extracted the text; normalise whitespace.
+                       (msg-snippet
+                        (if (and last-msg-raw (not (string-empty-p last-msg-raw)))
+                            (let ((text (string-trim
+                                         (replace-regexp-in-string "[ \t\n]+" " " last-msg-raw))))
+                              (if (> (length text) 400)
+                                  (concat (substring text 0 397) "...")
+                                text))
+                          "No messages yet"))
+
+                       (created-str (if (numberp created-raw)
+                                        (format-time-string "%Y-%m-%d %H:%M"
+                                                            (seconds-to-time (/ created-raw 1000.0)))
+                                      "Unknown"))
+                       (updated-str (if (numberp updated-raw)
+                                        (format-time-string "%Y-%m-%d %H:%M"
+                                                            (seconds-to-time (/ updated-raw 1000.0)))
+                                      "Unknown")))
+
+                  ;; Each session is a level-1 Org headline so folding,
+                  ;; org-goto, imenu, sparse trees, etc. work natively.
+                  (insert (format "* %s\n" title))
+                  (insert ":PROPERTIES:\n")
+                  (insert (format ":SESSION_ID: %s\n" id))
+                  (insert (format ":DIRECTORY: %s\n" project-root))
+                  (insert (format ":AGENT: %s\n" agent))
+                  (insert (format ":MODEL: %s\n" model))
+                  (insert (format ":CREATED: %s\n" created-str))
+                  (insert (format ":UPDATED: %s\n" updated-str))
+                  (insert ":END:\n")
+                  (insert (format "- Directory :: %s\n" project-short))
+                  (insert (format "- Agent :: %s (%s)\n" agent model))
+                  (insert (format "- Activity :: Created %s, Updated %s\n"
+                                  created-str updated-str))
+                  (insert (format "- Session :: %s\n" id))
+                  (insert (format "- Connect :: [[elisp:(opencode-open-session-terminal %s %s)][Open in terminal]]\n"
+                                  (prin1-to-string id)
+                                  (prin1-to-string project-root)))
+                  (insert "- Last ::\n")
+                  (insert "#+BEGIN_QUOTE\n")
+                  (insert msg-snippet "\n")
+                  (insert "#+END_QUOTE\n\n"))))
+            (org-mode)
+            ;; Honour #+STARTUP even if the user overrides
+            ;; `org-startup-folded' globally.
+            (when (fboundp 'org-overview)
+              (ignore-errors (org-overview)))
+            (read-only-mode 1)
+            ;; Keep point/cursor at the top whenever the buffer is (re)built.
+            (goto-char (point-min))))
+        ;; Display the buffer, focus its window, and park point at the top.
+        (let ((win (display-buffer buf)))
+          (when (window-live-p win)
+            (select-window win)
+            (set-window-point win (point-min))))))))
+
 (defface my/grep-search-face
   '((((background dark))
      :background "#f9e2af" :foreground "#1e1e2e" :weight bold)
