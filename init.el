@@ -1304,8 +1304,11 @@ If TITLE-FILTER is provided, filters results matching the session title."
         (error "Native SQLite support is not available in this Emacs build"))
 
       (let* ((db (sqlite-open db-path))
-             ;; Model/agent live inside message.data (JSON); message text
-             ;; lives in the separate `part' table as type:"text" rows.
+             ;; OpenCode v2 stores sessions in `session_v2' and messages in
+             ;; `session_message'.  User text lives at .text, assistant text is
+             ;; one of the .content blocks, and agent/model are session columns.
+             ;; The old `session'/`message'/`part' tables are legacy: they stop
+             ;; receiving new rows after the v2 migration.
              (query-base "
                SELECT
                  s.id,
@@ -1314,20 +1317,25 @@ If TITLE-FILTER is provided, filters results matching the session title."
                  s.title,
                  s.directory,
                  s.path,
-                 (SELECT json_extract(m.data,'$.modelID') || ' (' || json_extract(m.data,'$.providerID') || ')'
-                  FROM message m
-                  WHERE m.session_id = s.id AND json_extract(m.data,'$.modelID') IS NOT NULL
-                  ORDER BY m.time_created DESC LIMIT 1) as resolved_model,
-                 (SELECT json_extract(m.data,'$.agent')
-                  FROM message m
-                  WHERE m.session_id = s.id AND json_extract(m.data,'$.agent') IS NOT NULL
-                  ORDER BY m.time_created DESC LIMIT 1) as resolved_agent,
-                 (SELECT json_extract(p.data,'$.text')
-                  FROM part p
-                  WHERE p.session_id = s.id AND json_extract(p.data,'$.type') = 'text'
-                  ORDER BY p.time_created DESC LIMIT 1) as last_msg
-               FROM session s
-               WHERE s.parent_id IS NULL ")
+                 s.agent,
+                 (json_extract(s.model,'$.id') || ' (' ||
+                  json_extract(s.model,'$.providerID') || ')') as resolved_model,
+                 (SELECT CASE m.type
+                           WHEN 'user' THEN json_extract(m.data,'$.text')
+                           ELSE (SELECT json_extract(j.value,'$.text')
+                                 FROM json_each(m.data,'$.content') j
+                                 WHERE json_extract(j.value,'$.type') = 'text'
+                                 ORDER BY j.key DESC LIMIT 1)
+                         END
+                  FROM session_message m
+                  WHERE m.session_id = s.id
+                    AND m.type IN ('user','assistant')
+                    AND (m.type = 'user'
+                         OR EXISTS (SELECT 1 FROM json_each(m.data,'$.content') j2
+                                    WHERE json_extract(j2.value,'$.type') = 'text'))
+                  ORDER BY m.seq DESC LIMIT 1) as last_msg
+               FROM session_v2 s
+               WHERE s.parent_id IS NULL AND s.time_archived IS NULL ")
              ;; Apply filter if requested (? is bound to a LIKE pattern).
              (filtered (and title-filter (not (string-empty-p title-filter))))
              (query (if filtered
@@ -1360,8 +1368,8 @@ If TITLE-FILTER is provided, filters results matching the session title."
                                (replace-regexp-in-string "[ \t\n]+" " " title-raw)))
                        (directory (nth 4 row))
                        (path (nth 5 row))
-                       (model (or (nth 6 row) "default"))
-                       (agent (or (nth 7 row) "primary"))
+                       (agent (or (nth 6 row) "primary"))
+                       (model (or (nth 7 row) "default"))
                        (last-msg-raw (nth 8 row))
 
                        (project-root (cond
@@ -1984,8 +1992,6 @@ If a popup is visible, hide it.  Otherwise re-show the last popup
 
 ;; Toggle the last/visible popup.
 (define-key my-overrides-mode-map (kbd "C-x j") #'my/popper-toggle-current)
-(define-key my-overrides-mode-map (kbd "C-'") #'my/popper-toggle-current)
-(define-key my-overrides-mode-map (kbd "C-`") #'my/popper-toggle-current)
 
 ;; Cycle through popups in a stable order.
 (define-key my-overrides-mode-map (kbd "C-M-<return>") #'my/popper-cycle-popup)
@@ -2583,208 +2589,6 @@ Picks up extra capf properties via `completion-extra-properties'."
   (add-to-list 'completion-category-overrides
                '(shell-history (styles basic substring initials))))
 
-(with-eval-after-load 'org
-  (require 'ox-publish))
-
-(defun my/org-html-src-block-filter (text backend info)
-  (when (org-export-derived-backend-p backend 'html)
-    (replace-regexp-in-string "\n\\s-*\n" "<br>\n" text)))
-
-(defun my/org-setup-src-block-filter (backend)
-  "Set `org-export-filter-src-block-functions` dynamically based on BACKEND."
-  (message "Exporting with backend: %s" backend) ;; For debugging
-  (cond
-   ((eq backend 'hugo) ;; Clear the filter for ox-hugo
-    (setq-local org-export-filter-src-block-functions nil))
-   ((eq backend 'html) ;; Apply filter for ox-html/ox-publish
-    (setq-local org-export-filter-src-block-functions
-                '(my/org-html-src-block-filter)))))
-
-(add-hook 'org-export-before-processing-functions #'my/org-setup-src-block-filter)
-
-(setq org-publish-project-alist
-      '(("split-emacs"
-         :base-directory "~/DCIM/content"
-         :base-extension "org"
-         :publishing-directory "~/DCIM/content/split/emacs"
-         :exclude ".*"
-         :include ("emacs--all.org")
-         :publishing-function my-org-publish-split-headings
-         :recursive nil)
-        ("blog-posts-emacs"
-         :base-directory "~/DCIM/content/split/emacs"
-         :base-extension "org"
-         :publishing-directory "~/publish/hugo-emacs/site/static/public_html"
-         :publishing-function org-html-publish-to-html
-         :recursive t
-         :section-numbers nil
-         :with-toc nil
-         :html-preamble t
-         :html-postamble t
-         :auto-sitemap t
-         :sitemap-filename "index.org"
-         :sitemap-title "the DyerDwelling"
-         :html-head "<link rel=\"stylesheet\"
-                    href=\"../assets/css//bootstrap.css\"
-                    type=\"text/css\"/>\n
-                    <link rel=\"stylesheet\"
-                    href=\"../assets/css//style-ignore.css\"
-                    type=\"text/css\"/>"
-         :sitemap-function my-sitemap-format
-         :sitemap-sort-files alphabetically)
-        ("images-emacs"
-         :base-directory "~/DCIM/content/emacs"
-         :base-extension "jpg\\|gif\\|png"
-         :recursive t
-         :publishing-directory "~/publish/hugo-emacs/site/static/public_html/emacs"
-         :publishing-function org-publish-attachment)
-        ("blog" ;; Meta-project to combine phases
-         :components ("split-emacs" "images-emacs" "blog-posts-emacs"))))
-
-(defun my-org-publish-split-headings (plist filename pub-dir)
-  "Split an Org file into separate files, each corresponding to a top-level heading
-that is marked as DONE.
-Each file name is prefixed with the date in YYYYMMDD format extracted from the
-:EXPORT_HUGO_LASTMOD: property. PLIST is the property list for the publishing
-process, FILENAME is the input Org file, and PUB-DIR is the publishing directory."
-  (with-temp-buffer
-    (insert-file-contents filename) ;; Load the content of the current Org file
-    (goto-char (point-min))
-    (let ((heading-level 1) ;; Level of the top-level heading to split by
-          prev-start heading-title sanitized-title output-file lastmod-date)
-      ;; Iterate over all top-level headings
-      (while (re-search-forward (format "^\\*\\{%d\\} \\(?:\\([[:upper:]]+\\) \\)?\\(.*\\)" heading-level) nil t)
-        (let ((todo-keyword (match-string 1)) ;; Extract the TODO keyword (if it exists)
-              (heading-title (match-string 2))) ;; Extract the title of the heading
-          ;; Process only headings marked as DONE
-          (when (and todo-keyword (string-equal todo-keyword "DONE"))
-            (setq prev-start (match-beginning 0)) ;; Start of the current heading
-            (setq sanitized-title (when heading-title
-                                    (replace-regexp-in-string "[^a-zA-Z0-9_-]" "_" heading-title))) ;; Sanitize title
-            ;; Extract the :EXPORT_HUGO_LASTMOD: property for the current section
-            (save-excursion
-              (when (re-search-forward ":EXPORT_HUGO_LASTMOD: +\\(<.+>\\)" (save-excursion (re-search-forward "^\\* " nil t) (point)) t)
-                (let* ((raw-lastmod (match-string 1)) ;; Extract the timestamp string (e.g., "<2024-12-08 08:37>")
-                       (date-elements (when (string-match "<\\([0-9]+\\)-\\([0-9]+\\)-\\([0-9]+\\)" raw-lastmod)
-                                        (list (match-string 1 raw-lastmod) ;; Year
-                                              (match-string 2 raw-lastmod) ;; Month
-                                              (match-string 3 raw-lastmod))))) ;; Day
-                  (setq lastmod-date (when date-elements
-                                       (apply #'concat date-elements))))))
-            ;; Default to "00000000" if no valid lastmod-date is found
-            (setq lastmod-date (or lastmod-date "00000000"))
-            ;; Find the end of this section (right before the next top-level heading)
-            (let ((section-end (save-excursion
-                                 (or (re-search-forward (format "^\\*\\{%d\\} " heading-level) nil t)
-                                     (point-max))))) ;; End of current section or end of file
-              ;; Only proceed if sanitized title exists and is valid
-              (when (and sanitized-title (not (string-empty-p sanitized-title)))
-                ;; Create the output file name (prepend the date)
-                (setq output-file (expand-file-name (format "%s-%s.org" lastmod-date sanitized-title) pub-dir))
-                ;; Write the section content (from prev-start to section-end)
-                (write-region prev-start section-end output-file)
-                (message "Wrote %s" output-file)))))))
-    ;; Return nil to indicate successful processing
-    nil))
-
-(defun my-sitemap-format (title list)
-  "Generate a sitemap with TITLE and reverse-sorted LIST of files."
-  (setq list (nreverse (cdr list)))
-  (concat "#+TITLE: " title "\n\n"
-          "* Blog Posts\n"
-          (mapconcat
-           (lambda (entry)
-             (format "- %s\n" (car entry)))
-           list "")
-          "\n"))
-
-(defun my-generate-rss-feed ()
-  "Generate a detailed RSS feed for Org-published blog posts."
-  (interactive)
-  (let* ((rss-file (expand-file-name "index.xml" "/home/jdyer/publish/hugo-emacs/site/static/public_html"))
-         (base-url "https://www.emacs.dyerdwelling.family/public_html/")
-         (self-link "https://www.emacs.dyerdwelling.family/public_html/index.xml") ;; Self-referencing link for Atom feeds
-         (last-build-date (format-time-string "%a, %d %b %Y %H:%M:%S %z")) ;; Current time as lastBuildDate
-         (org-directory "/home/jdyer/source/test/elisp")
-         (static-author "captainflasmr@gmail.com (James Dyer)") ;; Static author 
-         ;; (org-directory "/home/jdyer/DCIM/content/split/emacs")
-         (rss-items ""))
-    ;; Iterate over all Org files in the directory
-    (dolist (org-file (directory-files org-directory t "\\.org$"))
-      (let* ((html-file (concat (file-name-sans-extension
-                                 (file-name-nondirectory org-file)) ".html"))
-             (url (concat base-url html-file))
-             (heading-level 1)
-             (guid url) ;; Default GUID as the post URL
-             title
-             content
-             html-content
-             raw-pubdate
-             pubdate)
-        ;; Read and process the org file
-        (with-temp-buffer
-          (insert-file-contents org-file)
-          (goto-char (point-min))
-          ;; Extract the title from the first heading
-          (when  (re-search-forward (format "^\\*\\{%d\\} \\(?:\\([[:upper:]]+\\) \\)?\\(.*\\)" heading-level) nil t)
-            (setq title (match-string 2)))
-          ;; Extract the :EXPORT_HUGO_LASTMOD: property value
-          (when (re-search-forward "^.*EXPORT_HUGO_LASTMOD: *<\\([^>]+\\)>" nil t)
-            (setq raw-pubdate (match-string 1)))
-          ;; Convert the raw-pubdate to the RFC 822 format for <pubDate>
-          (when raw-pubdate
-            (setq pubdate (format-time-string
-                           "%a, %d %b %Y %H:%M:%S %z"
-                           (org-time-string-to-time (concat "<" raw-pubdate ">")))))
-          ;; Move to the end of :END: and extract the remaining contents
-          (when (re-search-forward "^:END:\n" nil t)
-            (setq content (buffer-substring-no-properties (point) (point-max)))
-            ;; Convert the content to HTML
-            (setq html-content (org-export-string-as content 'html t '(:with-toc nil)))
-            ;; (setq html-content (xml-escape-string html-content))
-            ))
-        ;; Add an item to the RSS feed
-        (setq rss-items
-              (concat rss-items (format "
-<item>
-  <title>%s</title>
-  <link>%s</link>
-  <guid>%s</guid>
-  <pubDate>%s</pubDate>
-  <author>%s</author>
-  <description><![CDATA[%s]]></description>
-</item>"
-                                        (or title "Untitled Post")
-                                        url
-                                        guid ;; Use the generated GUID
-                                        (or pubdate last-build-date) ;; Fallback to lastBuildDate if missing
-                                        static-author ;; Static author name
-                                        (or html-content "No content available"))))))
-    ;; Write the RSS feed to the file
-    (with-temp-file rss-file
-      (insert "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>
-<rss version=\"2.0\" xmlns:atom=\"http://www.w3.org/2005/Atom\">
-<channel>
-  <title>Emacs@Dyerdwelling</title>
-  <image>
-      <url>/images/banner/favicon-james.png</url>
-      <title>Emacs@Dyerdwelling</title>
-      <link>https://emacs.dyerdwelling.family/public_html/</link>
-      <width>32</width>
-      <height>32</height>
-  </image>
-  <link>" base-url "</link>
-  <description>Recent content on Emacs@Dyerdwelling</description>
-  <language>en</language>
-  <managingEditor>captainflasmr@gmail.com (James Dyer)</managingEditor>
-  <webMaster>captainflasmr@gmail.com (James Dyer)</webMaster>
-  <lastBuildDate>" last-build-date "</lastBuildDate>
-  <atom:link href=\"" self-link "\" rel=\"self\" type=\"application/rss+xml\" />"
-  rss-items "
-</channel>
-</rss>"))
-    (message "RSS feed generated at %s" rss-file)))
-
 (defvar my/etags-excluded-dirs
   '(".cache" ".gnupg" ".local" ".mozilla" ".thunderbird" ".wine" "Games"
     "cache" "chromium" "elpa" "nas" "syncthing" "Image-Line" ".cargo"
@@ -2888,40 +2692,6 @@ implementation, compatible with both Windows and Linux."
 
 (global-set-key (kbd "C-x p l") 'my/etags-load)
 (global-set-key (kbd "C-x p u") 'my/etags-update)
-
-(defun simple-orderless-completion (string table pred point)
-  "Enhanced orderless completion with better partial matching."
-  (let* ((words (split-string string "[-, ]+"))
-         (patterns (mapcar (lambda (word)
-                             (concat "\\b.*" (regexp-quote word) ".*"))
-                           words))
-         (full-regexp (mapconcat 'identity patterns "")))
-    (if (string-empty-p string)
-        (all-completions "" table pred)
-      (cl-remove-if-not
-       (lambda (candidate)
-         (let ((case-fold-search completion-ignore-case))
-           (and (cl-every (lambda (word)
-                            (string-match-p
-                             (concat "\\b.*" (regexp-quote word))
-                             candidate))
-                          words)
-                t)))
-       (all-completions "" table pred)))))
-
-;; Register the completion style
-(add-to-list 'completion-styles-alist
-             '(simple-orderless simple-orderless-completion
-                                simple-orderless-completion))
-
-;; Set different completion styles for minibuffer vs other contexts
-(defun setup-minibuffer-completion-styles ()
-  "Use orderless completion in minibuffer, regular completion elsewhere."
-  ;; For minibuffer: use orderless first, then fallback to flex and basic
-  (setq-local completion-styles '(basic simple-orderless flex substring)))
-
-;; Hook into minibuffer setup
-(add-hook 'minibuffer-setup-hook #'setup-minibuffer-completion-styles)
 
 (defun my/dired-async-shell-command-nohup (orig-fun command &optional arg file-list)
   "Wrap COMMAND with `nohup' so the process survives Emacs exit.
@@ -3563,35 +3333,6 @@ collapsed line instead of opening a fresh dired for the literal parent."
       (funcall orig-fn other-window))))
 
 (advice-add 'dired-up-directory :around #'my/dired-collapse--up-advice)
-
-(defun emacs-solo/ollama-run-model ()
-  "Run `ollama list`, let the user choose a model, and open it in `ansi-term`.
-Asks for a prompt when run. If none is passed (RET), starts it interactive.
-If a region is selected, prompt for additional input and pass it as a query."
-  (interactive)
-  (let* ((output (shell-command-to-string "ollama list"))
-         (models (let ((lines (split-string output "\n" t)))
-                   (mapcar (lambda (line) (car (split-string line))) (cdr lines))))
-         (selected (completing-read "Select Ollama model: " models nil t))
-         (region-text (when (use-region-p)
-                        (shell-quote-argument
-                         (replace-regexp-in-string "\n" " "
-                                                   (buffer-substring-no-properties
-                                                    (region-beginning)
-                                                    (region-end))))))
-         (prompt (read-string "Ollama Prompt (leave it blank for interactive): " nil nil nil)))
-    (when (and selected (not (string-empty-p selected)))
-      (ansi-term "/bin/sh")
-      (sit-for 1)
-      (let ((args (list (format "ollama run %s"
-                                selected))))
-        (when (and prompt (not (string-empty-p prompt)))
-          (setq args (append args (list (format "\"%s\"" prompt)))))
-        (when region-text
-          (setq args (append args (list (format "\"%s\"" region-text)))))
-
-        (term-send-raw-string (string-join args " "))
-        (term-send-raw-string "\n")))))
 
 (defun tiny-diminish (mode &optional replacement)
   "Hide or replace modeline display of minor MODE with REPLACEMENT."

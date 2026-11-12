@@ -853,11 +853,6 @@ with the following abbrev =abbrev_defs=:
 
 The only downside is the lack of positional cursor options that are easily defined in Tempel, but if I really wanted to, I could just include lambda functions to move the cursor. However, I don't think I’m too bothered; I’ll just use the usual Emacs navigation keys.
 
-** DONE image-dired
-CLOSED: [2024-12-19 Thu 11:44]
-
-This is mainly enhancements to provide a more comfortable Desktop feel to image navigation.
-
 ** DONE selected-window-accent-mode
 CLOSED: [2024-12-20 Fri 08:53]
 
@@ -1693,6 +1688,8 @@ Personal media tagging, resizing, NAS sync, cleanup, and web-publishing helpers.
 
 Native OpenCode session browser.  =opencode-list-sessions-native= reads the local OpenCode SQLite database and renders each recent session as an Org heading with properties, a last-message quote, and an =Open in terminal= link; =opencode-open-session-terminal= opens the chosen session in the first available terminal emulator.  It uses Emacs's built-in SQLite support plus built-in Org and =cl-lib=, so there is no external package dependency beyond an Emacs built with SQLite.
 
+Since OpenCode v2, sessions live in =session_v2= and messages in =session_message=; the pre-v2 =session=, =message= and =part= tables are legacy and stop receiving new rows after migration.
+
 #+begin_src elisp
 ;;
 ;; -> opencode-sessions
@@ -1734,8 +1731,11 @@ If TITLE-FILTER is provided, filters results matching the session title."
         (error "Native SQLite support is not available in this Emacs build"))
 
       (let* ((db (sqlite-open db-path))
-             ;; Model/agent live inside message.data (JSON); message text
-             ;; lives in the separate `part' table as type:"text" rows.
+             ;; OpenCode v2 stores sessions in `session_v2' and messages in
+             ;; `session_message'.  User text lives at .text, assistant text is
+             ;; one of the .content blocks, and agent/model are session columns.
+             ;; The old `session'/`message'/`part' tables are legacy: they stop
+             ;; receiving new rows after the v2 migration.
              (query-base "
                SELECT
                  s.id,
@@ -1744,20 +1744,25 @@ If TITLE-FILTER is provided, filters results matching the session title."
                  s.title,
                  s.directory,
                  s.path,
-                 (SELECT json_extract(m.data,'$.modelID') || ' (' || json_extract(m.data,'$.providerID') || ')'
-                  FROM message m
-                  WHERE m.session_id = s.id AND json_extract(m.data,'$.modelID') IS NOT NULL
-                  ORDER BY m.time_created DESC LIMIT 1) as resolved_model,
-                 (SELECT json_extract(m.data,'$.agent')
-                  FROM message m
-                  WHERE m.session_id = s.id AND json_extract(m.data,'$.agent') IS NOT NULL
-                  ORDER BY m.time_created DESC LIMIT 1) as resolved_agent,
-                 (SELECT json_extract(p.data,'$.text')
-                  FROM part p
-                  WHERE p.session_id = s.id AND json_extract(p.data,'$.type') = 'text'
-                  ORDER BY p.time_created DESC LIMIT 1) as last_msg
-               FROM session s
-               WHERE s.parent_id IS NULL ")
+                 s.agent,
+                 (json_extract(s.model,'$.id') || ' (' ||
+                  json_extract(s.model,'$.providerID') || ')') as resolved_model,
+                 (SELECT CASE m.type
+                           WHEN 'user' THEN json_extract(m.data,'$.text')
+                           ELSE (SELECT json_extract(j.value,'$.text')
+                                 FROM json_each(m.data,'$.content') j
+                                 WHERE json_extract(j.value,'$.type') = 'text'
+                                 ORDER BY j.key DESC LIMIT 1)
+                         END
+                  FROM session_message m
+                  WHERE m.session_id = s.id
+                    AND m.type IN ('user','assistant')
+                    AND (m.type = 'user'
+                         OR EXISTS (SELECT 1 FROM json_each(m.data,'$.content') j2
+                                    WHERE json_extract(j2.value,'$.type') = 'text'))
+                  ORDER BY m.seq DESC LIMIT 1) as last_msg
+               FROM session_v2 s
+               WHERE s.parent_id IS NULL AND s.time_archived IS NULL ")
              ;; Apply filter if requested (? is bound to a LIKE pattern).
              (filtered (and title-filter (not (string-empty-p title-filter))))
              (query (if filtered
@@ -1790,8 +1795,8 @@ If TITLE-FILTER is provided, filters results matching the session title."
                                (replace-regexp-in-string "[ \t\n]+" " " title-raw)))
                        (directory (nth 4 row))
                        (path (nth 5 row))
-                       (model (or (nth 6 row) "default"))
-                       (agent (or (nth 7 row) "primary"))
+                       (agent (or (nth 6 row) "primary"))
+                       (model (or (nth 7 row) "default"))
                        (last-msg-raw (nth 8 row))
 
                        (project-root (cond
@@ -2543,8 +2548,6 @@ If a popup is visible, hide it.  Otherwise re-show the last popup
 
 ;; Toggle the last/visible popup.
 (define-key my-overrides-mode-map (kbd "C-x j") #'my/popper-toggle-current)
-(define-key my-overrides-mode-map (kbd "C-'") #'my/popper-toggle-current)
-(define-key my-overrides-mode-map (kbd "C-`") #'my/popper-toggle-current)
 
 ;; Cycle through popups in a stable order.
 (define-key my-overrides-mode-map (kbd "C-M-<return>") #'my/popper-cycle-popup)
@@ -3176,222 +3179,6 @@ More bonus points here for in buffer completion in shells, this includes eshell 
 
 *** DOING Test completion through programming modes                :issues:
 
-** DOING ox-hugo
-
-Lets try and see how far we can get going through the =org-publish= mechanism for publishing a web-site!
-
-#+begin_src elisp
-(with-eval-after-load 'org
-  (require 'ox-publish))
-
-(defun my/org-html-src-block-filter (text backend info)
-  (when (org-export-derived-backend-p backend 'html)
-    (replace-regexp-in-string "\n\\s-*\n" "<br>\n" text)))
-
-(defun my/org-setup-src-block-filter (backend)
-  "Set `org-export-filter-src-block-functions` dynamically based on BACKEND."
-  (message "Exporting with backend: %s" backend) ;; For debugging
-  (cond
-   ((eq backend 'hugo) ;; Clear the filter for ox-hugo
-    (setq-local org-export-filter-src-block-functions nil))
-   ((eq backend 'html) ;; Apply filter for ox-html/ox-publish
-    (setq-local org-export-filter-src-block-functions
-                '(my/org-html-src-block-filter)))))
-
-(add-hook 'org-export-before-processing-functions #'my/org-setup-src-block-filter)
-
-(setq org-publish-project-alist
-      '(("split-emacs"
-         :base-directory "~/DCIM/content"
-         :base-extension "org"
-         :publishing-directory "~/DCIM/content/split/emacs"
-         :exclude ".*"
-         :include ("emacs--all.org")
-         :publishing-function my-org-publish-split-headings
-         :recursive nil)
-        ("blog-posts-emacs"
-         :base-directory "~/DCIM/content/split/emacs"
-         :base-extension "org"
-         :publishing-directory "~/publish/hugo-emacs/site/static/public_html"
-         :publishing-function org-html-publish-to-html
-         :recursive t
-         :section-numbers nil
-         :with-toc nil
-         :html-preamble t
-         :html-postamble t
-         :auto-sitemap t
-         :sitemap-filename "index.org"
-         :sitemap-title "the DyerDwelling"
-         :html-head "<link rel=\"stylesheet\"
-                    href=\"../assets/css//bootstrap.css\"
-                    type=\"text/css\"/>\n
-                    <link rel=\"stylesheet\"
-                    href=\"../assets/css//style-ignore.css\"
-                    type=\"text/css\"/>"
-         :sitemap-function my-sitemap-format
-         :sitemap-sort-files alphabetically)
-        ("images-emacs"
-         :base-directory "~/DCIM/content/emacs"
-         :base-extension "jpg\\|gif\\|png"
-         :recursive t
-         :publishing-directory "~/publish/hugo-emacs/site/static/public_html/emacs"
-         :publishing-function org-publish-attachment)
-        ("blog" ;; Meta-project to combine phases
-         :components ("split-emacs" "images-emacs" "blog-posts-emacs"))))
-
-(defun my-org-publish-split-headings (plist filename pub-dir)
-  "Split an Org file into separate files, each corresponding to a top-level heading
-that is marked as DONE.
-Each file name is prefixed with the date in YYYYMMDD format extracted from the
-:EXPORT_HUGO_LASTMOD: property. PLIST is the property list for the publishing
-process, FILENAME is the input Org file, and PUB-DIR is the publishing directory."
-  (with-temp-buffer
-    (insert-file-contents filename) ;; Load the content of the current Org file
-    (goto-char (point-min))
-    (let ((heading-level 1) ;; Level of the top-level heading to split by
-          prev-start heading-title sanitized-title output-file lastmod-date)
-      ;; Iterate over all top-level headings
-      (while (re-search-forward (format "^\\*\\{%d\\} \\(?:\\([[:upper:]]+\\) \\)?\\(.*\\)" heading-level) nil t)
-        (let ((todo-keyword (match-string 1)) ;; Extract the TODO keyword (if it exists)
-              (heading-title (match-string 2))) ;; Extract the title of the heading
-          ;; Process only headings marked as DONE
-          (when (and todo-keyword (string-equal todo-keyword "DONE"))
-            (setq prev-start (match-beginning 0)) ;; Start of the current heading
-            (setq sanitized-title (when heading-title
-                                    (replace-regexp-in-string "[^a-zA-Z0-9_-]" "_" heading-title))) ;; Sanitize title
-            ;; Extract the :EXPORT_HUGO_LASTMOD: property for the current section
-            (save-excursion
-              (when (re-search-forward ":EXPORT_HUGO_LASTMOD: +\\(<.+>\\)" (save-excursion (re-search-forward "^\\* " nil t) (point)) t)
-                (let* ((raw-lastmod (match-string 1)) ;; Extract the timestamp string (e.g., "<2024-12-08 08:37>")
-                       (date-elements (when (string-match "<\\([0-9]+\\)-\\([0-9]+\\)-\\([0-9]+\\)" raw-lastmod)
-                                        (list (match-string 1 raw-lastmod) ;; Year
-                                              (match-string 2 raw-lastmod) ;; Month
-                                              (match-string 3 raw-lastmod))))) ;; Day
-                  (setq lastmod-date (when date-elements
-                                       (apply #'concat date-elements))))))
-            ;; Default to "00000000" if no valid lastmod-date is found
-            (setq lastmod-date (or lastmod-date "00000000"))
-            ;; Find the end of this section (right before the next top-level heading)
-            (let ((section-end (save-excursion
-                                 (or (re-search-forward (format "^\\*\\{%d\\} " heading-level) nil t)
-                                     (point-max))))) ;; End of current section or end of file
-              ;; Only proceed if sanitized title exists and is valid
-              (when (and sanitized-title (not (string-empty-p sanitized-title)))
-                ;; Create the output file name (prepend the date)
-                (setq output-file (expand-file-name (format "%s-%s.org" lastmod-date sanitized-title) pub-dir))
-                ;; Write the section content (from prev-start to section-end)
-                (write-region prev-start section-end output-file)
-                (message "Wrote %s" output-file)))))))
-    ;; Return nil to indicate successful processing
-    nil))
-
-(defun my-sitemap-format (title list)
-  "Generate a sitemap with TITLE and reverse-sorted LIST of files."
-  (setq list (nreverse (cdr list)))
-  (concat "#+TITLE: " title "\n\n"
-          "* Blog Posts\n"
-          (mapconcat
-           (lambda (entry)
-             (format "- %s\n" (car entry)))
-           list "")
-          "\n"))
-#+end_src
-
-*** DOING Generate RSS xml                                         :issues:
-
-Starting with the following and adapting, it is a decent starting point:
-
-#+begin_src elisp
-(defun my-generate-rss-feed ()
-  "Generate a detailed RSS feed for Org-published blog posts."
-  (interactive)
-  (let* ((rss-file (expand-file-name "index.xml" "/home/jdyer/publish/hugo-emacs/site/static/public_html"))
-         (base-url "https://www.emacs.dyerdwelling.family/public_html/")
-         (self-link "https://www.emacs.dyerdwelling.family/public_html/index.xml") ;; Self-referencing link for Atom feeds
-         (last-build-date (format-time-string "%a, %d %b %Y %H:%M:%S %z")) ;; Current time as lastBuildDate
-         (org-directory "/home/jdyer/source/test/elisp")
-         (static-author "captainflasmr@gmail.com (James Dyer)") ;; Static author 
-         ;; (org-directory "/home/jdyer/DCIM/content/split/emacs")
-         (rss-items ""))
-    ;; Iterate over all Org files in the directory
-    (dolist (org-file (directory-files org-directory t "\\.org$"))
-      (let* ((html-file (concat (file-name-sans-extension
-                                 (file-name-nondirectory org-file)) ".html"))
-             (url (concat base-url html-file))
-             (heading-level 1)
-             (guid url) ;; Default GUID as the post URL
-             title
-             content
-             html-content
-             raw-pubdate
-             pubdate)
-        ;; Read and process the org file
-        (with-temp-buffer
-          (insert-file-contents org-file)
-          (goto-char (point-min))
-          ;; Extract the title from the first heading
-          (when  (re-search-forward (format "^\\*\\{%d\\} \\(?:\\([[:upper:]]+\\) \\)?\\(.*\\)" heading-level) nil t)
-            (setq title (match-string 2)))
-          ;; Extract the :EXPORT_HUGO_LASTMOD: property value
-          (when (re-search-forward "^.*EXPORT_HUGO_LASTMOD: *<\\([^>]+\\)>" nil t)
-            (setq raw-pubdate (match-string 1)))
-          ;; Convert the raw-pubdate to the RFC 822 format for <pubDate>
-          (when raw-pubdate
-            (setq pubdate (format-time-string
-                           "%a, %d %b %Y %H:%M:%S %z"
-                           (org-time-string-to-time (concat "<" raw-pubdate ">")))))
-          ;; Move to the end of :END: and extract the remaining contents
-          (when (re-search-forward "^:END:\n" nil t)
-            (setq content (buffer-substring-no-properties (point) (point-max)))
-            ;; Convert the content to HTML
-            (setq html-content (org-export-string-as content 'html t '(:with-toc nil)))
-            ;; (setq html-content (xml-escape-string html-content))
-            ))
-        ;; Add an item to the RSS feed
-        (setq rss-items
-              (concat rss-items (format "
-<item>
-  <title>%s</title>
-  <link>%s</link>
-  <guid>%s</guid>
-  <pubDate>%s</pubDate>
-  <author>%s</author>
-  <description><![CDATA[%s]]></description>
-</item>"
-                                        (or title "Untitled Post")
-                                        url
-                                        guid ;; Use the generated GUID
-                                        (or pubdate last-build-date) ;; Fallback to lastBuildDate if missing
-                                        static-author ;; Static author name
-                                        (or html-content "No content available"))))))
-    ;; Write the RSS feed to the file
-    (with-temp-file rss-file
-      (insert "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>
-<rss version=\"2.0\" xmlns:atom=\"http://www.w3.org/2005/Atom\">
-<channel>
-  <title>Emacs@Dyerdwelling</title>
-  <image>
-      <url>/images/banner/favicon-james.png</url>
-      <title>Emacs@Dyerdwelling</title>
-      <link>https://emacs.dyerdwelling.family/public_html/</link>
-      <width>32</width>
-      <height>32</height>
-  </image>
-  <link>" base-url "</link>
-  <description>Recent content on Emacs@Dyerdwelling</description>
-  <language>en</language>
-  <managingEditor>captainflasmr@gmail.com (James Dyer)</managingEditor>
-  <webMaster>captainflasmr@gmail.com (James Dyer)</webMaster>
-  <lastBuildDate>" last-build-date "</lastBuildDate>
-  <atom:link href=\"" self-link "\" rel=\"self\" type=\"application/rss+xml\" />"
-  rss-items "
-</channel>
-</rss>"))
-    (message "RSS feed generated at %s" rss-file)))
-#+end_src
-
-*** TODO Apply css                                                 :issues:
-
 ** DOING eglot
 
 Note: a more modern version would have eglot built-in (29.1)
@@ -3502,48 +3289,6 @@ implementation, compatible with both Windows and Linux."
 
 (global-set-key (kbd "C-x p l") 'my/etags-load)
 (global-set-key (kbd "C-x p u") 'my/etags-update)
-#+end_src
-
-** DOING orderless
-
-A bit of a bonus this one, I was watching one of System Crafters videos and there was talk around using built-in functionality and how it would be nice if there was an =orderless= implementation to allow minibuffer completion on an any word basis.
-
-Well I thought I would take up the challenge and came up with this:
-
-#+begin_src elisp
-(defun simple-orderless-completion (string table pred point)
-  "Enhanced orderless completion with better partial matching."
-  (let* ((words (split-string string "[-, ]+"))
-         (patterns (mapcar (lambda (word)
-                             (concat "\\b.*" (regexp-quote word) ".*"))
-                           words))
-         (full-regexp (mapconcat 'identity patterns "")))
-    (if (string-empty-p string)
-        (all-completions "" table pred)
-      (cl-remove-if-not
-       (lambda (candidate)
-         (let ((case-fold-search completion-ignore-case))
-           (and (cl-every (lambda (word)
-                            (string-match-p
-                             (concat "\\b.*" (regexp-quote word))
-                             candidate))
-                          words)
-                t)))
-       (all-completions "" table pred)))))
-
-;; Register the completion style
-(add-to-list 'completion-styles-alist
-             '(simple-orderless simple-orderless-completion
-                                simple-orderless-completion))
-
-;; Set different completion styles for minibuffer vs other contexts
-(defun setup-minibuffer-completion-styles ()
-  "Use orderless completion in minibuffer, regular completion elsewhere."
-  ;; For minibuffer: use orderless first, then fallback to flex and basic
-  (setq-local completion-styles '(basic simple-orderless flex substring)))
-
-;; Hook into minibuffer setup
-(add-hook 'minibuffer-setup-hook #'setup-minibuffer-completion-styles)
 #+end_src
 
 ** DONE open-with
@@ -4263,277 +4008,6 @@ collapsed line instead of opening a fresh dired for the literal parent."
 (advice-add 'dired-up-directory :around #'my/dired-collapse--up-advice)
 #+end_src
 
-** DONE LLMs
-
-As this configuration is mainly offline then naturally running some AI would take place locally and therefore using something like ollama, so lets replace the likes of gptel, chatgpt-shell and ellama can be replace by a scaled down version of my =ollama-buddy= package:
-
-#+begin_src elisp :tangle no
-;;; ollama-buddy.el --- A mini version of ollama-buddy
-
-;;; Commentary:
-;; 
-
-(require 'json)
-(require 'subr-x)
-(require 'url)
-(require 'cl-lib)
-
-;;; Code:
-
-(defgroup ollama-buddy nil "Customization group for Ollama Buddy." :group 'applications :prefix "ollama-buddy-")
-(defcustom ollama-buddy-host "localhost" "Host where Ollama server is running." :type 'string :group 'ollama-buddy)
-(defcustom ollama-buddy-port 11434 "Port where Ollama server is running." :type 'integer :group 'ollama-buddy)
-(defcustom ollama-buddy-default-model nil "Default Ollama model to use." :type 'string :group 'ollama-buddy)
-(defvar ollama-buddy--conversation-history nil "History of messages for the current conversation.")
-(defvar ollama-buddy--current-model nil "Timer for checking Ollama connection status.")
-(defvar ollama-buddy--chat-buffer "*Ollama Buddy Chat*" "Chat interaction buffer.")
-(defvar ollama-buddy--active-process nil "Active Ollama process.")
-(defvar ollama-buddy--prompt-history nil "History of prompts used in ollama-buddy.")
-
-(defun ollama-buddy--add-to-history (role content)
-  "Add message with ROLE and CONTENT to conversation history."
-  (push `((role . ,role)(content . ,content)) ollama-buddy--conversation-history))
-
-(defun ollama-buddy-clear-history ()
-  "Clear the current conversation history."
-  (interactive)
-  (setq ollama-buddy--conversation-history nil)
-  (ollama-buddy--update-status "History cleared"))
-
-(defun ollama-buddy--update-status (status &optional model)
-  "Update the status with STATUS text and MODEL in the header-line."
-  (with-current-buffer (get-buffer-create ollama-buddy--chat-buffer)
-    (let* ((model (or ollama-buddy--current-model ollama-buddy-default-model "No Model")))
-      (setq header-line-format
-            (concat (propertize (format " %s : %s" model status) 'face `(:weight bold)))))))
-
-(defun ollama-buddy--stream-filter (_proc output)
-  "Process stream OUTPUT while preserving cursor position."
-  (when-let* ((json-str (replace-regexp-in-string "^[^\{]*" "" output))
-              (json-data (and (> (length json-str) 0) (json-read-from-string json-str)))
-              (text (alist-get 'content (alist-get 'message json-data))))
-    (with-current-buffer ollama-buddy--chat-buffer
-      (let* ((inhibit-read-only t)
-             (window (get-buffer-window ollama-buddy--chat-buffer t))
-             (old-point (and window (window-point window)))
-             (at-end (and window (>= old-point (point-max))))
-             (old-window-start (and window (window-start window))))
-        (save-excursion
-          (ollama-buddy--update-status "Processing...")
-          (goto-char (point-max))
-          (insert text)
-          (when (boundp 'ollama-buddy--current-response)
-            (setq ollama-buddy--current-response
-                  (concat (or ollama-buddy--current-response "") text)))
-          (unless (boundp 'ollama-buddy--current-response)
-            (setq ollama-buddy--current-response text))
-          (when (eq (alist-get 'done json-data) t)
-            (ollama-buddy--add-to-history "assistant" ollama-buddy--current-response)
-            (makunbound 'ollama-buddy--current-response)
-            (insert "\n\n" (propertize (concat "[" ollama-buddy--current-model ": FINISHED]")
-                                       'face '(:inherit bold)))
-            (ollama-buddy--show-prompt)
-            (ollama-buddy--update-status "Finished")))
-        (when window
-          (if at-end
-              (set-window-point window (point-max))
-            (set-window-point window old-point))
-          (set-window-start window old-window-start t))))))
-
-(defun ollama-buddy--stream-sentinel (_proc event)
-  "Handle stream completion EVENT."
-  (when-let* ((status (cond ((string-match-p "finished" event) "Completed")
-                            ((string-match-p "\\(?:deleted\\|connection broken\\)" event)
-                             "Interrupted"))))
-    (with-current-buffer ollama-buddy--chat-buffer
-      (let ((inhibit-read-only t))
-        (goto-char (point-max))
-        (insert (propertize (format "\n\n[Stream %s]" status) 'face '(:weight bold)))
-        (ollama-buddy--show-prompt)))
-    (ollama-buddy--update-status (concat "Stream " status))))
-
-(defun ollama-buddy--swap-model ()
-  "Swap ollama model."
-  (interactive)
-  (let ((new-model (completing-read "Model: " (ollama-buddy--get-models) nil t)))
-    (setq ollama-buddy-default-model new-model ollama-buddy--current-model new-model)
-    (pop-to-buffer (get-buffer-create ollama-buddy--chat-buffer))
-    (ollama-buddy--show-prompt)
-    (goto-char (point-max))
-    (ollama-buddy--update-status "Idle")))
-
-(defun ollama-buddy-menu ()
-  "Open chat buffer and initialize if needed."
-  (interactive)
-  (pop-to-buffer (get-buffer-create ollama-buddy--chat-buffer))
-  (with-current-buffer (get-buffer-create ollama-buddy--chat-buffer)
-    (when (= (buffer-size) 0)
-      (ollama-buddy-mode 1)
-      (insert "Send   : C-c C-c\nCancel : C-c C-k\nModel  : C-c m\n\n")
-      (insert (mapconcat 'identity (ollama-buddy--get-models) "\n"))
-      (ollama-buddy--show-prompt))
-    (ollama-buddy--update-status "Idle"))
-  (goto-char (point-max)))
-
-(defun ollama-buddy--show-prompt ()
-  "Show the prompt with optionally a MODEL."
-  (interactive)
-  (when (not ollama-buddy-default-model)
-    ;; just get the first model
-    (let ((model (car (ollama-buddy--get-models))))
-      (setq ollama-buddy--current-model model)
-      (setq ollama-buddy-default-model model)
-      (insert (format "\n\n* NO DEFAULT MODEL : Using best guess : %s" model))))
-  (let* ((model (or ollama-buddy--current-model ollama-buddy-default-model "Default:latest")))
-    (insert (format "\n\n%s\n\n%s %s"
-                    (propertize "------------------" 'face '(:inherit bold))
-                    (propertize model 'face `(:weight bold))
-                    (propertize ">> PROMPT: " 'face '(:inherit bold))))))
-
-(defun ollama-buddy--send (&optional prompt model)
-  "Send PROMPT with optional MODEL"
-  (unless (> (length prompt) 0)
-    (user-error "Ensure prompt is defined"))
-  (let* ((messages (reverse ollama-buddy--conversation-history))
-         (messages (append messages `(((role . "user")
-                                       (content . ,prompt)))))
-         (payload (json-encode
-                   `((model . ,model)
-                     (messages . ,(vconcat [] messages))
-                     (stream . t)))))
-    (setq ollama-buddy--current-model model)
-    (ollama-buddy--add-to-history "user" prompt)
-    (with-current-buffer (get-buffer-create ollama-buddy--chat-buffer)
-      (pop-to-buffer (current-buffer))
-      (goto-char (point-max))
-      (insert (format "\n\n%s\n\n%s %s\n\n%s\n\n"
-                      (propertize "------------------" 'face '(:inherit bold))
-                      (propertize "[User: PROMPT]" 'face '(:inherit bold))
-                      prompt
-                      (propertize (concat "[" model ": RESPONSE]") 'face `(:inherit bold))))
-      (visual-line-mode 1))
-    (ollama-buddy--update-status "Sending request..." model)
-    (when (and ollama-buddy--active-process
-               (process-live-p ollama-buddy--active-process))
-      (set-process-sentinel ollama-buddy--active-process nil)
-      (delete-process ollama-buddy--active-process)
-      (setq ollama-buddy--active-process nil))
-    (condition-case err
-        (setq ollama-buddy--active-process
-              (make-network-process
-               :name "ollama-chat-stream"
-               :buffer nil
-               :host ollama-buddy-host
-               :service ollama-buddy-port
-               :coding 'utf-8
-               :filter #'ollama-buddy--stream-filter
-               :sentinel #'ollama-buddy--stream-sentinel))
-      (error
-       (ollama-buddy--update-status "OFFLINE - Connection failed")
-       (error "Failed to connect to Ollama: %s" (error-message-string err))))
-    (condition-case err
-        (process-send-string
-         ollama-buddy--active-process
-         (concat "POST /api/chat HTTP/1.1\r\n"
-                 (format "Host: %s:%d\r\n" ollama-buddy-host ollama-buddy-port)
-                 "Content-Type: application/json\r\n"
-                 (format "Content-Length: %d\r\n\r\n" (string-bytes payload))
-                 payload))
-      (error
-       (ollama-buddy--update-status "OFFLINE - Send failed")
-       (when (and ollama-buddy--active-process
-                  (process-live-p ollama-buddy--active-process))
-         (delete-process ollama-buddy--active-process))
-       (error "Failed to send request to Ollama: %s" (error-message-string err))))))
-
-(defun ollama-buddy--make-request (endpoint method &optional payload)
-  "Generic request function for ENDPOINT with METHOD and optional PAYLOAD."
-  (let* ((url (format "http://%s:%d%s" ollama-buddy-host ollama-buddy-port endpoint))
-         (url-request-method method)
-         (url-request-extra-headers '(("Content-Type" . "application/json")
-                                      ("Connection" . "close")))
-         (url-request-data (when payload
-                             (encode-coding-string payload 'utf-8))))
-    (with-temp-buffer
-      (url-insert-file-contents url)
-      (json-read-from-string (buffer-string)))))
-
-(defun ollama-buddy--get-models ()
-  "Get available Ollama models."
-  (when-let ((response (ollama-buddy--make-request "/api/tags" "GET")))
-    (mapcar (lambda (m) (alist-get 'name m))(alist-get 'models response))))
-
-(defun ollama-buddy--send-prompt ()
-  "Send the current prompt to a LLM.."
-  (interactive)
-  (let* ((bounds (save-excursion
-                   (search-backward ">> PROMPT:")
-                   (search-forward ":")
-                   (point)))
-         (model (or ollama-buddy--current-model ollama-buddy-default-model "Default:latest"))
-         (query-text (string-trim (buffer-substring-no-properties bounds (point)))))
-    (when (and query-text (not (string-empty-p query-text)))
-      (add-to-history 'ollama-buddy--prompt-history query-text))
-    (ollama-buddy--send query-text model)))
-
-(defun ollama-buddy--cancel-request ()
-  "Cancel the current request and clean up resources."
-  (interactive)
-  (when ollama-buddy--active-process
-    (delete-process ollama-buddy--active-process)
-    (setq ollama-buddy--active-process nil))
-  (ollama-buddy--update-status "Cancelled"))
-
-(defvar ollama-buddy-mode-map
-  (let ((map (make-sparse-keymap)))
-    (define-key map (kbd "C-c C-c") #'ollama-buddy--send-prompt)
-    (define-key map (kbd "C-c C-k") #'ollama-buddy--cancel-request)
-    (define-key map (kbd "C-c m") #'ollama-buddy--swap-model)
-    map)
-  "Keymap for ollama-buddy mode.")
-
-(define-minor-mode ollama-buddy-mode
-  "Minor mode for ollama-buddy keybindings."
-  :lighter " OB" :keymap ollama-buddy-mode-map)
-
-(provide 'ollama-buddy)
-
-;;; ollama-buddy.el ends here
-#+end_src
-
-And for another bonus, which I have just discovered from Emacs Solo, this:
-
-#+begin_src elisp
-(defun emacs-solo/ollama-run-model ()
-  "Run `ollama list`, let the user choose a model, and open it in `ansi-term`.
-Asks for a prompt when run. If none is passed (RET), starts it interactive.
-If a region is selected, prompt for additional input and pass it as a query."
-  (interactive)
-  (let* ((output (shell-command-to-string "ollama list"))
-         (models (let ((lines (split-string output "\n" t)))
-                   (mapcar (lambda (line) (car (split-string line))) (cdr lines))))
-         (selected (completing-read "Select Ollama model: " models nil t))
-         (region-text (when (use-region-p)
-                        (shell-quote-argument
-                         (replace-regexp-in-string "\n" " "
-                                                   (buffer-substring-no-properties
-                                                    (region-beginning)
-                                                    (region-end))))))
-         (prompt (read-string "Ollama Prompt (leave it blank for interactive): " nil nil nil)))
-    (when (and selected (not (string-empty-p selected)))
-      (ansi-term "/bin/sh")
-      (sit-for 1)
-      (let ((args (list (format "ollama run %s"
-                                selected))))
-        (when (and prompt (not (string-empty-p prompt)))
-          (setq args (append args (list (format "\"%s\"" prompt)))))
-        (when region-text
-          (setq args (append args (list (format "\"%s\"" region-text)))))
-
-        (term-send-raw-string (string-join args " "))
-        (term-send-raw-string "\n")))))
-#+end_src
-
 ** DONE diminish
 
 Just poodling around with some extreme yak shaving and I thought, why not shave down the mode-line, I now sometimes have many modes displayed for a file so lets cut back on them, turns out this is a very small defun replacement!
@@ -4609,59 +4083,6 @@ Taken directly from [[https://thanosapollo.org/posts/use-emacs-everywhere/][Emac
       (set-window-dedicated-p (selected-window) t))))
 
 (server-start)
-#+end_src
-
-** DONE evil-mode
-
-I've recently explored [[https://www.gnu.org/software/emacs/manual/html_node/emacs/View-Mode.html][Emacs view-mode]] and found that, with a little customization, it serves as an excellent lightweight modal editing solution, potentially replacing Evil mode for many users.
-
-*Highlights:*
-- Single-key navigation (Vim or Emacs style, no modifiers)
-- Easily toggled on/off (=C-<escape>=, =C-<tab>=)
-- Cursor style changes for clear state indication
-- Optional: enable read-only by default for “baby-proofing”
-- Vanilla, extensible, and package-free
-
-#+begin_src elisp :tangle no
-(add-hook 'find-file-hook 
-          (lambda ()
-            (view-mode 1)))
-
-(setq view-read-only t)
-(with-eval-after-load 'view
-  (define-key view-mode-map (kbd "j") 'next-line)
-  (define-key view-mode-map (kbd "k") 'previous-line)
-  (define-key view-mode-map (kbd "h") 'backward-char)
-  (define-key view-mode-map (kbd "l") 'forward-char)
-  (define-key view-mode-map (kbd "i") 'View-exit)
-
-  ;; Beginning/end of line (Vim style)
-  (define-key view-mode-map (kbd "0") 'beginning-of-line)
-  (define-key view-mode-map (kbd "$") 'end-of-line)
-
-  ;; Beginning/end of buffers
-  (define-key view-mode-map (kbd "g") 'beginning-of-buffer)
-  (define-key view-mode-map (kbd "G") 'end-of-buffer)
-
-  ;; Page movement
-  (define-key view-mode-map (kbd "u") '(lambda()
-                                         (interactive)
-                                         (View-scroll-page-backward 3)))
-  (define-key view-mode-map (kbd "d") '(lambda()
-                                         (interactive)
-                                         (View-scroll-page-forward 3))))
-
-;; Optional: return to view-mode after saving
-(add-hook 'after-save-hook 
-          (lambda ()
-            (when (and buffer-file-name (not view-mode))
-              (view-mode 1))))
-
-(add-hook 'view-mode-hook
-          (defun view-mode-hookee+ ()
-            (setq cursor-type (if view-mode 'box 'bar))))
-
-(define-key my-overrides-mode-map (kbd "C-<escape>") 'view-mode)
 #+end_src
 
 ** DONE spray/speedread
@@ -4878,220 +4299,4 @@ still use a separate frame.  ALIST is the buffer display action alist."
 
 (add-to-list 'display-buffer-alist
              '("\\*Remember\\*" my/display-remember-in-current-window))
-#+end_src
-
-** DOING diff-minimap
-
-A VSCode-style minimap sidebar showing a ~scaled overview of the entire buffer~ with diff regions (added, modified, deleted) highlighted. Unlike demap, which shows a miniature of the visible window, this renders the complete file top-to-bottom scaled to the side-window height — every diff hunk is always in view.
-
-Colours are extracted from the active theme at render time: normal rows use the =fringe= background, the viewport uses the =region= face, and diff hunks use =diff-hl-insert=, =diff-hl-change=, =diff-hl-delete=. A white pixel marks the cursor line. Clicking any row scrolls the source buffer there.
-
-Updates continuously on every command via =post-command-hook= with a short idle debounce.
-
-#+begin_src elisp :tangle no
-(defgroup my/diff-minimap nil
-  "VSCode-style minimap showing diff regions across the entire buffer."
-  :group 'tools)
-
-(defcustom my/diff-minimap-font-scale 0.4
-  "Fraction of default font height for the minimap. 1.0 = normal, 0.4 = tiny."
-  :type 'float
-  :group 'my/diff-minimap)
-
-(defcustom my/diff-minimap-width 8
-  "Width in characters of the diff-minimap side window (at the small font)."
-  :type 'integer
-  :group 'my/diff-minimap)
-
-(defcustom my/diff-minimap-side 'right
-  "Which side to display the diff-minimap window."
-  :type '(choice (const left) (const right))
-  :group 'my/diff-minimap)
-
-(defface my/diff-minimap-font
-  '((t :height 0.4 :inherit default))
-  "Face used for the minimap buffer — tiny font for fine-grained display.")
-
-(defvar-local my/diff-minimap--last-ws nil
-  "Last window-start to skip truly redundant re-renders.")
-
-(defun my/diff-minimap--render ()
-  "Render the full-file diff minimap for the current buffer."
-  (let ((mm-buf (get-buffer-create " *diff-minimap*")))
-    (when (and (bound-and-true-p diff-hl-mode)
-               (get-buffer-window mm-buf))
-      (let* ((this-buf (current-buffer))
-             (total (with-current-buffer this-buf
-                      (line-number-at-pos (point-max) t)))
-             (src-win (get-buffer-window this-buf))
-             (mm-win (get-buffer-window mm-buf))
-             (nrows (max 1
-                         (cond (src-win
-                                (floor (/ (window-height src-win)
-                                          my/diff-minimap-font-scale)))
-                               (mm-win (window-height mm-win))
-                               (t (frame-height)))))
-             (scale (/ (float total) nrows))
-             (row-diff (make-vector nrows nil))
-             ws-line we-line cur-row
-             (hunk-count 0))
-        (with-current-buffer this-buf
-          (save-excursion
-            (setq ws-line (line-number-at-pos (window-start)))
-            (goto-char (window-end nil t))
-            (setq we-line (line-number-at-pos)))
-          (setq cur-row (max 0 (min (floor (/ (1- (line-number-at-pos)) scale))
-                                      (1- nrows))))
-          (dolist (ov (overlays-in (point-min) (point-max)))
-            (let ((ty (overlay-get ov 'diff-hl-hunk-type)))
-              (when (or ty (overlay-get ov 'diff-hl-hunk))
-                (let* ((st (overlay-start ov))
-                      (en (overlay-end ov))
-                      (raw-ty (or ty 'change))
-                      (ty (pcase (format "%s" raw-ty)
-                            ((or "insert" "add" "added") 'added)
-                            ((or "delete" "removed" "remove") 'removed)
-                            (_ 'changed))))
-                  (when (and st en)
-                    (message "DMM: hunk at %d-%d type=%S" st en ty)
-                  (save-excursion
-                    (goto-char st)
-                    (let* ((sl (line-number-at-pos))
-                          (el (if (eq ty 'removed)
-                                  sl
-                                (progn (goto-char en)
-                                        (if (bolp) (1- (line-number-at-pos))
-                                          (line-number-at-pos))))))
-                      (setq hunk-count (1+ hunk-count))
-                      (let ((fr (floor (/ (1- sl) scale)))
-                            (lr (min (1- nrows) (floor (/ el scale)))))
-                        (cl-loop for r from fr to lr
-                                 do (aset row-diff r ty)))))))))))
-        (let* ((fbg (lambda (f attr d)
-                      (let ((v (face-attribute f attr nil t)))
-                        (if (or (not v) (eq v 'unspecified) (not (stringp v)))
-                            d v))))
-               (norm-bg (funcall fbg 'fringe :background "#1a1a1a"))
-               (view-bg (funcall fbg 'region :background "#404060"))
-               (ins-bg  (funcall fbg 'diff-added :background (funcall fbg 'diff-hl-insert :background "#006600")))
-               (chg-bg  (funcall fbg 'diff-changed :background (funcall fbg 'diff-hl-change :background "#666600")))
-               (del-bg  (funcall fbg 'diff-removed :background (funcall fbg 'diff-hl-delete :background "#660000")))
-               (ins-fg  (funcall fbg 'diff-added :foreground (funcall fbg 'diff-hl-insert :foreground "#00ff00")))
-               (chg-fg  (funcall fbg 'diff-changed :foreground (funcall fbg 'diff-hl-change :foreground "#ffff00")))
-               (del-fg  (funcall fbg 'diff-removed :foreground (funcall fbg 'diff-hl-delete :foreground "#ff0000")))
-               (cur-bg  (funcall fbg 'cursor :background "#00ffff")))
-          (message "DMM: hunks=%d nrows=%d scale=%.1f norm=%s view=%s ins=%s chg=%s del=%s"
-                   hunk-count nrows scale norm-bg view-bg ins-bg chg-bg del-bg)
-          (with-current-buffer mm-buf
-            (let ((inhibit-read-only t))
-              (erase-buffer)
-              (dotimes (i nrows)
-                (let* ((sline (1+ (floor (* i scale))))
-                       (dtype (aref row-diff i))
-                       (invp (and (>= sline ws-line) (<= sline we-line)))
-                       (row-bg (cond ((eq dtype 'added) ins-bg)
-                                     ((eq dtype 'changed) chg-bg)
-                                     ((eq dtype 'removed) del-bg)
-                                     (invp view-bg)
-                                     (t norm-bg))))
-                  (let ((ind-face (cond ((= i cur-row) `(:foreground ,cur-bg :background ,cur-bg))
-                                        (dtype (cond ((eq dtype 'added) `(:foreground ,ins-fg :background ,ins-bg))
-                                                     ((eq dtype 'changed) `(:foreground ,chg-fg :background ,chg-bg))
-                                                     ((eq dtype 'removed) `(:foreground ,del-fg :background ,del-bg))
-                                                     (t `(:foreground ,norm-bg :background ,norm-bg))))
-                                         (invp `(:foreground ,view-bg :background ,view-bg))
-                                         (t `(:foreground ,norm-bg :background ,norm-bg))))
-                        (bg-face `(:background ,row-bg :extend t)))
-                    (insert
-                     (propertize " " 'face ind-face
-                                 'source-line sline 'source-buf this-buf)
-                     (propertize (make-string (1- my/diff-minimap-width) ?\s)
-                                 'face bg-face
-                                 'source-line sline 'source-buf this-buf)
-                     (propertize "\n" 'face bg-face))))))))))))
-
-(defun my/diff-minimap--update ()
-  "Re-render the minimap unconditionally."
-  (when (and (bound-and-true-p diff-hl-mode)
-             (get-buffer-window " *diff-minimap*"))
-    (my/diff-minimap--render)))
-
-(defun my/diff-minimap--schedule ()
-  "Post-command-hook: schedule an idle re-render."
-  (let ((buf (current-buffer)))
-    (run-with-idle-timer
-     0.02 nil
-     (lambda ()
-       (when (buffer-live-p buf)
-         (with-current-buffer buf
-           (my/diff-minimap--update)))))))
-
-(defun my/diff-minimap--after-save ()
-  "Force re-render after save."
-  (let ((buf (current-buffer)))
-    (run-with-idle-timer
-     0.1 nil
-     (lambda ()
-       (when (buffer-live-p buf)
-         (with-current-buffer buf
-           (setq my/diff-minimap--last-ws nil)
-           (my/diff-minimap--render)))))))
-
-(defun my/diff-minimap--click-handler ()
-  "Handle mouse click: scroll source to clicked line."
-  (interactive)
-  (let* ((pos (event-start last-input-event))
-         (line (get-text-property (posn-point pos) 'source-line))
-         (buf (get-text-property (posn-point pos) 'source-buf)))
-    (when (and line buf (buffer-live-p buf))
-      (with-selected-window (get-buffer-window buf)
-        (goto-char (point-min))
-        (forward-line (1- line))
-        (recenter 0)))))
-
-(defun my/diff-minimap-toggle ()
-  "Toggle the diff minimap side window."
-  (interactive)
-  (let ((mm-buf (get-buffer-create " *diff-minimap*")))
-    (if (get-buffer-window mm-buf)
-        (progn
-          (my/diff-minimap-mode -1)
-          (delete-window (get-buffer-window mm-buf)))
-      (setq my/diff-minimap--last-ws nil)
-      (display-buffer-in-side-window
-       mm-buf
-       `((side . ,my/diff-minimap-side)
-         (window-width . ,my/diff-minimap-width)
-         (no-delete-other-windows . t)
-         (preserve-size . (t . nil))))
-      (with-current-buffer mm-buf
-        (setq buffer-read-only t)
-        (setq cursor-type nil)
-        (setq line-spacing 0)
-        (setq-local truncate-lines t)
-        (setq-local left-fringe-width 0)
-        (setq-local right-fringe-width 0)
-        (face-remap-set-base 'default :height my/diff-minimap-font-scale)
-        (let ((map (make-sparse-keymap)))
-          (define-key map [mouse-1] #'my/diff-minimap--click-handler)
-          (define-key map [down-mouse-1] #'ignore)
-          (use-local-map map))
-        (setq-local mode-line-format nil)
-        (setq-local header-line-format nil))
-      (my/diff-minimap--render)
-      (my/diff-minimap-mode 1))))
-
-(define-minor-mode my/diff-minimap-mode
-  "Keep diff minimap in sync on scroll and save."
-  :lighter " DMap"
-  :global nil
-  (if my/diff-minimap-mode
-      (progn
-        (setq my/diff-minimap--last-ws (window-start))
-        (add-hook 'after-save-hook #'my/diff-minimap--after-save nil t)
-        (add-hook 'post-command-hook #'my/diff-minimap--schedule nil t))
-    (remove-hook 'after-save-hook #'my/diff-minimap--after-save t)
-    (remove-hook 'post-command-hook #'my/diff-minimap--schedule t)))
-
-(define-key vc-prefix-map (kbd "m") #'my/diff-minimap-toggle)
 #+end_src
