@@ -25,7 +25,7 @@ Used in concert with https://github.com/captainflasmr/Emacs-vanilla
 
 ** <2026-11-12>
 
-Replaced the =remember= notes workflow with a plain =org-capture= template.  =C-c c n= appends a timestamped entry to =~/.emacs.d/notes= and jumps to it after filing; the old =C-c r= remember prefix is no longer bound, and =M-l l= now jumps straight to the notes file.  The persistent =*notes*= buffer, its save-on-kill advice, and the =*Remember*= display rule are gone.
+Replaced the =remember= notes workflow with a plain =org-capture= template.  =C-c c n= appends a timestamped entry to =~/.emacs.d/notes= and jumps to it after filing; the old =C-c r= remember prefix is no longer bound, and =M-l l= now jumps straight to the notes file.  =C-z z= is now =font-lock-update=, while the appearance menu's =0= entry still resets the display scale.  The persistent =*notes*= buffer, its save-on-kill advice, and the =*Remember*= display rule are gone.
 
 ** <2026-11-05>
 
@@ -1403,7 +1403,7 @@ was active before the preview is restored."
 
 ** DONE appearance-menu
 
-=my/appearance-menu= (bound to =C-z a=) gathers the theme, font, and colour commands into one transient, so the =C-z= visual prefix has a single appearance entry point.  The direct keys remain available: =M-0= theme picker, =M-9= random theme, =M-8= font picker, =C-z l= / =C-z u= / =C-z U= / =C-z B= / =C-z D= for colours, and =C-z d= for window dividers.  The font-size entries reuse =my/global-font-size-change= from =Emacs-vanilla=, and =0= runs =my/reset-display-scale= (=C-z z=).  Window dividers start hidden: =window-divider-mode= is enabled, but the divider faces are painted with the frame background, avoiding the one-pixel border that remains when the mode is simply disabled.  The =d= entry (and =C-z d=) calls =my/toggle-window-dividers= without leaving the menu; showing restores the saved divider colour, and the theme hook re-applies the hidden state after theme changes.
+=my/appearance-menu= (bound to =C-z a=) gathers the theme, font, and colour commands into one transient, so the =C-z= visual prefix has a single appearance entry point.  The direct keys remain available: =M-0= theme picker, =M-9= random theme, =M-8= font picker, =C-z l= / =C-z u= / =C-z U= / =C-z B= / =C-z D= for colours, and =C-z d= for window dividers.  The font-size entries reuse =my/global-font-size-change= from =Emacs-vanilla=, and =0= runs =my/reset-display-scale=.  Window dividers start hidden: =window-divider-mode= is enabled, but the divider faces are painted with the frame background, avoiding the one-pixel border that remains when the mode is simply disabled.  The =d= entry (and =C-z d=) calls =my/toggle-window-dividers= without leaving the menu; showing restores the saved divider colour, and the theme hook re-applies the hidden state after theme changes.
 
 #+begin_src elisp
 (defvar my/window-dividers-hidden t
