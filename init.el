@@ -184,6 +184,22 @@ they share the frame evenly."
     (select-window new-window)
     (balance-windows)))
 
+(defun my/tab-bar-push-window (direction)
+  "Push the selected window's buffer to the tab DIRECTION tabs away.
+DIRECTION is -1 for the left tab and 1 for the right tab."
+  (interactive)
+  (let* ((buf (window-buffer))
+         (current (tab-bar--current-tab-index))
+         (tabs (tab-bar-tabs))
+         (target (mod (+ current direction) (length tabs))))
+    (unless (eq target current)
+      (tab-bar-select-tab (1+ target))
+      (switch-to-buffer buf)
+      (tab-bar-select-tab (1+ current))
+      (if (one-window-p)
+          (switch-to-buffer (other-buffer buf))
+        (delete-window)))))
+
 (defun my/rainbow-mode ()
   "Overlay colors represented as hex values in the current buffer."
   (interactive)

@@ -341,6 +341,29 @@ they share the frame evenly."
     (balance-windows)))
 #+end_src
 
+** DONE tab-bar-push-window
+CLOSED: [2026-11-12 Thu 13:00]
+
+Restored the missing helper used by the =M-s u= / =M-s i= bindings in the =simply-annotate= map.  It moves the selected window's buffer to the previous or next tab, then returns to the original tab and closes the now-empty window.
+
+#+begin_src elisp
+(defun my/tab-bar-push-window (direction)
+  "Push the selected window's buffer to the tab DIRECTION tabs away.
+DIRECTION is -1 for the left tab and 1 for the right tab."
+  (interactive)
+  (let* ((buf (window-buffer))
+         (current (tab-bar--current-tab-index))
+         (tabs (tab-bar-tabs))
+         (target (mod (+ current direction) (length tabs))))
+    (unless (eq target current)
+      (tab-bar-select-tab (1+ target))
+      (switch-to-buffer buf)
+      (tab-bar-select-tab (1+ current))
+      (if (one-window-p)
+          (switch-to-buffer (other-buffer buf))
+        (delete-window)))))
+#+end_src
+
 ** DONE rainbow-mode
 CLOSED: [2024-12-09 Mon 10:50]
 
