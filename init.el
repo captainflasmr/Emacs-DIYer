@@ -3503,75 +3503,21 @@ Use f/s for speed, [/] for size, b/n to skip, SPC to pause, q to quit."
 
 (add-hook 'minibuffer-setup-hook #'tiny-marginalia--setup)
 
-(require 'remember)
-(setq remember-data-file (expand-file-name "notes" user-emacs-directory)
-      ;; Keep remember's original *notes* buffer name
-      remember-notes-buffer-name "*notes*"
-      ;; Both the persistent *notes* buffer and the transient
-      ;; capture buffer open in org-mode
-      remember-notes-initial-major-mode #'org-mode
-      remember-initial-major-mode #'org-mode
-      ;; Level-one Org headings for captured notes
-      remember-leader-text "* "
-      ;; ISO-ish sortable timestamp instead of ctime-style default
-      remember-time-format "%Y-%m-%d %a %H:%M"
-      ;; No source-file annotation appended to captures
-      remember-annotation-functions nil)
-;; C-c r r = capture note, C-c r c = capture clipboard, C-c r n = jump to *notes*
-(global-set-key (kbd "C-c r") 'remember-prefix-map)
-;; The *notes* buffer is no longer recreated at startup (it made startup
-;; slower and popped an unwanted buffer).  Open it with C-c r n or
-;; M-x remember-notes when needed.
-;; (add-hook 'after-init-hook #'remember-notes)
-;; After a capture is filed away, pop the *notes* buffer with point on
-;; the new note.  Must run after `remember-finalize' finishes, because
-;; `remember-destroy' restores the pre-capture window configuration.
-(defun my/remember-show-notes ()
-  "Display the notes buffer with point at the end of the new capture."
-  (with-current-buffer (remember-notes)
-    (goto-char (point-max))
-    (pop-to-buffer-same-window (current-buffer))))
-(advice-add 'remember-finalize :after #'my/remember-show-notes)
-;; `remember' displays *Remember* with `switch-to-buffer-other-window',
-;; which splits the selected window.  Override that so the capture
-;; buffer replaces the current buffer instead.  The normal display
-;; machinery is kept intact so `remember-destroy' can still restore the
-;; saved window configuration.
-(defcustom my/remember-use-pointer-window nil
-  "Non-nil means display *Remember* in the window under the mouse pointer.
-When nil, display it in the selected window."
-  :type 'boolean
-  :group 'remember)
+;;
+;; -> notes-capture
+;;
+(defun my/open-notes ()
+  "Open the personal notes file."
+  (interactive)
+  (find-file (expand-file-name "notes" user-emacs-directory)))
 
-(defun my/window-under-mouse-pointer ()
-  "Return the live window under the mouse pointer, or nil.
-Ignore child frames (such as completion popups) and the minibuffer."
-  (let ((position (mouse-position)))
-    (when-let* ((frame (car position))
-                ((frame-live-p frame))
-                ((not (frame-parameter frame 'parent-frame)))
-                (window (window-at (cadr position)
-                                   (cddr position)
-                                   frame))
-                ((window-live-p window))
-                ((not (window-minibuffer-p window))))
-      window)))
+(with-eval-after-load 'org-capture
+  (add-to-list 'org-capture-templates
+               '("n" "Note" entry
+                 (file "~/.emacs.d/notes")
+                 "* %<%Y-%m-%d %a %H:%M> %^{Title}\n%?"
+                 :empty-lines 1
+                 :jump-to-captured t)))
 
-(defun my/display-remember-in-current-window (buffer alist)
-  "Display BUFFER in the selected window.
-With `my/remember-use-pointer-window' non-nil, use the window under the
-mouse pointer instead.  Return nil for `remember-other-frame' so it can
-still use a separate frame.  ALIST is the buffer display action alist."
-  (unless remember-in-new-frame
-    (let ((window (and my/remember-use-pointer-window
-                       (my/window-under-mouse-pointer))))
-      (if window
-          ;; `remember' passes `inhibit-same-window', so call the
-          ;; internal display helper directly rather than
-          ;; `display-buffer-same-window'.
-          (window--display-buffer buffer window 'reuse alist)
-        (display-buffer-same-window
-         buffer (cons '(inhibit-same-window . nil) alist))))))
-
-(add-to-list 'display-buffer-alist
-             '("\\*Remember\\*" my/display-remember-in-current-window))
+;; M-l l jumps straight to the notes file.
+(define-key my-jump-keymap (kbd "l") #'my/open-notes)
