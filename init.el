@@ -3791,3 +3791,46 @@ Use f/s for speed, [/] for size, b/n to skip, SPC to pause, q to quit."
     (goto-char (point-max))
     (pop-to-buffer-same-window (current-buffer))))
 (advice-add 'remember-finalize :after #'my/remember-show-notes)
+;; `remember' displays *Remember* with `switch-to-buffer-other-window',
+;; which splits the selected window.  Override that so the capture
+;; buffer replaces the current buffer instead.  The normal display
+;; machinery is kept intact so `remember-destroy' can still restore the
+;; saved window configuration.
+(defcustom my/remember-use-pointer-window nil
+  "Non-nil means display *Remember* in the window under the mouse pointer.
+When nil, display it in the selected window."
+  :type 'boolean
+  :group 'remember)
+
+(defun my/window-under-mouse-pointer ()
+  "Return the live window under the mouse pointer, or nil.
+Ignore child frames (such as completion popups) and the minibuffer."
+  (let ((position (mouse-position)))
+    (when-let* ((frame (car position))
+                ((frame-live-p frame))
+                ((not (frame-parameter frame 'parent-frame)))
+                (window (window-at (cadr position)
+                                   (cddr position)
+                                   frame))
+                ((window-live-p window))
+                ((not (window-minibuffer-p window))))
+      window)))
+
+(defun my/display-remember-in-current-window (buffer alist)
+  "Display BUFFER in the selected window.
+With `my/remember-use-pointer-window' non-nil, use the window under the
+mouse pointer instead.  Return nil for `remember-other-frame' so it can
+still use a separate frame.  ALIST is the buffer display action alist."
+  (unless remember-in-new-frame
+    (let ((window (and my/remember-use-pointer-window
+                       (my/window-under-mouse-pointer))))
+      (if window
+          ;; `remember' passes `inhibit-same-window', so call the
+          ;; internal display helper directly rather than
+          ;; `display-buffer-same-window'.
+          (window--display-buffer buffer window 'reuse alist)
+        (display-buffer-same-window
+         buffer (cons '(inhibit-same-window . nil) alist))))))
+
+(add-to-list 'display-buffer-alist
+             '("\\*Remember\\*" my/display-remember-in-current-window))

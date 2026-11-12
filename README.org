@@ -4803,7 +4803,7 @@ bookmarks.
 
 ** DONE remember
 
-Replacing the hand-rolled =persistent-scratch= implementation with the built-in =remember= notes feature. The persistent buffer is now =*notes*=, backed by =~/.emacs.d/notes=: saved on =C-c C-c= (save and bury), on =C-x C-s= and =C-x s= without prompting, and on kill or exit (=C-x k= save-and-buries instead of killing). The buffer is no longer opened at startup (open it on demand with =C-c r n= or =M-x remember-notes=), while =*scratch*= returns to stock ephemeral behaviour; the old =~/.emacs.d/.scratch= file is left untouched on disk. =C-c r= binds remember's own prefix map: =C-c r r= captures a note, =C-c r c= captures the clipboard, =C-c r n= jumps to =*notes*=. Both the persistent =*notes*= buffer and the transient capture buffer open in =org-mode=, and captures append as level-one Org headings (=*= leader text) with an ISO-style timestamp header and no source-file annotation. Finalizing a capture (=C-c C-c= or =C-x C-s=) pops the =*notes*= buffer with point on the newly filed note.
+Replacing the hand-rolled =persistent-scratch= implementation with the built-in =remember= notes feature. The persistent buffer is now =*notes*=, backed by =~/.emacs.d/notes=: saved on =C-c C-c= (save and bury), on =C-x C-s= and =C-x s= without prompting, and on kill or exit (=C-x k= save-and-buries instead of killing). The buffer is no longer opened at startup (open it on demand with =C-c r n= or =M-x remember-notes=), while =*scratch*= returns to stock ephemeral behaviour; the old =~/.emacs.d/.scratch= file is left untouched on disk. =C-c r= binds remember's own prefix map: =C-c r r= captures a note, =C-c r c= captures the clipboard, =C-c r n= jumps to =*notes*=. Both the persistent =*notes*= buffer and the transient capture buffer open in =org-mode=, and captures append as level-one Org headings (=*= leader text) with an ISO-style timestamp header and no source-file annotation. The transient =*Remember*= buffer opens in the selected window instead of splitting it; set =my/remember-use-pointer-window= to use the window under the mouse pointer instead. Finalizing a capture (=C-c C-c= or =C-x C-s=) pops the =*notes*= buffer with point on the newly filed note.
 
 #+begin_src elisp
 (require 'remember)
@@ -4835,6 +4835,49 @@ Replacing the hand-rolled =persistent-scratch= implementation with the built-in 
     (goto-char (point-max))
     (pop-to-buffer-same-window (current-buffer))))
 (advice-add 'remember-finalize :after #'my/remember-show-notes)
+;; `remember' displays *Remember* with `switch-to-buffer-other-window',
+;; which splits the selected window.  Override that so the capture
+;; buffer replaces the current buffer instead.  The normal display
+;; machinery is kept intact so `remember-destroy' can still restore the
+;; saved window configuration.
+(defcustom my/remember-use-pointer-window nil
+  "Non-nil means display *Remember* in the window under the mouse pointer.
+When nil, display it in the selected window."
+  :type 'boolean
+  :group 'remember)
+
+(defun my/window-under-mouse-pointer ()
+  "Return the live window under the mouse pointer, or nil.
+Ignore child frames (such as completion popups) and the minibuffer."
+  (let ((position (mouse-position)))
+    (when-let* ((frame (car position))
+                ((frame-live-p frame))
+                ((not (frame-parameter frame 'parent-frame)))
+                (window (window-at (cadr position)
+                                   (cddr position)
+                                   frame))
+                ((window-live-p window))
+                ((not (window-minibuffer-p window))))
+      window)))
+
+(defun my/display-remember-in-current-window (buffer alist)
+  "Display BUFFER in the selected window.
+With `my/remember-use-pointer-window' non-nil, use the window under the
+mouse pointer instead.  Return nil for `remember-other-frame' so it can
+still use a separate frame.  ALIST is the buffer display action alist."
+  (unless remember-in-new-frame
+    (let ((window (and my/remember-use-pointer-window
+                       (my/window-under-mouse-pointer))))
+      (if window
+          ;; `remember' passes `inhibit-same-window', so call the
+          ;; internal display helper directly rather than
+          ;; `display-buffer-same-window'.
+          (window--display-buffer buffer window 'reuse alist)
+        (display-buffer-same-window
+         buffer (cons '(inhibit-same-window . nil) alist))))))
+
+(add-to-list 'display-buffer-alist
+             '("\\*Remember\\*" my/display-remember-in-current-window))
 #+end_src
 
 ** DOING diff-minimap
