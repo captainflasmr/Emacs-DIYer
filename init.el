@@ -3520,22 +3520,25 @@ Use f/s for speed, [/] for size, b/n to skip, SPC to pause, q to quit."
 (add-hook 'minibuffer-setup-hook #'tiny-marginalia--setup)
 
 ;;
-;; -> notes-capture
+;; -> notes
 ;;
-(defun my/open-notes ()
-  "Open the personal notes file."
-  (interactive)
-  (find-file (expand-file-name "notes" user-emacs-directory)))
+(defvar my/notes-file (expand-file-name "notes" user-emacs-directory)
+  "Default file used by `my/open-notes'.
+Set this in the top-level init to use a different base notes file.")
 
-(with-eval-after-load 'org-capture
-  (add-to-list 'org-capture-templates
-               '("n" "Note" entry
-                 (file "~/.emacs.d/notes")
-                 "* %<%Y-%m-%d %a %H:%M> %^{Title}\n%?"
-                 :empty-lines 1
-                 :jump-to-captured t)))
+(defun my/open-notes (&optional file)
+  "Open FILE, or `my/notes-file', at the end for a new entry.
+FILE defaults to `my/notes-file'.  With a prefix argument, prompt for
+a file."
+  (interactive
+   (list (when current-prefix-arg
+           (read-file-name "Notes file: " my/notes-file))))
+  (find-file (or file my/notes-file))
+  (when (eq major-mode 'fundamental-mode)
+    (org-mode))
+  (goto-char (point-max)))
 
-;; M-l l jumps straight to the notes file.
+;; M-l l opens the default notes file at the end.
 (define-key my-jump-keymap (kbd "l") #'my/open-notes)
 
 ;;

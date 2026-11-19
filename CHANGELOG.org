@@ -12,6 +12,13 @@ This document contains the release notes for Emacs-enhanced
 
 ** <2026-11-19>
 
+Replace the notes capture template with find-file
+
+- Removed the =C-c c n= Note entry from =org-capture-templates=.
+- =my/open-notes= now opens =my/notes-file= (default =~/.emacs.d/notes=) with =find-file= and moves to the end of the buffer.  It accepts an optional file argument and prompts with =C-u=, so the top-level init can bind a lambda for another base notes file.  Extensionless files open in Org mode.
+
+** <2026-11-19>
+
 Add GitHub release management from Emacs-vanilla
 
 - Moved the =gh-release-core= block wholesale: =my/gh-release-list=, =-create=, =-view=, =-browse=, =-edit=, =-delete= and =-download=, the =my/gh-release-mode= list buffer and keymap, and the =C-c G= menu.  It shells out to the external =gh= CLI, so it belongs here rather than in =Emacs-vanilla=; all key bindings are unchanged.
