@@ -3132,7 +3132,7 @@ Works with both standard `move-end-of-line` and `org-end-of-line`."
 
 (defcustom simple-autosuggest-allowed-modes '(eshell-mode)
   "Modes that always get `simple-autosuggest-mode'.
-Auto-suggestions stay on in these modes even when `C-c x' has
+Auto-suggestions stay on in these modes even when `C-c S' has
 switched them off everywhere else.  Add e.g. `comint-mode' to also
 cover shell-like buffers.  The minor mode itself can still be
 toggled manually anywhere."
@@ -3189,7 +3189,7 @@ Eshell always keeps auto-suggestions (see
                "enabled in all buffers"
              "disabled outside eshell")))
 
-(global-set-key (kbd "C-c x") #'my/toggle-autosuggest)
+(global-set-key (kbd "C-c S") #'my/toggle-autosuggest)
 
 (defvar my/dired-icons-map
   '(("el" . "λ") ("rb" . "◆") ("js" . "○") ("ts" . "●") ("json" . "◎") ("md" . "■")
@@ -3825,3 +3825,19 @@ NOTES is the release notes text, and FILES is a list of file paths to attach."
 \\{my/gh-release-mode-map}")
 
 (global-set-key (kbd "C-c G") 'my/gh-release-menu)
+
+;;
+;; -> org-export-docx
+;;
+(defun my/org-export-docx (&optional arg)
+  "Export the current Org file to DOCX via ODT and LibreOffice.
+With a prefix argument ARG, export only the current subtree.  The
+intermediate ODT is left next to the DOCX."
+  (interactive "P")
+  (unless (derived-mode-p 'org-mode)
+    (user-error "Not an Org buffer"))
+  (require 'ox-odt)
+  (let ((org-odt-preferred-output-format "docx"))
+    (org-odt-export-to-odt nil (and arg t))))
+
+(global-set-key (kbd "C-c X") #'my/org-export-docx)

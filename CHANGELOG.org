@@ -12,6 +12,18 @@ This document contains the release notes for Emacs-enhanced
 
 ** <2026-11-19>
 
+Rebind the autosuggest toggle
+
+- Moved =my/toggle-autosuggest= from =C-c x= to =C-c S=, freeing =C-c x=.  =C-c X= remains the one-step DOCX export.
+
+** <2026-11-19>
+
+Add a one-step Org to DOCX export
+
+- Added =my/org-export-docx= on =C-c X=.  It binds =org-odt-preferred-output-format= to ="docx"= and calls =org-odt-export-to-odt=, so Org produces the ODT and LibreOffice converts it to DOCX in one command; =C-u= exports the current subtree.  The ODT intermediate is left beside the DOCX.
+
+** <2026-11-19>
+
 Replace the notes capture template with find-file
 
 - Removed the =C-c c n= Note entry from =org-capture-templates=.
