@@ -10,6 +10,12 @@ This document contains the release notes for Emacs-enhanced
 
 * Versions
 
+** <2026-11-19>
+
+Add GitHub release management from Emacs-vanilla
+
+- Moved the =gh-release-core= block wholesale: =my/gh-release-list=, =-create=, =-view=, =-browse=, =-edit=, =-delete= and =-download=, the =my/gh-release-mode= list buffer and keymap, and the =C-c G= menu.  It shells out to the external =gh= CLI, so it belongs here rather than in =Emacs-vanilla=; all key bindings are unchanged.
+
 ** <2026-10-21>
 
 Added =my/consult-font=, a DIY replacement for a consult-style font picker with live preview (bound to =M-8=).  The current family is marked with =*= and each candidate carries a sample rendered in its own typeface.  Only the family changes, so the existing height and frame geometry are preserved; the choice applies to all existing and future frames.  On =C-g= the previous font is restored.  With =C-u= only monospaced families are offered, and that filtered list is cached for the session.  Monospaced picks also update =fixed-pitch=, while proportional picks update =variable-pitch=, keeping Org code blocks and prose consistent with the new family.
