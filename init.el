@@ -1275,7 +1275,7 @@ generate from the current source selection."
       ("ci" "clean image dirs"     my/media-clean-images)
       ("ct" "clean tagged dir"     my/media-clean-tagged)
       ("ca" "clean all"            my/media-clean-all)
-      ("vp" "verify photos"        my/media-verify-photos)
+      ("V"  "verify photos"        my/media-verify-photos)
       ("r"  "regenerate"           my/media-regenerate-thumbnails)]
      ["Web Publishing"
       ("wu" "web update site…"     (lambda (site)
