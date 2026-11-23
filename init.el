@@ -1222,6 +1222,13 @@ Each row is a list (ITEM STATUS TARGET SOLD)."
   (interactive)
   (my/media-run "images.sh"))
 
+(defun my/media-verify-photos ()
+  "Verify generated photos against the NAS source tree.
+Reports missing outputs and any files that images.sh would not
+generate from the current source selection."
+  (interactive)
+  (my/media-run "verify_photos.sh"))
+
 (defun my/media-process-videos ()
   "Resize videos from ~/nas/Photos to ~/DCIM/Videos."
   (interactive)
@@ -1268,6 +1275,7 @@ Each row is a list (ITEM STATUS TARGET SOLD)."
       ("ci" "clean image dirs"     my/media-clean-images)
       ("ct" "clean tagged dir"     my/media-clean-tagged)
       ("ca" "clean all"            my/media-clean-all)
+      ("vp" "verify photos"        my/media-verify-photos)
       ("r"  "regenerate"           my/media-regenerate-thumbnails)]
      ["Web Publishing"
       ("wu" "web update site…"     (lambda (site)

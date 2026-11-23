@@ -1642,6 +1642,8 @@ Each row is a list (ITEM STATUS TARGET SOLD)."
 
 Personal media tagging, resizing, NAS sync, cleanup, and web-publishing helpers.  The menu is a =transient= (built in on Emacs 28+), and the commands run through the built-in `async-shell-command`; no external Emacs packages are required.
 
+`images.sh` runs `verify_photos.sh` automatically after processing photos.  The verifier mirrors its source selection and reports missing generated files; =vp= in the media menu runs the same check manually.  It also lists generated files that have no matching source image.
+
 #+begin_src elisp
 ;;
 ;; -> media-management
@@ -1667,6 +1669,13 @@ Personal media tagging, resizing, NAS sync, cleanup, and web-publishing helpers.
   "Interactive image resizer (art, scans, photos)."
   (interactive)
   (my/media-run "images.sh"))
+
+(defun my/media-verify-photos ()
+  "Verify generated photos against the NAS source tree.
+Reports missing outputs and any files that images.sh would not
+generate from the current source selection."
+  (interactive)
+  (my/media-run "verify_photos.sh"))
 
 (defun my/media-process-videos ()
   "Resize videos from ~/nas/Photos to ~/DCIM/Videos."
@@ -1714,6 +1723,7 @@ Personal media tagging, resizing, NAS sync, cleanup, and web-publishing helpers.
       ("ci" "clean image dirs"     my/media-clean-images)
       ("ct" "clean tagged dir"     my/media-clean-tagged)
       ("ca" "clean all"            my/media-clean-all)
+      ("vp" "verify photos"        my/media-verify-photos)
       ("r"  "regenerate"           my/media-regenerate-thumbnails)]
      ["Web Publishing"
       ("wu" "web update site…"     (lambda (site)
